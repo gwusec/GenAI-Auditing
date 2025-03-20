@@ -1,9 +1,10 @@
 {
-    "name": "trails-chatbot-local-llm",
-    "version": "0.1.0",
+    "name": "trails-chatbot-wrapper",
+    "version": "1.0.0",
     "private": true,
     "dependencies": {
       "trails-ui-chatbot": "github:gwusec/TRAILS-Chatbot#main",
+      "@mlc-ai/web-llm": "^0.2.18",
       "axios": "^1.6.2",
       "cors": "^2.8.5",
       "express": "^4.18.2",
