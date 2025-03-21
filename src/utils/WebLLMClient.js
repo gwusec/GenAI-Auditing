@@ -1,4 +1,4 @@
-import { ChatModule } from '@mlc-ai/web-llm';
+import { Chat } from '@mlc-ai/web-llm';
 
 class WebLLMClient {
   constructor() {
@@ -32,8 +32,8 @@ class WebLLMClient {
         this.modelName = modelName;
         this.initialized = false;
 
-        // Create a new chat instance
-        this.chat = new ChatModule();
+        // Create a new chat instance - using Chat instead of ChatModule
+        this.chat = new Chat();
 
         // Configure the model options
         const modelOptions = {

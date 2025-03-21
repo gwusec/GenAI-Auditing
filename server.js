@@ -9,27 +9,156 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+// Simple in-memory session store to keep track of user configurations
+const sessionStore = {
+  sessions: {},
+  
+  // Store a user's configuration
+  setUserConfig(userId, config) {
+    console.log(`SETTING USER CONFIG for ${userId}:`, config);
+    this.sessions[userId] = {
+      ...config,
+      lastUpdated: new Date()
+    };
+    return true;
+  },
+  
+  // Get a user's configuration
+  getUserConfig(userId) {
+    const config = this.sessions[userId];
+    if (config) {
+      console.log(`RETRIEVED USER CONFIG for ${userId}:`, config);
+    } else {
+      console.log(`NO CONFIG FOUND for ${userId}`);
+    }
+    return config;
+  },
+  
+  // Clean up old sessions (can be called periodically)
+  cleanup() {
+    const now = new Date();
+    const expireTime = 24 * 60 * 60 * 1000; // 24 hours
+    
+    Object.keys(this.sessions).forEach(userId => {
+      const session = this.sessions[userId];
+      if (now - session.lastUpdated > expireTime) {
+        delete this.sessions[userId];
+      }
+    });
+  }
+};
+
 // Enable CORS
 app.use(cors());
 
 // Parse JSON request bodies
 app.use(express.json());
 
-// API endpoint for Ollama chat
+// Enhanced request logging middleware
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  const originalSend = res.send;
+  
+  // Pretty formatting for the method + URL in logs
+  const methodColor = '\x1b[36m'; // Cyan
+  const resetColor = '\x1b[0m';
+  console.log(`${methodColor}${req.method} ${req.url}${resetColor}`);
+  
+  // Add header logging for important requests
+  if (req.url === '/chat') {
+    console.log('REQUEST HEADERS:', {
+      'x-api-provider': req.headers['x-api-provider'],
+      'x-api-model': req.headers['x-api-model'],
+      'x-api-base-url': req.headers['x-api-base-url'],
+      // Only show the last 4 chars of API key for security
+      'x-api-key': req.headers['x-api-key'] ? 
+        '***' + req.headers['x-api-key'].slice(-4) : undefined,
+      'x-ollama-url': req.headers['x-ollama-url'],
+      'x-ollama-model': req.headers['x-ollama-model']
+    });
+  }
+  
+  // Add response logging
+  res.send = function(body) {
+    const duration = Date.now() - startTime;
+    console.log(`Response sent in ${duration}ms - Status: ${res.statusCode}`);
+    return originalSend.call(this, body);
+  };
+  
+  next();
+});
+
+// Endpoint to save user configuration
+app.post('/api/set-config', (req, res) => {
+  const { userId, backend, config } = req.body;
+  
+  if (!userId || !backend || !config) {
+    return res.status(400).json({ 
+      error: 'Missing required parameters' 
+    });
+  }
+  
+  console.log(`RECEIVED CONFIG UPDATE for user ${userId}`);
+  console.log(`BACKEND: ${backend}`);
+  console.log('CONFIG:', config);
+  
+  // Store the configuration
+  sessionStore.setUserConfig(userId, { backend, config });
+  
+  res.json({ success: true });
+});
+
+// IMPORTANT: This is the main chat endpoint that TRAILS-Chatbot uses
 app.post('/chat', async (req, res) => {
   try {
     // Extract the relevant information from the request
-    const { pid, messages } = req.body;
+    const { pid: userId, messages } = req.body;
+    console.log(`CHAT REQUEST - User ID: ${userId}, Messages: ${messages?.length || 0}`);
     
-    // Get Ollama URL from request header or use default
-    const ollamaUrl = req.headers['x-ollama-url'] || 'http://localhost:11434';
+    // Get the user's configuration from the session store
+    const userConfig = sessionStore.getUserConfig(userId);
     
-    // Get Ollama model from request or use default
-    const ollamaModel = req.headers['x-ollama-model'] || 'llama3';
+    // Check if we have API configuration in the headers (legacy support)
+    const apiProvider = req.headers['x-api-provider'];
+    const apiKey = req.headers['x-api-key'];
+    const apiModel = req.headers['x-api-model'];
+    const apiBaseUrl = req.headers['x-api-base-url'];
     
-    console.log(`Proxying request to Ollama (${ollamaUrl})`);
-    console.log(`Using model: ${ollamaModel}`);
-    console.log(`Message count: ${messages?.length || 0}`);
+    // Use the session store config if available, otherwise fall back to headers
+    if (userConfig && userConfig.backend === 'api') {
+      console.log(`USING STORED CONFIG: Backend ${userConfig.backend}, Provider ${userConfig.config.provider}`);
+      
+      // Get the API config from the session store
+      const apiConfig = userConfig.config;
+      
+      return handleApiProviderRequest(req, res, 
+        apiConfig.provider, 
+        apiConfig.apiKey, 
+        apiConfig.model, 
+        apiConfig.baseUrl
+      );
+    } else if (apiProvider && apiKey) {
+      console.log(`USING HEADER CONFIG: Provider ${apiProvider}`);
+      return handleApiProviderRequest(req, res, apiProvider, apiKey, apiModel, apiBaseUrl);
+    }
+    
+    // Otherwise, handle Ollama request
+    // If there's a stored config for Ollama, use that
+    let ollamaUrl = 'http://localhost:11434';
+    let ollamaModel = 'llama3';
+    
+    if (userConfig && userConfig.backend === 'ollama') {
+      ollamaUrl = userConfig.config.url || ollamaUrl;
+      ollamaModel = userConfig.config.model || ollamaModel;
+      console.log(`USING STORED OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+    } else {
+      // For backward compatibility, get from headers if available
+      ollamaUrl = req.headers['x-ollama-url'] || ollamaUrl;
+      ollamaModel = req.headers['x-ollama-model'] || ollamaModel;
+      console.log(`USING DEFAULT/HEADER OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+    }
+    
+    console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
     
     // Format messages for Ollama API
     const ollamaMessages = messages.map(msg => ({
@@ -45,38 +174,301 @@ app.post('/chat', async (req, res) => {
       });
     }
     
-    // Call Ollama API
-    const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
-      model: ollamaModel,
-      messages: ollamaMessages,
-      stream: false,
-      options: {
-        temperature: 0.7,
-        num_predict: 2000
-      }
-    });
+    try {
+      console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
+      // Call Ollama API
+      const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
+        model: ollamaModel,
+        messages: ollamaMessages,
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 2000
+        }
+      });
+      
+      console.log('RECEIVED RESPONSE FROM OLLAMA');
+      
+      // Format response to match what the TRAILS chatbot expects
+      const responseData = {
+        statusCode: 200,
+        body: {
+          message: {
+            role: 'assistant',
+            content: ollamaResponse.data.message.content
+          },
+          finish_reason: 'stop'
+        }
+      };
+      
+      console.log('RETURNING RESPONSE TO CLIENT');
+      res.json(responseData);
+    } catch (error) {
+      console.error('Error calling Ollama API:', error.message);
+      console.error('Error details:', error.response?.data || 'No response data');
+      
+      // Send error response
+      res.status(500).json({
+        statusCode: 500,
+        error: `Failed to get response from Ollama: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'Sorry, I encountered an error when trying to communicate with the LLM. Please make sure Ollama is running and try again.'
+          },
+          finish_reason: 'error'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error processing chat request:', error.message);
     
-    // Format response to match what the TRAILS chatbot expects
+    // Send error response
+    res.status(500).json({
+      statusCode: 500,
+      error: `Failed to process request: ${error.message}`
+    });
+  }
+});
+
+// Handler for API provider requests
+async function handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl) {
+  const { messages } = req.body;
+  
+  try {
+    console.log(`PROCESSING ${provider.toUpperCase()} API REQUEST - Model: ${model}`);
+    
+    // Format messages according to provider requirements
+    const formattedMessages = formatMessagesForProvider(messages, provider);
+    
+    // Prepare headers for the API request
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Set provider-specific headers
+    switch (provider) {
+      case 'openai':
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'anthropic':
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        break;
+      case 'cohere':
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'gemini':
+        // Google uses API key as a query parameter, not a header
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Prepare the request body based on the provider
+    let requestBody;
+    let apiEndpoint;
+    
+    switch (provider) {
+      case 'openai':
+        apiEndpoint = `${baseUrl}/chat/completions`;
+        requestBody = {
+          model: model,
+          messages: formattedMessages,
+          temperature: 0.7,
+          max_tokens: 2000
+        };
+        break;
+      case 'anthropic':
+        apiEndpoint = `${baseUrl}/messages`;
+        requestBody = {
+          model: model,
+          messages: formattedMessages,
+          max_tokens: 2000,
+          temperature: 0.7
+        };
+        break;
+      case 'cohere':
+        apiEndpoint = `${baseUrl}/chat`;
+        requestBody = {
+          model: model,
+          message: formattedMessages[formattedMessages.length - 1].content,
+          chat_history: formattedMessages.slice(0, -1).map(msg => ({
+            role: msg.role,
+            message: msg.content
+          })),
+          temperature: 0.7,
+          max_tokens: 2000
+        };
+        break;
+      case 'gemini':
+        // For Gemini, API key is in the URL as a parameter
+        apiEndpoint = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`;
+        requestBody = {
+          contents: formattedMessages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+          })),
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2000
+          }
+        };
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    console.log(`SENDING REQUEST TO ${provider.toUpperCase()} API at ${apiEndpoint}`);
+    
+    // Make the API request
+    const apiResponse = await axios.post(apiEndpoint, requestBody, { headers });
+    
+    console.log(`RECEIVED RESPONSE FROM ${provider.toUpperCase()} API`);
+    
+    // Extract and format the response based on provider
+    let assistantResponse;
+    switch (provider) {
+      case 'openai':
+        assistantResponse = apiResponse.data.choices[0].message.content;
+        break;
+      case 'anthropic':
+        assistantResponse = apiResponse.data.content[0].text;
+        break;
+      case 'cohere':
+        assistantResponse = apiResponse.data.text;
+        break;
+      case 'gemini':
+        assistantResponse = apiResponse.data.candidates[0].content.parts[0].text;
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Format response for the TRAILS chatbot
     const responseData = {
       statusCode: 200,
       body: {
         message: {
           role: 'assistant',
-          content: ollamaResponse.data.message.content
+          content: assistantResponse
         },
         finish_reason: 'stop'
       }
     };
     
+    console.log('RETURNING API RESPONSE TO CLIENT');
     res.json(responseData);
   } catch (error) {
-    console.error('Error proxying to Ollama:', error.message);
+    console.error(`Error processing ${provider} API request:`, error.message);
+    console.error(error.response?.data || 'No response data');
     
-    // Send error response
     res.status(500).json({
       statusCode: 500,
-      error: `Failed to get response from LLM: ${error.message}`
+      error: `API error: ${error.message}`,
+      body: {
+        message: {
+          role: 'assistant',
+          content: `I encountered an error when trying to communicate with ${provider}. Please check your API key and settings.`
+        },
+        finish_reason: 'error'
+      }
     });
+  }
+}
+
+// Format messages for different providers
+function formatMessagesForProvider(messages, provider) {
+  // Clone messages to avoid modifying the original
+  const formattedMessages = JSON.parse(JSON.stringify(messages));
+  
+  // Make sure we have a system message
+  const hasSystemMessage = formattedMessages.some(msg => msg.role === 'system');
+  
+  if (!hasSystemMessage) {
+    formattedMessages.unshift({
+      role: 'system',
+      content: 'You are a helpful assistant.'
+    });
+  }
+  
+  console.log(`FORMATTING MESSAGES FOR ${provider.toUpperCase()}`);
+  
+  // Provider-specific formatting
+  switch (provider) {
+    case 'anthropic':
+      // Claude requires 'user' and 'assistant' roles, 'system' remains the same
+      return formattedMessages;
+      
+    case 'gemini':
+      // Gemini uses 'user' and 'model' roles
+      return formattedMessages.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : msg.role,
+        content: msg.content
+      }));
+      
+    case 'cohere':
+      // Cohere has a different structure we'll handle in the API call
+      return formattedMessages;
+      
+    case 'openai':
+    default:
+      // OpenAI format is our default
+      return formattedMessages;
+  }
+}
+
+// API endpoint to test API keys
+app.post('/api/test-api-key', async (req, res) => {
+  const { provider, apiKey, model, baseUrl } = req.body;
+  
+  if (!provider || !apiKey) {
+    return res.status(400).json({ error: 'Provider and API key are required' });
+  }
+  
+  console.log(`TESTING API KEY FOR ${provider.toUpperCase()} - Model: ${model}`);
+  
+  try {
+    // Create test request based on provider
+    let testEndpoint;
+    const headers = { 'Content-Type': 'application/json' };
+    
+    switch (provider) {
+      case 'openai':
+        testEndpoint = `${baseUrl}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'anthropic':
+        testEndpoint = `${baseUrl}/models`;
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        break;
+      case 'cohere':
+        testEndpoint = `${baseUrl}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'gemini':
+        testEndpoint = `${baseUrl}/models?key=${apiKey}`;
+        break;
+      default:
+        return res.status(400).json({ error: 'Unsupported provider' });
+    }
+    
+    console.log(`SENDING TEST REQUEST TO ${testEndpoint}`);
+    
+    // Make test request
+    const response = await axios.get(testEndpoint, { headers });
+    
+    if (response.status === 200) {
+      console.log(`API KEY TEST SUCCESSFUL FOR ${provider.toUpperCase()}`);
+      res.json({ success: true });
+    } else {
+      console.log(`API KEY TEST FAILED FOR ${provider.toUpperCase()} - Status: ${response.status}`);
+      res.status(response.status).json({ error: 'API key validation failed' });
+    }
+  } catch (error) {
+    console.error(`Error testing ${provider} API key:`, error.message);
+    res.status(500).json({ error: error.response?.data?.error || error.message });
   }
 });
 
@@ -116,6 +508,15 @@ app.use('/api/ollama', createProxyMiddleware({
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
+
+// Clean up old sessions periodically
+setInterval(() => {
+  try {
+    sessionStore.cleanup();
+  } catch (error) {
+    console.error('Error cleaning up session store:', error);
+  }
+}, 3600000); // Once per hour
 
 // In development mode, don't try to serve the static build files
 if (!isDevelopment) {

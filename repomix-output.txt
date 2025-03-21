@@ -1,0 +1,3119 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+================================================================
+File Summary
+================================================================
+
+Purpose:
+--------
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+
+File Format:
+------------
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Multiple file entries, each consisting of:
+  a. A separator line (================)
+  b. The file path (File: path/to/file)
+  c. Another separator line
+  d. The full contents of the file
+  e. A blank line
+
+Usage Guidelines:
+-----------------
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+Notes:
+------
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+
+Additional Info:
+----------------
+
+================================================================
+Directory Structure
+================================================================
+public/
+  index.html
+  manifest.json
+  robots.txt
+src/
+  components/
+    adapters/
+      APIAdapter.js
+      ProxyAdapter.js
+      WebLLMAdapter.js
+    APIKeySetup.css
+    APIKeySetup.jsx
+    LLMSelector.css
+    LLMSelector.jsx
+    OllamaSetup.css
+    OllamaSetup.jsx
+    WebLLMSetup.css
+    WebLLMSetup.jsx
+  utils/
+    WebLLMClient.js
+  App.css
+  App.jsx
+  index.css
+  index.js
+.babelrc
+.gitignore
+config-overrides.js
+package.json
+README.md
+server.js
+
+================================================================
+Files
+================================================================
+
+================
+File: src/components/adapters/APIAdapter.js
+================
+/**
+ * Adapter to handle API-based LLM providers like OpenAI, Anthropic, etc.
+ */
+class APIAdapter {
+    constructor() {
+      this.apiKey = null;
+      this.provider = null;
+      this.model = null;
+      this.baseUrl = null;
+    }
+  
+    /**
+     * Initialize the API adapter
+     * @param {Object} config - Configuration object
+     * @param {string} config.provider - API provider (openai, anthropic, etc.)
+     * @param {string} config.apiKey - API key
+     * @param {string} config.model - Model to use
+     * @param {string} config.baseUrl - Base URL for API (can be custom for proxies)
+     * @returns {boolean} - Whether initialization was successful
+     */
+    initialize(config) {
+      try {
+        this.provider = config.provider;
+        this.apiKey = config.apiKey;
+        this.model = config.model;
+        this.baseUrl = config.baseUrl;
+        
+        if (!this.apiKey || !this.provider || !this.model) {
+          throw new Error('Missing required configuration');
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('Error initializing API adapter:', error);
+        return false;
+      }
+    }
+  
+    /**
+     * Verify API key is valid
+     * @returns {Promise<boolean>} - Whether the key is valid
+     */
+    async verifyApiKey() {
+      try {
+        const response = await fetch('/api/test-api-key', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            provider: this.provider,
+            apiKey: this.apiKey,
+            model: this.model,
+            baseUrl: this.baseUrl
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API key validation failed: ${response.statusText}`);
+        }
+        
+        return true;
+      } catch (error) {
+        console.error('API key verification failed:', error);
+        return false;
+      }
+    }
+  
+    /**
+     * Process a chat message using the appropriate API
+     * @param {Object} requestData - Chat request data from TRAILS-Chatbot
+     * @returns {Promise<Object>} - Formatted response for TRAILS-Chatbot
+     */
+    async processChat(requestData) {
+      try {
+        if (!this.apiKey || !this.provider || !this.model) {
+          throw new Error('API adapter not initialized properly');
+        }
+  
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': this.apiKey,
+            'X-API-Provider': this.provider,
+            'X-API-Model': this.model,
+            'X-API-Base-URL': this.baseUrl
+          },
+          body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'API request failed');
+        }
+        
+        return await response.json();
+      } catch (error) {
+        console.error('API processing error:', error);
+        
+        // Return error in the format expected by TRAILS-Chatbot
+        return {
+          statusCode: 500,
+          error: `API error: ${error.message}`,
+          body: {
+            message: {
+              role: 'assistant',
+              content: `I apologize, but I encountered an error when trying to communicate with ${this.provider}. Please check your API key and settings.`
+            },
+            finish_reason: 'error'
+          }
+        };
+      }
+    }
+  }
+  
+  // Create a singleton instance
+  const apiAdapter = new APIAdapter();
+  export default apiAdapter;
+
+================
+File: src/components/APIKeySetup.css
+================
+.api-key-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .api-key-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .provider-selection {
+    margin-bottom: 20px;
+  }
+  
+  .provider-selection label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .provider-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .provider-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 120px;
+    height: 100px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .provider-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #d0d0d0;
+  }
+  
+  .provider-option.selected {
+    border-color: #3498db;
+    background-color: #ebf5fb;
+  }
+  
+  .provider-logo {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  
+  .provider-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .provider-name {
+    font-size: 0.9rem;
+    text-align: center;
+    color: #333;
+  }
+  
+  .api-key-input {
+    display: flex;
+    align-items: center;
+  }
+  
+  .api-key-input input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px;
+    font-size: 1rem;
+    background-color: white;
+    font-family: monospace;
+  }
+  
+  .toggle-visibility {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-left: none;
+    padding: 10px 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+    transition: background-color 0.2s ease;
+  }
+  
+  .toggle-visibility:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .test-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+    margin-top: 24px;
+  }
+  
+  .test-button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .test-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  .api-test-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .test-result {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .test-result.success {
+    background-color: #d5f5e3;
+    color: #27ae60;
+    border: 1px solid #27ae60;
+  }
+  
+  .test-result.error {
+    background-color: #f5d5d5;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+  }
+  
+  .api-help {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #f0f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .api-help h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #2c3e50;
+  }
+  
+  .api-help ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  
+  .api-help li {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+  }
+  
+  .api-help a {
+    color: #3498db;
+    text-decoration: none;
+  }
+  
+  .api-help a:hover {
+    text-decoration: underline;
+  }
+
+================
+File: src/components/APIKeySetup.jsx
+================
+import React, { useState } from 'react';
+import './APIKeySetup.css';
+
+// List of available API providers
+const API_PROVIDERS = [
+  { id: 'openai', name: 'OpenAI', logo: '/openai-logo.png', fallbackLogo: 'https://openai.com/content/images/2022/05/openai-logo-1.svg' },
+  { id: 'anthropic', name: 'Anthropic', logo: '/anthropic-logo.png', fallbackLogo: 'https://assets-global.website-files.com/62a295c7120a7e4c6220712a/62a2b61930dc1b42a9ee1ad2_Logo%20Icon%20for%20Favicon.svg' },
+  { id: 'cohere', name: 'Cohere', logo: '/cohere-logo.png', fallbackLogo: 'https://cohere.com/favicon/favicon.ico' },
+  { id: 'gemini', name: 'Google Gemini', logo: '/gemini-logo.png', fallbackLogo: 'https://gemini.google.com/favicon.ico' }
+];
+
+// List of available models per provider
+const PROVIDER_MODELS = {
+  openai: [
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+    { id: 'gpt-4', name: 'GPT-4' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+  ],
+  anthropic: [
+    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+    { id: 'claude-2.1', name: 'Claude 2.1' }
+  ],
+  cohere: [
+    { id: 'command-r-plus', name: 'Command R+' },
+    { id: 'command-r', name: 'Command R' },
+    { id: 'command', name: 'Command' }
+  ],
+  gemini: [
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
+  ]
+};
+
+// API base URLs
+const API_BASE_URLS = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  cohere: 'https://api.cohere.ai/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta'
+};
+
+function APIKeySetup({ config, setConfig }) {
+  const [testStatus, setTestStatus] = useState(null);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  
+  // Handle form field changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    if (name === 'provider') {
+      // When provider changes, update the model to the first available model
+      const newProvider = value;
+      const firstModel = PROVIDER_MODELS[newProvider]?.[0]?.id || '';
+      const baseUrl = API_BASE_URLS[newProvider] || '';
+      
+      setConfig({
+        ...config,
+        provider: newProvider,
+        model: firstModel,
+        baseUrl: baseUrl
+      });
+    } else {
+      setConfig({
+        ...config,
+        [name]: value
+      });
+    }
+  };
+  
+  // Handle API key display toggle
+  const toggleKeyVisibility = () => {
+    setShowKey(!showKey);
+  };
+  
+  // Test the API key by making a simple request
+  const testApiKey = async () => {
+    setIsTestingKey(true);
+    setTestStatus(null);
+    
+    try {
+      const response = await fetch('/api/test-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          provider: config.provider,
+          apiKey: config.apiKey,
+          model: config.model,
+          baseUrl: config.baseUrl
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setTestStatus({ success: true, message: 'API key is valid!' });
+      } else {
+        setTestStatus({ success: false, message: `Error: ${data.error || 'Unknown error'}` });
+      }
+    } catch (error) {
+      setTestStatus({ success: false, message: `Error: ${error.message}` });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+  
+  return (
+    <div className="api-key-setup">
+      <h4>API Configuration</h4>
+      
+      <div className="provider-selection">
+        <label htmlFor="provider">Select API Provider:</label>
+        <div className="provider-options">
+          {API_PROVIDERS.map(provider => (
+            <div 
+              key={provider.id} 
+              className={`provider-option ${config.provider === provider.id ? 'selected' : ''}`}
+              onClick={() => handleChange({ target: { name: 'provider', value: provider.id } })}
+            >
+              <div className="provider-logo">
+                <img 
+                  src={provider.logo} 
+                  alt={provider.name} 
+                  onError={(e) => {e.target.src = provider.fallbackLogo}}
+                />
+              </div>
+              <div className="provider-name">{provider.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="apiKey">API Key:</label>
+          <div className="api-key-input">
+            <input
+              type={showKey ? "text" : "password"}
+              id="apiKey"
+              name="apiKey"
+              value={config.apiKey}
+              onChange={handleChange}
+              placeholder="Enter your API key"
+            />
+            <button 
+              type="button" 
+              className="toggle-visibility" 
+              onClick={toggleKeyVisibility}
+            >
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
+          <p className="field-hint">Your API key is stored locally in your browser</p>
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="model">Model:</label>
+          <select
+            id="model"
+            name="model"
+            value={config.model}
+            onChange={handleChange}
+          >
+            {PROVIDER_MODELS[config.provider]?.map(model => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+          <p className="field-hint">Select the model to use</p>
+        </div>
+      </div>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="baseUrl">API Base URL:</label>
+          <input
+            type="text"
+            id="baseUrl"
+            name="baseUrl"
+            value={config.baseUrl}
+            onChange={handleChange}
+            placeholder="https://api.example.com/v1"
+          />
+          <p className="field-hint">For API proxy or compatible services</p>
+        </div>
+        
+        <div className="form-group api-test-container">
+          <button 
+            onClick={testApiKey} 
+            disabled={isTestingKey || !config.apiKey} 
+            className="test-button"
+          >
+            {isTestingKey ? "Testing..." : "Test API Key"}
+          </button>
+          
+          {testStatus && (
+            <div className={`test-result ${testStatus.success ? 'success' : 'error'}`}>
+              {testStatus.message}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="api-help">
+        <h5>How to get an API key</h5>
+        <ul>
+          <li><strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from OpenAI</a></li>
+          <li><strong>Anthropic:</strong> <a href="https://console.anthropic.com/account/keys" target="_blank" rel="noopener noreferrer">Get API key from Anthropic</a></li>
+          <li><strong>Cohere:</strong> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from Cohere</a></li>
+          <li><strong>Google Gemini:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get API key from Google AI Studio</a></li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+export default APIKeySetup;
+
+================
+File: public/index.html
+================
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#3498db" />
+    <meta
+      name="description"
+      content="TRAILS Chatbot with multiple LLM backends"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>TRAILS Chatbot</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+
+================
+File: public/manifest.json
+================
+{
+    "short_name": "TRAILS Chatbot",
+    "name": "TRAILS Chatbot with Multiple LLM Options",
+    "icons": [
+      {
+        "src": "favicon.ico",
+        "sizes": "64x64 32x32 24x24 16x16",
+        "type": "image/x-icon"
+      },
+      {
+        "src": "logo192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "logo512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+      }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#3498db",
+    "background_color": "#ffffff"
+  }
+
+================
+File: public/robots.txt
+================
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+
+================
+File: src/components/adapters/ProxyAdapter.js
+================
+import axios from 'axios';
+
+/**
+ * Adapter to handle communication with the LLM proxy server
+ */
+class ProxyAdapter {
+  constructor() {
+    this.axiosInstance = null;
+    this.config = null;
+  }
+
+  /**
+   * Initialize the proxy adapter
+   * @param {Object} config - Configuration object
+   * @param {string} config.proxyUrl - URL of the proxy server
+   * @param {string} config.ollamaUrl - URL of the Ollama server
+   * @param {string} config.model - Model name to use
+   * @returns {boolean} - Whether initialization was successful
+   */
+  initialize(config) {
+    this.config = config;
+    
+    // Create axios instance
+    this.axiosInstance = axios.create({
+      baseURL: config.proxyUrl,
+      timeout: 60000, // 60 second timeout for LLM responses
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Ollama-Url': config.ollamaUrl || 'http://localhost:11434',
+        'X-Ollama-Model': config.model || 'llama3'
+      }
+    });
+    
+    return true;
+  }
+
+  /**
+   * Check if the proxy server is reachable
+   * @returns {Promise<boolean>} - Whether the server is reachable
+   */
+  async checkConnection() {
+    try {
+      await this.axiosInstance.get('/api/health', { timeout: 3000 });
+      return true;
+    } catch (error) {
+      console.error('Proxy server connection check failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Process a chat message using the proxy server
+   * @param {Object} requestData - Chat request data from TRAILS-Chatbot
+   * @returns {Promise<Object>} - Formatted response for TRAILS-Chatbot
+   */
+  async processChat(requestData) {
+    try {
+      if (!this.axiosInstance) {
+        throw new Error('Proxy adapter not initialized');
+      }
+
+      const response = await this.axiosInstance.post('/chat', requestData);
+      return response.data;
+    } catch (error) {
+      console.error('Proxy processing error:', error);
+      
+      // Return error in the format expected by TRAILS-Chatbot
+      return {
+        statusCode: error.response?.status || 500,
+        error: `Proxy error: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'I apologize, but I encountered an error while processing your request. Please check your server connection and try again.'
+          },
+          finish_reason: 'error'
+        }
+      };
+    }
+  }
+
+  /**
+   * Fetch available models from Ollama
+   * @returns {Promise<Array>} - Array of available models
+   */
+  async getAvailableModels() {
+    try {
+      if (!this.axiosInstance) {
+        throw new Error('Proxy adapter not initialized');
+      }
+
+      const response = await this.axiosInstance.get('/api/ollama/api/tags', {
+        timeout: 3000
+      });
+      
+      if (response.data && response.data.models) {
+        return response.data.models;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error fetching available models:', error);
+      return [];
+    }
+  }
+}
+
+// Create a singleton instance
+const proxyAdapter = new ProxyAdapter();
+export default proxyAdapter;
+
+================
+File: src/components/adapters/WebLLMAdapter.js
+================
+import webllmClient from '../../utils/WebLLMClient';
+
+/**
+ * Adapter to integrate WebLLM with the TRAILS-Chatbot
+ * Simulates API responses that the chatbot expects
+ */
+class WebLLMAdapter {
+  constructor() {
+    this.isInitialized = false;
+    this.currentModel = '';
+    this.quantized = true;
+    this.initPromise = null;
+  }
+
+  /**
+   * Initialize the WebLLM client
+   * @param {Object} config - Configuration object
+   * @param {string} config.model - Model name
+   * @param {boolean} config.quantized - Whether to use the quantized model
+   * @param {Function} config.onProgress - Progress callback
+   * @returns {Promise<boolean>} - Resolves when initialization is complete
+   */
+  async initialize(config) {
+    const { model, quantized = true, onProgress } = config;
+    
+    if (this.isInitialized && this.currentModel === model && this.quantized === quantized) {
+      return true;
+    }
+
+    // Check if browser supports WebGPU
+    if (!webllmClient.isWebGPUSupported()) {
+      throw new Error('Your browser does not support WebGPU, which is required for WebLLM');
+    }
+
+    this.initPromise = webllmClient.initialize(model, quantized, onProgress);
+    
+    try {
+      await this.initPromise;
+      this.isInitialized = true;
+      this.currentModel = model;
+      this.quantized = quantized;
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize WebLLM:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Process a chat message using WebLLM
+   * @param {Object} requestData - Chat request data from TRAILS-Chatbot
+   * @returns {Promise<Object>} - Formatted response for TRAILS-Chatbot
+   */
+  async processChat(requestData) {
+    try {
+      // Ensure WebLLM is initialized
+      if (!this.isInitialized) {
+        throw new Error('WebLLM is not initialized');
+      }
+
+      const { messages } = requestData;
+      
+      // Generate response using WebLLM
+      const response = await webllmClient.chat(messages);
+      
+      // Format the response to match what TRAILS-Chatbot expects
+      return {
+        statusCode: 200,
+        body: {
+          message: {
+            role: 'assistant',
+            content: response
+          },
+          finish_reason: 'stop'
+        }
+      };
+    } catch (error) {
+      console.error('WebLLM processing error:', error);
+      
+      // Return error in the format expected by TRAILS-Chatbot
+      return {
+        statusCode: 500,
+        error: `WebLLM error: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'I apologize, but I encountered an error while processing your request. Please try again or consider using a different model.'
+          },
+          finish_reason: 'error'
+        }
+      };
+    }
+  }
+
+  /**
+   * Clean up and unload model when no longer needed
+   */
+  async cleanup() {
+    if (this.isInitialized) {
+      await webllmClient.unload();
+      this.isInitialized = false;
+      this.currentModel = '';
+    }
+  }
+}
+
+// Create a singleton instance
+const webllmAdapter = new WebLLMAdapter();
+export default webllmAdapter;
+
+================
+File: src/components/LLMSelector.css
+================
+.llm-selector {
+  margin-bottom: 25px;
+}
+
+.llm-selector h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.backend-options {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.backend-option {
+  display: flex;
+  align-items: center;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  width: 300px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backend-option:hover {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+  transform: translateY(-2px);
+}
+
+.backend-option.selected {
+  border-color: #3498db;
+  background-color: #ebf5fb;
+}
+
+.backend-icon {
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+}
+
+.backend-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.backend-details {
+  flex: 1;
+}
+
+.backend-details h5 {
+  margin: 0 0 5px 0;
+  font-size: 1rem;
+}
+
+.backend-details p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.feature-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.feature-item {
+  background-color: #f0f4f8;
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #2c3e50;
+}
+
+.feature-icon {
+  font-size: 1.1rem;
+}
+
+.coming-soon {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.coming-soon p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .backend-option {
+    width: 100%;
+  }
+  
+  .feature-banner {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+================
+File: src/components/LLMSelector.jsx
+================
+import React from 'react';
+import './LLMSelector.css';
+
+function LLMSelector({ backend, setBackend }) {
+  return (
+    <div className="llm-selector">
+      <h4>Choose LLM Provider</h4>
+      
+      <div className="backend-options">
+        <div 
+          className={`backend-option ${backend === 'ollama' ? 'selected' : ''}`}
+          onClick={() => setBackend('ollama')}
+        >
+          <div className="backend-icon ollama-icon">
+            <img src="/ollama-logo.png" alt="Ollama" onError={(e) => e.target.src = "https://ollama.com/public/ollama.png"} />
+          </div>
+          <div className="backend-details">
+            <h5>Ollama</h5>
+            <p>Use locally hosted models via Ollama</p>
+          </div>
+        </div>
+        
+        <div 
+          className={`backend-option ${backend === 'webllm' ? 'selected' : ''}`}
+          onClick={() => setBackend('webllm')}
+        >
+          <div className="backend-icon webllm-icon">
+            <img src="/webllm-logo.png" alt="WebLLM" onError={(e) => e.target.src = "https://raw.githubusercontent.com/mlc-ai/web-llm/main/site/img/webllm-logo.png"} />
+          </div>
+          <div className="backend-details">
+            <h5>WebLLM</h5>
+            <p>Run LLMs directly in your browser</p>
+          </div>
+        </div>
+        
+        <div 
+          className={`backend-option ${backend === 'api' ? 'selected' : ''}`}
+          onClick={() => setBackend('api')}
+        >
+          <div className="backend-icon api-icon">
+            <img src="/api-logo.png" alt="API" onError={(e) => e.target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxwYXRoIGQ9Ik05LjA5IDlhMyAzIDAgMCAxIDUuODMgMWMwIDItMyAzLTMgM00xMiAxN2guMDEiLz48L3N2Zz4="} />
+          </div>
+          <div className="backend-details">
+            <h5>API Key</h5>
+            <p>Use commercial LLM APIs (OpenAI, Claude, etc.)</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="feature-banner">
+        <div className="feature-item">
+          <span className="feature-icon">🔒</span>
+          <span className="feature-text">API keys are stored locally in your browser</span>
+        </div>
+        <div className="feature-item">
+          <span className="feature-icon">🌐</span>
+          <span className="feature-text">Support for multiple API providers</span>
+        </div>
+        <div className="feature-item">
+          <span className="feature-icon">⚙️</span>
+          <span className="feature-text">Compatible with API proxies</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default LLMSelector;
+
+================
+File: src/components/OllamaSetup.css
+================
+.ollama-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .ollama-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .form-row {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+  }
+  
+  .form-group {
+    flex: 1;
+    min-width: 250px;
+  }
+  
+  .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    background-color: white;
+  }
+  
+  .form-group select {
+    cursor: pointer;
+  }
+  
+  .field-hint {
+    margin: 5px 0 0 0;
+    font-size: 0.8rem;
+    color: #777;
+  }
+  
+  .connection-status-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  
+  .connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .status-indicator {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .status-indicator.connected {
+    background-color: #2ecc71;
+    color: white;
+  }
+  
+  .status-indicator.disconnected {
+    background-color: #e74c3c;
+    color: white;
+  }
+  
+  .status-indicator.unknown,
+  .status-indicator.checking {
+    background-color: #f39c12;
+    color: white;
+  }
+  
+  .check-button {
+    background-color: #7f8c8d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+  }
+  
+  .check-button:hover {
+    background-color: #6d7b7c;
+  }
+  
+  .ollama-help {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f0f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .ollama-help h5 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #2c3e50;
+  }
+  
+  .ollama-help p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #34495e;
+  }
+  
+  .ollama-help a {
+    color: #3498db;
+    text-decoration: none;
+    margin: 0 5px;
+  }
+  
+  .ollama-help a:hover {
+    text-decoration: underline;
+  }
+  
+  .ollama-help code {
+    background-color: #e8f0fe;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 0.9rem;
+  }
+
+================
+File: src/components/OllamaSetup.jsx
+================
+import React, { useState, useEffect } from 'react';
+import './OllamaSetup.css';
+
+function OllamaSetup({ config, setConfig }) {
+  const [availableModels, setAvailableModels] = useState([]);
+  const [connectionStatus, setConnectionStatus] = useState('unknown');
+  
+  // Update the config when user changes input fields
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setConfig({
+      ...config,
+      [name]: value
+    });
+  };
+  
+  // Check connection to Ollama on mount and when URL changes
+  useEffect(() => {
+    checkOllamaConnection();
+  }, [config.url]);
+  
+  const checkOllamaConnection = async () => {
+    setConnectionStatus('checking');
+    try {
+      // First try a direct connection
+      let response = await fetch(`${config.url}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      
+      // If direct connection fails, try via proxy
+      if (!response.ok) {
+        response = await fetch(`${config.proxyUrl}/api/ollama/api/tags`, {
+          headers: { 'x-ollama-url': config.url },
+          signal: AbortSignal.timeout(2000)
+        });
+      }
+      
+      if (!response.ok) {
+        throw new Error('Failed to connect to Ollama');
+      }
+      
+      const data = await response.json();
+      setConnectionStatus('connected');
+      
+      // Extract models from the response
+      if (data.models) {
+        setAvailableModels(data.models.map(model => ({
+          name: model.name,
+          value: model.name
+        })));
+      }
+    } catch (error) {
+      console.error('Error connecting to Ollama:', error);
+      setConnectionStatus('disconnected');
+      
+      // Set some default models when disconnected
+      setAvailableModels([
+        { name: 'llama3', value: 'llama3' },
+        { name: 'llama2', value: 'llama2' },
+        { name: 'gemma:2b', value: 'gemma:2b' },
+        { name: 'mistral', value: 'mistral' }
+      ]);
+    }
+  };
+  
+  return (
+    <div className="ollama-setup">
+      <h4>Ollama Configuration</h4>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="url">Ollama URL:</label>
+          <input
+            type="text"
+            id="url"
+            name="url"
+            value={config.url}
+            onChange={handleChange}
+            placeholder="http://localhost:11434"
+          />
+          <p className="field-hint">Local Ollama server URL</p>
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="proxyUrl">Proxy URL:</label>
+          <input
+            type="text"
+            id="proxyUrl"
+            name="proxyUrl"
+            value={config.proxyUrl}
+            onChange={handleChange}
+            placeholder="http://localhost:3000"
+          />
+          <p className="field-hint">Proxy server for API calls</p>
+        </div>
+      </div>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="model">Ollama Model:</label>
+          <select
+            id="model"
+            name="model"
+            value={config.model}
+            onChange={handleChange}
+          >
+            {availableModels.length > 0 ? (
+              availableModels.map(model => (
+                <option key={model.value} value={model.value}>
+                  {model.name}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="llama3">llama3</option>
+                <option value="llama2">llama2</option>
+                <option value="mistral">mistral</option>
+                <option value="gemma:2b">gemma:2b</option>
+              </>
+            )}
+          </select>
+          <p className="field-hint">Select an available model</p>
+        </div>
+        
+        <div className="form-group connection-status-container">
+          <div className="connection-status">
+            <span>Ollama Status:</span> 
+            <span className={`status-indicator ${connectionStatus}`}>
+              {connectionStatus === 'connected' ? 'Connected' : 
+               connectionStatus === 'disconnected' ? 'Not Connected' : 'Checking...'}
+            </span>
+          </div>
+          <button onClick={checkOllamaConnection} className="check-button">
+            Check Connection
+          </button>
+        </div>
+      </div>
+      
+      <div className="ollama-help">
+        <h5>Don't have Ollama installed?</h5>
+        <p>
+          Ollama lets you run LLMs locally. 
+          <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a> 
+          and run <code>ollama pull llama3</code> to get started.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default OllamaSetup;
+
+================
+File: src/components/WebLLMSetup.css
+================
+.webllm-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .webllm-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .info-box {
+    background-color: #e8f4fd;
+    border-left: 4px solid #3498db;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+  
+  .info-box p {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 0.9rem;
+  }
+  
+  .checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .checkbox-container input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+  }
+  
+  .model-preload {
+    margin: 25px 0;
+  }
+  
+  .preload-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+    width: 100%;
+  }
+  
+  .preload-button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .preload-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  .preload-button.loaded {
+    background-color: #27ae60;
+  }
+  
+  .progress-container {
+    margin-top: 10px;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+    height: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background-color: #3498db;
+    transition: width 0.2s ease;
+  }
+  
+  .progress-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2c3e50;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+  
+  .browser-compatibility {
+    background-color: #fef9e7;
+    border-left: 4px solid #f1c40f;
+    padding: 15px;
+    border-radius: 4px;
+  }
+  
+  .browser-compatibility h5 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #7d6608;
+  }
+  
+  .browser-compatibility p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #7d6608;
+  }
+
+================
+File: src/components/WebLLMSetup.jsx
+================
+import React, { useState } from 'react';
+import './WebLLMSetup.css';
+
+// Available models for WebLLM
+const AVAILABLE_MODELS = [
+  { name: 'Llama-3-8B-Instruct', value: 'Llama-3-8B-Instruct' },
+  { name: 'Gemma-2B-Instruct', value: 'Gemma-2B-Instruct' },
+  { name: 'Mistral-7B-Instruct', value: 'Mistral-7B-Instruct' },
+  { name: 'Phi-3-Mini-4K', value: 'Phi-3-Mini-4K' }
+];
+
+function WebLLMSetup({ config, setConfig }) {
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [modelLoaded, setModelLoaded] = useState(false);
+  
+  // Update the config when user changes input
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (name === 'quantized') {
+      setConfig({
+        ...config,
+        [name]: e.target.checked
+      });
+    } else {
+      setConfig({
+        ...config,
+        [name]: value
+      });
+    }
+  };
+  
+  // Simulate downloading the model
+  const preloadModel = () => {
+    setDownloading(true);
+    setDownloadProgress(0);
+    
+    // Simulate download progress
+    const interval = setInterval(() => {
+      setDownloadProgress(prev => {
+        const newProgress = prev + Math.random() * 10;
+        if (newProgress >= 100) {
+          clearInterval(interval);
+          setModelLoaded(true);
+          setDownloading(false);
+          return 100;
+        }
+        return newProgress;
+      });
+    }, 500);
+  };
+  
+  return (
+    <div className="webllm-setup">
+      <h4>WebLLM Configuration</h4>
+      
+      <div className="info-box">
+        <p>
+          WebLLM runs AI models directly in your browser. 
+          Models will be downloaded the first time you use them (~1-2GB).
+        </p>
+      </div>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="model">Choose Model:</label>
+          <select
+            id="model"
+            name="model"
+            value={config.model}
+            onChange={handleChange}
+          >
+            {AVAILABLE_MODELS.map(model => (
+              <option key={model.value} value={model.value}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+          <p className="field-hint">Select the model to run in browser</p>
+        </div>
+        
+        <div className="form-group">
+          <div className="checkbox-container">
+            <input
+              type="checkbox"
+              id="quantized"
+              name="quantized"
+              checked={config.quantized}
+              onChange={handleChange}
+            />
+            <label htmlFor="quantized">Use quantized model (smaller download)</label>
+          </div>
+          <p className="field-hint">Quantized models are smaller but slightly less accurate</p>
+        </div>
+      </div>
+      
+      <div className="model-preload">
+        <button 
+          onClick={preloadModel} 
+          disabled={downloading || modelLoaded}
+          className={`preload-button ${modelLoaded ? 'loaded' : ''}`}
+        >
+          {modelLoaded ? 'Model Ready!' : downloading ? 'Downloading...' : 'Pre-download Model'}
+        </button>
+        
+        {downloading && (
+          <div className="progress-container">
+            <div 
+              className="progress-bar" 
+              style={{ width: `${downloadProgress}%` }}
+            ></div>
+            <span className="progress-text">{Math.round(downloadProgress)}%</span>
+          </div>
+        )}
+      </div>
+      
+      <div className="browser-compatibility">
+        <h5>Browser Compatibility</h5>
+        <p>
+          WebLLM works best in Chrome and Edge. Firefox has limited WebGPU support.
+          Safari support is experimental.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default WebLLMSetup;
+
+================
+File: src/utils/WebLLMClient.js
+================
+import { ChatModule } from '@mlc-ai/web-llm';
+
+class WebLLMClient {
+  constructor() {
+    this.chat = null;
+    this.initialized = false;
+    this.modelName = '';
+    this.initializationPromise = null;
+  }
+
+  /**
+   * Initialize the WebLLM client with the specified model
+   * @param {string} modelName - Name of the model to use
+   * @param {boolean} quantized - Whether to use the quantized model version
+   * @param {Function} progressCallback - Optional callback for progress updates
+   */
+  async initialize(modelName, quantized = true, progressCallback = null) {
+    // If already initializing with the same model, return the existing promise
+    if (this.initializationPromise && this.modelName === modelName) {
+      return this.initializationPromise;
+    }
+
+    // Create a new initialization promise
+    this.initializationPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Clean up any existing instance
+        if (this.chat) {
+          await this.chat.unload();
+          this.chat = null;
+        }
+
+        this.modelName = modelName;
+        this.initialized = false;
+
+        // Create a new chat instance
+        this.chat = new ChatModule();
+
+        // Configure the model options
+        const modelOptions = {
+          // Prefer quantized models to save bandwidth, unless specifically requested otherwise
+          model: quantized ? `${modelName}-q4f32_1` : modelName
+        };
+
+        // Set up progress handling if a callback was provided
+        if (progressCallback && typeof progressCallback === 'function') {
+          this.chat.setInitProgressCallback((report) => {
+            const progress = {
+              progress: report.progress,
+              timeElapsed: report.timeElapsed,
+              text: `${report.text} (${Math.round(report.progress * 100)}%)`
+            };
+            progressCallback(progress);
+          });
+        }
+
+        // Initialize the model
+        await this.chat.reload(modelOptions);
+        this.initialized = true;
+        resolve(true);
+      } catch (error) {
+        console.error('WebLLM initialization error:', error);
+        reject(error);
+      }
+    });
+
+    return this.initializationPromise;
+  }
+
+  /**
+   * Generate a response for the given conversation
+   * @param {Array} messages - Array of message objects with role and content
+   * @returns {Promise<string>} - The generated response
+   */
+  async chat(messages) {
+    if (!this.initialized || !this.chat) {
+      throw new Error('WebLLM client not initialized');
+    }
+
+    // Format messages for WebLLM
+    let prompt = '';
+    
+    // Implement proper prompt formatting based on the model type
+    if (this.modelName.includes('Llama')) {
+      // Llama format
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<s>[INST] <<SYS>>\n${msg.content}\n<</SYS>>\n\n`;
+        } else if (msg.role === 'user') {
+          prompt += `${msg.content} [/INST]\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `${msg.content}</s>\n<s>[INST] `;
+        }
+      });
+      // Add final user instruction if the last message is from the user
+      if (messages[messages.length - 1].role === 'user') {
+        prompt += ' [/INST]\n';
+      }
+    } else if (this.modelName.includes('Gemma')) {
+      // Gemma format
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<start_of_turn>system\n${msg.content}<end_of_turn>\n`;
+        } else if (msg.role === 'user') {
+          prompt += `<start_of_turn>user\n${msg.content}<end_of_turn>\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `<start_of_turn>model\n${msg.content}<end_of_turn>\n`;
+        }
+      });
+      prompt += `<start_of_turn>model\n`;
+    } else {
+      // Generic format for other models (Mistral, etc.)
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<|im_start|>system\n${msg.content}<|im_end|>\n`;
+        } else if (msg.role === 'user') {
+          prompt += `<|im_start|>user\n${msg.content}<|im_end|>\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `<|im_start|>assistant\n${msg.content}<|im_end|>\n`;
+        }
+      });
+      prompt += `<|im_start|>assistant\n`;
+    }
+
+    try {
+      // Generate the response
+      const response = await this.chat.generate(prompt, {
+        temperature: 0.7,
+        max_gen_length: 2048
+      });
+
+      return response.trim();
+    } catch (error) {
+      console.error('WebLLM generation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if the browser supports WebGPU
+   * @returns {boolean} - True if WebGPU is supported
+   */
+  static isWebGPUSupported() {
+    return navigator && 'gpu' in navigator;
+  }
+
+  /**
+   * Unload the model and free resources
+   */
+  async unload() {
+    if (this.chat) {
+      await this.chat.unload();
+      this.chat = null;
+      this.initialized = false;
+    }
+  }
+}
+
+// Create a singleton instance
+const webllmClient = new WebLLMClient();
+export default webllmClient;
+
+================
+File: src/App.css
+================
+.app-container {
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: #f5f7f9;
+  }
+  
+  header {
+    background-color: #3498db;
+    color: white;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+  
+  .config-toggle {
+    background-color: #2980b9;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .config-toggle:hover {
+    background-color: #1c638e;
+    transform: translateY(-1px);
+  }
+  
+  .config-toggle:active {
+    transform: translateY(1px);
+  }
+  
+  .config-panel {
+    background-color: white;
+    padding: 25px;
+    border-bottom: 1px solid #ddd;
+    margin: 0 auto;
+    max-width: 1200px;
+    width: 100%;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  }
+  
+  .config-panel h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.5rem;
+    text-align: center;
+    position: relative;
+  }
+  
+  .config-panel h3::after {
+    content: '';
+    display: block;
+    width: 50px;
+    height: 3px;
+    background-color: #3498db;
+    margin: 8px auto 0;
+    border-radius: 3px;
+  }
+  
+  .save-button {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    margin: 20px auto 0;
+    display: block;
+    transition: all 0.2s ease;
+    font-weight: 500;
+  }
+  
+  .save-button:hover {
+    background-color: #219653;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .save-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .chatbot-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background-color: white;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+  }
+  
+  /* Make the TrailsChatbot component take full available space */
+  .chatbot-container > div {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .config-prompt {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    background-color: white;
+    border-radius: 8px;
+    margin: 50px auto;
+    padding: 40px;
+    max-width: 500px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  }
+  
+  .config-prompt p {
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    color: #555;
+  }
+  
+  .config-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    font-weight: 500;
+  }
+  
+  .config-button:hover {
+    background-color: #2980b9;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .config-button:active {
+    transform: translateY(1px);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .config-panel {
+      padding: 15px;
+    }
+    
+    .config-panel h3 {
+      font-size: 1.3rem;
+    }
+    
+    .save-button {
+      width: 100%;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    header {
+      flex-direction: column;
+      gap: 10px;
+      text-align: center;
+      padding: 10px;
+    }
+    
+    .config-toggle {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+================
+File: src/App.jsx
+================
+import React, { useState, useEffect } from 'react';
+import { App as TrailsChatbot } from 'trails-ui-chatbot';
+import LLMSelector from './components/LLMSelector';
+import OllamaSetup from './components/OllamaSetup';
+import WebLLMSetup from './components/WebLLMSetup';
+import APIKeySetup from './components/APIKeySetup';
+import './App.css';
+
+function App() {
+  // LLM backend configuration
+  const [backend, setBackend] = useState('ollama'); // 'ollama', 'webllm', 'api'
+  const [showConfig, setShowConfig] = useState(true);
+  const [configApplied, setConfigApplied] = useState(false);
+  
+  // Ollama config
+  const [ollamaConfig, setOllamaConfig] = useState({
+    url: 'http://localhost:11434',
+    model: 'llama3',
+    proxyUrl: 'http://localhost:3000'
+  });
+  
+  // WebLLM config
+  const [webLLMConfig, setWebLLMConfig] = useState({
+    model: 'Llama-3-8B-Instruct',
+    quantized: true
+  });
+  
+  // API config
+  const [apiConfig, setApiConfig] = useState({
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-3.5-turbo',
+    baseUrl: 'https://api.openai.com/v1'
+  });
+  
+  // User ID for the chatbot (normally would come from auth)
+  const [userId] = useState('user-' + Math.random().toString(36).substring(2, 9));
+  
+  // Load saved configuration on mount
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('llmConfig');
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig);
+      if (config.backend) {
+        setBackend(config.backend);
+      }
+      if (config.ollama) {
+        setOllamaConfig(config.ollama);
+      }
+      if (config.webllm) {
+        setWebLLMConfig(config.webllm);
+      }
+      if (config.api) {
+        setApiConfig(config.api);
+      }
+      
+      // Auto-apply saved config if it exists
+      setConfigApplied(true);
+      setShowConfig(false);
+    }
+  }, []);
+  
+  // Handle configuration save
+  const saveConfig = () => {
+    const config = {
+      backend,
+      ollama: ollamaConfig,
+      webllm: webLLMConfig,
+      api: apiConfig
+    };
+    localStorage.setItem('llmConfig', JSON.stringify(config));
+    setConfigApplied(true);
+    setShowConfig(false);
+  };
+  
+  // Handle audit completion event
+  const handleAuditFinished = (event) => {
+    console.log('Audit finished:', event.detail);
+    
+    // Display consent dialog for data collection (implementation placeholder)
+    const consentToShare = window.confirm(
+      "Would you be willing to share your audit data with the developers to improve the system? " +
+      "No personal information will be shared, only the conversation and audit responses."
+    );
+    
+    if (consentToShare) {
+      console.log("User consented to share data. This would send data to a server in a real implementation.");
+      // Here you would implement the data sharing functionality
+    } else {
+      console.log("User declined to share data.");
+    }
+  };
+  
+  // Set up event listener for audit completion
+  useEffect(() => {
+    document.addEventListener('trails-chatbot:audit-finished', handleAuditFinished);
+    return () => {
+      document.removeEventListener('trails-chatbot:audit-finished', handleAuditFinished);
+    };
+  }, []);
+  
+  // Get the proxy URL based on current backend
+  const getProxyUrl = () => {
+    if (backend === 'ollama') {
+      // Return the full proxy URL - IMPORTANT: no /api prefix for Ollama
+      return ollamaConfig.proxyUrl;
+    } else if (backend === 'api') {
+      // For API keys, return the absolute URL to our server
+      return 'http://localhost:3000';
+    }
+    // For WebLLM, return the absolute URL to our server
+    return 'http://localhost:3000';
+  };
+
+  return (
+    <div className="app-container">
+      <header>
+        <h1>TRAILS Chatbot</h1>
+        <button 
+          onClick={() => setShowConfig(!showConfig)} 
+          className="config-toggle"
+        >
+          {showConfig ? 'Hide' : 'Show'} Settings
+        </button>
+      </header>
+      
+      {showConfig && (
+        <div className="config-panel">
+          <h3>Chatbot Settings</h3>
+          
+          <LLMSelector 
+            backend={backend} 
+            setBackend={setBackend} 
+          />
+          
+          {backend === 'ollama' && (
+            <OllamaSetup 
+              config={ollamaConfig}
+              setConfig={setOllamaConfig}
+            />
+          )}
+          
+          {backend === 'webllm' && (
+            <WebLLMSetup 
+              config={webLLMConfig}
+              setConfig={setWebLLMConfig}
+            />
+          )}
+          
+          {backend === 'api' && (
+            <APIKeySetup 
+              config={apiConfig}
+              setConfig={setApiConfig}
+            />
+          )}
+          
+          <button onClick={saveConfig} className="save-button">
+            Save Configuration
+          </button>
+        </div>
+      )}
+      
+      {configApplied && (
+        <div className="chatbot-container">
+          <TrailsChatbot
+            userId={userId}
+            llmProxyServerUrl={getProxyUrl()}
+            debugMode={false}
+            config={{
+              timerMaxOverallChatTimeSeconds: 30 * 60, // 30 minutes total
+              timerChatsMaxSeconds: [7 * 60, 7 * 60],  // 7 minutes per chat
+              timerWarningChatTimeIsUpSeconds: 2 * 60,  // 2 min warning
+              timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60 // 3 min minimum
+            }}
+          />
+        </div>
+      )}
+      
+      {!configApplied && !showConfig && (
+        <div className="config-prompt">
+          <p>Please configure your LLM settings to continue.</p>
+          <button 
+            onClick={() => setShowConfig(true)} 
+            className="config-button"
+          >
+            Configure
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
+
+================
+File: src/index.css
+================
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    height: 100vh;
+    background-color: #f5f7f9;
+    overflow: hidden;
+  }
+  
+  #root {
+    height: 100vh;
+  }
+  
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+      monospace;
+  }
+  
+  /* Fix for the createRoot API usage in index.js */
+  #root > div {
+    height: 100%;
+  }
+
+================
+File: .babelrc
+================
+{
+    "presets": ["@babel/preset-env", "@babel/preset-react"],
+    "plugins": ["@babel/plugin-transform-runtime"],
+    "ignore": ["node_modules/(?!(trails-ui-chatbot)/)"]
+  }
+
+================
+File: .gitignore
+================
+node_modules
+
+================
+File: config-overrides.js
+================
+module.exports = function override(config, env) {
+    // Find the rule that handles JavaScript/JSX files
+    const babelLoader = config.module.rules.find(rule => 
+      rule.oneOf && rule.oneOf.find(oneOf => 
+        oneOf.loader && oneOf.loader.includes('babel-loader')
+      )
+    );
+  
+    if (babelLoader && babelLoader.oneOf) {
+      // Find the specific babel-loader rule
+      const jsRule = babelLoader.oneOf.find(rule => 
+        rule.loader && rule.loader.includes('babel-loader')
+      );
+  
+      if (jsRule) {
+        // Modify the include to also transpile trails-ui-chatbot
+        jsRule.include = undefined;
+        jsRule.exclude = /node_modules\/(?!(trails-ui-chatbot)\/).*/;
+      }
+    }
+  
+    return config;
+  };
+
+================
+File: src/index.js
+================
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+================
+File: package.json
+================
+{
+  "name": "trails-chatbot-wrapper",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "trails-ui-chatbot": "github:gwusec/TRAILS-Chatbot-Website#main",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/icons-material": "^6.3.1",
+    "@mui/material": "^6.3.1",
+    "@mlc-ai/web-llm": "^0.2.18",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "dexie": "^4.0.10",
+    "express": "^4.18.2",
+    "http-proxy-middleware": "^2.0.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.0.3",
+    "rehype-raw": "^7.0.0",
+    "remark-gfm": "^4.0.0",
+    "uuid": "^11.0.4",
+    "web-vitals": "^3.5.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.5",
+    "@babel/plugin-transform-runtime": "^7.22.5",
+    "@babel/preset-env": "^7.22.5",
+    "@babel/preset-react": "^7.22.5",
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@babel/plugin-transform-private-property-in-object": "^7.25.9",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0", 
+    "babel-loader": "^9.1.2",
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.0.1",
+    "react-app-rewired": "^2.2.1",
+    "react-scripts": "^5.0.1"
+  },
+  "scripts": {
+    "start": "PORT=3001 react-app-rewired start",
+    "build": "react-app-rewired build",
+    "test": "react-app-rewired test",
+    "eject": "react-scripts eject",
+    "server": "nodemon server.js",
+    "dev": "concurrently \"npm run server\" \"npm run start\"",
+    "prod": "node server.js"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "proxy": "http://localhost:3000"
+}
+
+================
+File: README.md
+================
+# TRAILS-Website
+
+A wrapper application for the TRAILS Chatbot that provides multiple LLM backend options.
+
+## 📋 Table of Contents
+
+- [Features](#features)
+- [System Architecture](#system-architecture)
+- [Directory Structure](#directory-structure)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Backend Options](#backend-options)
+- [Implementation Details](#implementation-details)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+## ✨ Features
+
+- Use the TRAILS Chatbot with multiple LLM backend options:
+  - **Ollama**: Run models locally through Ollama
+  - **WebLLM**: Run models directly in your browser
+  - *(Coming soon)* Support for API keys (OpenAI, Claude, Gemini)
+- Simple and intuitive user interface
+- Configurable settings for each backend
+- Persistent configuration
+
+## 🏗️ System Architecture
+
+### Component Diagram
+
+```mermaid
+graph TD
+    A[User Browser] --> B[React App]
+    B --> C[LLM Selector]
+    C -->|Select Ollama| D[Ollama Setup]
+    C -->|Select WebLLM| E[WebLLM Setup]
+    D --> F[Proxy Adapter]
+    E --> G[WebLLM Adapter]
+    F --> H[Express Server API]
+    G --> I[Browser WebLLM]
+    H --> J[Ollama]
+    I --> B
+    H --> B
+    K[TRAILS-Chatbot] --> B
+```
+
+### Data Flow Diagram
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant React as React App
+    participant ChatComp as TRAILS-Chatbot
+    participant Backend as LLM Backend
+    
+    User->>React: Configure LLM settings
+    React->>React: Save config to localStorage
+    User->>ChatComp: Send message
+    
+    alt Ollama Backend
+        ChatComp->>Backend: Send request to Proxy
+        Backend->>Ollama: Forward request
+        Ollama->>Backend: Return response
+        Backend->>ChatComp: Return formatted response
+    else WebLLM Backend
+        ChatComp->>Backend: Process in browser
+        Backend->>ChatComp: Return response
+    end
+    
+    ChatComp->>User: Display AI response
+```
+
+### Component Relationship Diagram
+
+```mermaid
+classDiagram
+    class App {
+        +state: backend
+        +state: showConfig
+        +state: configApplied
+        +state: ollamaConfig
+        +state: webLLMConfig
+        +state: userId
+        +saveConfig()
+        +handleAuditFinished()
+    }
+    
+    class LLMSelector {
+        +props: backend
+        +props: setBackend
+    }
+    
+    class OllamaSetup {
+        +props: config
+        +props: setConfig
+        +state: availableModels
+        +state: connectionStatus
+        +checkOllamaConnection()
+        +handleChange()
+    }
+    
+    class WebLLMSetup {
+        +props: config
+        +props: setConfig
+        +state: downloading
+        +state: downloadProgress
+        +state: modelLoaded
+        +preloadModel()
+        +handleChange()
+    }
+    
+    class ProxyAdapter {
+        +initialize()
+        +checkConnection()
+        +processChat()
+        +getAvailableModels()
+    }
+    
+    class WebLLMAdapter {
+        +initialize()
+        +processChat()
+        +cleanup()
+    }
+    
+    class WebLLMClient {
+        +initialize()
+        +chat()
+        +isWebGPUSupported()
+        +unload()
+    }
+    
+    class TrailsChatbot {
+        +props: userId
+        +props: llmProxyServerUrl
+        +props: debugMode
+        +props: config
+    }
+    
+    App --> LLMSelector
+    App --> OllamaSetup
+    App --> WebLLMSetup
+    App --> TrailsChatbot
+    OllamaSetup ..> ProxyAdapter
+    WebLLMSetup ..> WebLLMAdapter
+    WebLLMAdapter ..> WebLLMClient
+```
+
+## 📁 Directory Structure
+
+```
+TRAILS-Website/
+├── public/                          # Static files
+│   ├── index.html                   # HTML template
+│   ├── manifest.json                # Web app manifest
+│   ├── robots.txt                   # Robots file
+│   ├── favicon.ico                  # Website favicon
+│   ├── ollama-logo.png              # Ollama logo for UI
+│   └── webllm-logo.png              # WebLLM logo for UI
+│
+├── src/                             # Source code
+│   ├── components/                  # React components
+│   │   ├── adapters/                # LLM backend adapters
+│   │   │   ├── ProxyAdapter.js      # Adapter for proxy server
+│   │   │   └── WebLLMAdapter.js     # Adapter for WebLLM
+│   │   │
+│   │   ├── LLMSelector.jsx          # LLM selection component
+│   │   ├── LLMSelector.css          # Styles for LLM selector
+│   │   ├── OllamaSetup.jsx          # Ollama configuration component
+│   │   ├── OllamaSetup.css          # Styles for Ollama setup
+│   │   ├── WebLLMSetup.jsx          # WebLLM configuration component
+│   │   └── WebLLMSetup.css          # Styles for WebLLM setup
+│   │
+│   ├── utils/                       # Utility functions
+│   │   └── WebLLMClient.js          # WebLLM client utilities
+│   │
+│   ├── App.jsx                      # Main application component
+│   ├── App.css                      # Styles for main app
+│   ├── index.js                     # Application entry point
+│   └── index.css                    # Global styles
+│
+├── .babelrc                         # Babel configuration
+├── config-overrides.js              # React-app-rewired config
+├── server.js                        # Express server for API proxy
+├── package.json                     # Project dependencies and scripts
+└── README.md                        # Project documentation
+```
+
+## ✅ Prerequisites
+
+- [Node.js](https://nodejs.org/) (v16 or higher)
+- [npm](https://www.npmjs.com/) (v8 or higher)
+- **Important**: This project requires **React 19** due to the TRAILS-Chatbot dependency
+- For Ollama backend:
+  - [Ollama](https://ollama.ai/) installed and running
+  - LLM models pulled with Ollama (e.g., `ollama pull llama3`)
+
+## 🚀 Installation
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/your-username/TRAILS-Website.git
+   cd TRAILS-Website
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Add the favicon and logo files to the public directory:
+   ```bash
+   cd public
+   curl -o favicon.ico https://raw.githubusercontent.com/facebook/create-react-app/main/packages/cra-template/template/public/favicon.ico
+   curl -o ollama-logo.png https://ollama.com/public/ollama.png
+   curl -o webllm-logo.png https://raw.githubusercontent.com/mlc-ai/web-llm/main/site/img/webllm-logo.png
+   cd ..
+   ```
+
+## 🖥️ Usage
+
+### Development Mode
+
+Start both the React app and the proxy server:
+```bash
+npm run dev
+```
+
+The application will be available at:
+- React dev server: http://localhost:3001
+- API server: http://localhost:3000
+
+### Production Mode
+
+1. Build the React app:
+   ```bash
+   npm run build
+   ```
+
+2. Run the production server:
+   ```bash
+   npm run prod
+   ```
+
+The application will be available at http://localhost:3000.
+
+## 🔧 Backend Options
+
+### Ollama
+
+[Ollama](https://ollama.ai/) allows you to run large language models locally. The website communicates with Ollama through a proxy server.
+
+To use Ollama:
+1. [Install Ollama](https://ollama.ai/download)
+2. Pull your desired model: `ollama pull llama3`
+3. Run Ollama: `ollama serve`
+4. Configure the Ollama URL and model in the website settings
+
+### WebLLM
+
+[WebLLM](https://mlc.ai/web-llm/) runs models directly in your browser using WebGPU. The model will be downloaded the first time you use it.
+
+To use WebLLM:
+1. Make sure you're using a WebGPU-compatible browser (Chrome/Edge recommended)
+2. Select WebLLM in the website settings
+3. Choose your desired model
+4. Wait for the model to download
+
+## 📝 Implementation Details
+
+### Adapter Pattern
+
+The application uses the Adapter pattern to provide a consistent interface to different LLM backends:
+
+1. **ProxyAdapter**: Handles communication with the Express server, which forwards requests to Ollama
+2. **WebLLMAdapter**: Wraps the WebLLM client for browser-based inference
+
+### Configuration Management
+
+Settings are stored in the browser's localStorage, including:
+- Selected backend (Ollama/WebLLM)
+- Backend-specific configurations
+- Model selections
+
+### React 19 Compatibility
+
+The TRAILS-Chatbot component requires React 19, which is still in alpha/beta. The application is configured to use React 19 to ensure compatibility.
+
+## ❓ Troubleshooting
+
+### Common Issues
+
+1. **Port Conflicts**: If port 3000 or 3001 is already in use:
+   - Change the port in package.json scripts
+   - Update the proxy configuration accordingly
+
+2. **React Version Conflicts**: If you see useState or other React hooks errors:
+   - Ensure you're using React 19 as specified in package.json
+   - Run `npm install` to ensure all dependencies are correctly installed
+
+3. **Ollama Connection Issues**:
+   - Verify Ollama is running with `ollama serve`
+   - Check the Ollama URL in your settings
+   - Make sure you've pulled the model you're trying to use
+
+4. **WebLLM Browser Compatibility**:
+   - Ensure you're using a browser with WebGPU support (Chrome/Edge recommended)
+   - Check console for WebGPU-related errors
+
+### Debug Tips
+
+1. Check the browser console for errors
+2. Examine the server logs for API-related issues
+3. Use the network tab to inspect request/response patterns
+4. Try different models to isolate issues
+
+================
+File: server.js
+================
+const express = require('express');
+const path = require('path');
+const cors = require('cors');
+const fs = require('fs');
+const { createProxyMiddleware } = require('http-proxy-middleware');
+const axios = require('axios');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
+// Enable CORS
+app.use(cors());
+
+// Parse JSON request bodies
+app.use(express.json());
+
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// IMPORTANT: This is the main chat endpoint that TRAILS-Chatbot uses
+// It must be at /chat, not /api/chat
+app.post('/chat', async (req, res) => {
+  try {
+    // Extract the relevant information from the request
+    const { pid, messages } = req.body;
+    console.log(`Processing chat request for pid: ${pid}`);
+    console.log(`Messages count: ${messages?.length || 0}`);
+    
+    // Check if this is an API provider request
+    const apiProvider = req.headers['x-api-provider'];
+    const apiKey = req.headers['x-api-key'];
+    const apiModel = req.headers['x-api-model'];
+    const apiBaseUrl = req.headers['x-api-base-url'];
+    
+    if (apiProvider && apiKey) {
+      // Handle API provider request
+      return handleApiProviderRequest(req, res, apiProvider, apiKey, apiModel, apiBaseUrl);
+    }
+    
+    // Otherwise, handle Ollama request
+    // Get Ollama URL from request header or use default
+    const ollamaUrl = req.headers['x-ollama-url'] || 'http://localhost:11434';
+    
+    // Get Ollama model from request or use default
+    const ollamaModel = req.headers['x-ollama-model'] || 'llama3';
+    
+    console.log(`Proxying request to Ollama (${ollamaUrl})`);
+    console.log(`Using model: ${ollamaModel}`);
+    
+    // Format messages for Ollama API
+    const ollamaMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
+    
+    // Make sure we have a system message
+    if (!ollamaMessages.some(msg => msg.role === 'system')) {
+      ollamaMessages.unshift({
+        role: 'system',
+        content: 'You are a helpful assistant.'
+      });
+    }
+    
+    try {
+      // Call Ollama API
+      const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
+        model: ollamaModel,
+        messages: ollamaMessages,
+        stream: false,
+        options: {
+          temperature: 0.7,
+          num_predict: 2000
+        }
+      });
+      
+      // Format response to match what the TRAILS chatbot expects
+      const responseData = {
+        statusCode: 200,
+        body: {
+          message: {
+            role: 'assistant',
+            content: ollamaResponse.data.message.content
+          },
+          finish_reason: 'stop'
+        }
+      };
+      
+      res.json(responseData);
+    } catch (error) {
+      console.error('Error calling Ollama API:', error.message);
+      console.error('Error details:', error.response?.data || 'No response data');
+      
+      // Send error response
+      res.status(500).json({
+        statusCode: 500,
+        error: `Failed to get response from Ollama: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'Sorry, I encountered an error when trying to communicate with the LLM. Please make sure Ollama is running and try again.'
+          },
+          finish_reason: 'error'
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error processing chat request:', error.message);
+    
+    // Send error response
+    res.status(500).json({
+      statusCode: 500,
+      error: `Failed to process request: ${error.message}`
+    });
+  }
+});
+
+// Handler for API provider requests
+async function handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl) {
+  const { messages } = req.body;
+  
+  try {
+    console.log(`Processing ${provider} API request for model: ${model}`);
+    
+    // Format messages according to provider requirements
+    const formattedMessages = formatMessagesForProvider(messages, provider);
+    
+    // Prepare headers for the API request
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Set provider-specific headers
+    switch (provider) {
+      case 'openai':
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'anthropic':
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        break;
+      case 'cohere':
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'gemini':
+        // Google uses API key as a query parameter, not a header
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Prepare the request body based on the provider
+    let requestBody;
+    let apiEndpoint;
+    
+    switch (provider) {
+      case 'openai':
+        apiEndpoint = `${baseUrl}/chat/completions`;
+        requestBody = {
+          model: model,
+          messages: formattedMessages,
+          temperature: 0.7,
+          max_tokens: 2000
+        };
+        break;
+      case 'anthropic':
+        apiEndpoint = `${baseUrl}/messages`;
+        requestBody = {
+          model: model,
+          messages: formattedMessages,
+          max_tokens: 2000,
+          temperature: 0.7
+        };
+        break;
+      case 'cohere':
+        apiEndpoint = `${baseUrl}/chat`;
+        requestBody = {
+          model: model,
+          message: formattedMessages[formattedMessages.length - 1].content,
+          chat_history: formattedMessages.slice(0, -1).map(msg => ({
+            role: msg.role,
+            message: msg.content
+          })),
+          temperature: 0.7,
+          max_tokens: 2000
+        };
+        break;
+      case 'gemini':
+        // For Gemini, API key is in the URL as a parameter
+        apiEndpoint = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`;
+        requestBody = {
+          contents: formattedMessages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+          })),
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 2000
+          }
+        };
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Make the API request
+    const apiResponse = await axios.post(apiEndpoint, requestBody, { headers });
+    
+    // Extract and format the response based on provider
+    let assistantResponse;
+    switch (provider) {
+      case 'openai':
+        assistantResponse = apiResponse.data.choices[0].message.content;
+        break;
+      case 'anthropic':
+        assistantResponse = apiResponse.data.content[0].text;
+        break;
+      case 'cohere':
+        assistantResponse = apiResponse.data.text;
+        break;
+      case 'gemini':
+        assistantResponse = apiResponse.data.candidates[0].content.parts[0].text;
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
+    }
+    
+    // Format response for the TRAILS chatbot
+    const responseData = {
+      statusCode: 200,
+      body: {
+        message: {
+          role: 'assistant',
+          content: assistantResponse
+        },
+        finish_reason: 'stop'
+      }
+    };
+    
+    res.json(responseData);
+  } catch (error) {
+    console.error(`Error processing ${provider} API request:`, error.message);
+    console.error(error.response?.data || 'No response data');
+    
+    res.status(500).json({
+      statusCode: 500,
+      error: `API error: ${error.message}`,
+      body: {
+        message: {
+          role: 'assistant',
+          content: `I encountered an error when trying to communicate with ${provider}. Please check your API key and settings.`
+        },
+        finish_reason: 'error'
+      }
+    });
+  }
+}
+
+// Format messages for different providers
+function formatMessagesForProvider(messages, provider) {
+  // Clone messages to avoid modifying the original
+  const formattedMessages = JSON.parse(JSON.stringify(messages));
+  
+  // Make sure we have a system message
+  const hasSystemMessage = formattedMessages.some(msg => msg.role === 'system');
+  
+  if (!hasSystemMessage) {
+    formattedMessages.unshift({
+      role: 'system',
+      content: 'You are a helpful assistant.'
+    });
+  }
+  
+  // Provider-specific formatting
+  switch (provider) {
+    case 'anthropic':
+      // Claude requires 'user' and 'assistant' roles, 'system' remains the same
+      return formattedMessages;
+      
+    case 'gemini':
+      // Gemini uses 'user' and 'model' roles
+      return formattedMessages.map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : msg.role,
+        content: msg.content
+      }));
+      
+    case 'cohere':
+      // Cohere has a different structure we'll handle in the API call
+      return formattedMessages;
+      
+    case 'openai':
+    default:
+      // OpenAI format is our default
+      return formattedMessages;
+  }
+}
+
+// API endpoint to test API keys
+app.post('/api/test-api-key', async (req, res) => {
+  const { provider, apiKey, model, baseUrl } = req.body;
+  
+  if (!provider || !apiKey) {
+    return res.status(400).json({ error: 'Provider and API key are required' });
+  }
+  
+  try {
+    // Create test request based on provider
+    let testEndpoint;
+    const headers = { 'Content-Type': 'application/json' };
+    
+    switch (provider) {
+      case 'openai':
+        testEndpoint = `${baseUrl}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'anthropic':
+        testEndpoint = `${baseUrl}/models`;
+        headers['x-api-key'] = apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        break;
+      case 'cohere':
+        testEndpoint = `${baseUrl}/models`;
+        headers['Authorization'] = `Bearer ${apiKey}`;
+        break;
+      case 'gemini':
+        testEndpoint = `${baseUrl}/models?key=${apiKey}`;
+        break;
+      default:
+        return res.status(400).json({ error: 'Unsupported provider' });
+    }
+    
+    // Make test request
+    const response = await axios.get(testEndpoint, { headers });
+    
+    if (response.status === 200) {
+      res.json({ success: true });
+    } else {
+      res.status(response.status).json({ error: 'API key validation failed' });
+    }
+  } catch (error) {
+    console.error(`Error testing ${provider} API key:`, error.message);
+    res.status(500).json({ error: error.response?.data?.error || error.message });
+  }
+});
+
+// WebLLM API endpoint for client-side initialization
+app.get('/api/webllm/models', (req, res) => {
+  // Return a list of available WebLLM models
+  res.json({
+    models: [
+      { id: 'Llama-3-8B-Instruct', size: '4.1 GB', quantized_size: '2.2 GB' },
+      { id: 'Gemma-2B-Instruct', size: '2.5 GB', quantized_size: '1.3 GB' },
+      { id: 'Mistral-7B-Instruct', size: '4.5 GB', quantized_size: '2.4 GB' },
+      { id: 'Phi-3-Mini-4K', size: '2.0 GB', quantized_size: '1.1 GB' }
+    ]
+  });
+});
+
+// Create a proxy for the Ollama API for direct model queries
+app.use('/api/ollama', createProxyMiddleware({
+  target: 'http://localhost:11434',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api/ollama': ''
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    // If a custom Ollama URL was provided in headers, use that instead
+    const customOllamaUrl = req.headers['x-ollama-url'];
+    if (customOllamaUrl) {
+      // We'd need to cancel this proxy and create a new request
+      // This is complex with http-proxy-middleware, so we'll handle
+      // the case in the route handler if needed
+    }
+    console.log(`Proxying Ollama API request: ${req.method} ${req.path}`);
+  }
+}));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', version: '1.0.0' });
+});
+
+// In development mode, don't try to serve the static build files
+if (!isDevelopment) {
+  // Check if the build directory exists
+  const buildPath = path.join(__dirname, 'build');
+  if (fs.existsSync(buildPath)) {
+    // Serve static files from the React app
+    app.use(express.static(buildPath));
+    
+    // For any other GET request, send the React app
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(buildPath, 'index.html'));
+    });
+  } else {
+    console.warn('Warning: Build directory does not exist. Run npm run build first.');
+    
+    app.get('*', (req, res) => {
+      res.send('Server is running but the React app has not been built yet. Run npm run build first.');
+    });
+  }
+} else {
+  console.log('Running in development mode. Static files will be served by the React dev server.');
+  
+  // In development, any unknown routes should 404
+  app.get('*', (req, res) => {
+    res.status(404).send('Not found: This route is not handled by the API server in development mode.');
+  });
+}
+
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`API available at http://localhost:${PORT}`);
+  if (isDevelopment) {
+    console.log(`React app running at http://localhost:3001`);
+  } else {
+    console.log(`App available at http://localhost:${PORT}`);
+  }
+});
+
+
+
+================================================================
+End of Codebase
+================================================================

@@ -1,0 +1,186 @@
+.api-key-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .api-key-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .provider-selection {
+    margin-bottom: 20px;
+  }
+  
+  .provider-selection label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .provider-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .provider-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 120px;
+    height: 100px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .provider-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #d0d0d0;
+  }
+  
+  .provider-option.selected {
+    border-color: #3498db;
+    background-color: #ebf5fb;
+  }
+  
+  .provider-logo {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  
+  .provider-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .provider-name {
+    font-size: 0.9rem;
+    text-align: center;
+    color: #333;
+  }
+  
+  .api-key-input {
+    display: flex;
+    align-items: center;
+  }
+  
+  .api-key-input input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px;
+    font-size: 1rem;
+    background-color: white;
+    font-family: monospace;
+  }
+  
+  .toggle-visibility {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-left: none;
+    padding: 10px 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+    transition: background-color 0.2s ease;
+  }
+  
+  .toggle-visibility:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .test-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+    margin-top: 24px;
+  }
+  
+  .test-button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .test-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  .api-test-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .test-result {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .test-result.success {
+    background-color: #d5f5e3;
+    color: #27ae60;
+    border: 1px solid #27ae60;
+  }
+  
+  .test-result.error {
+    background-color: #f5d5d5;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+  }
+  
+  .api-help {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #f0f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .api-help h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #2c3e50;
+  }
+  
+  .api-help ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  
+  .api-help li {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+  }
+  
+  .api-help a {
+    color: #3498db;
+    text-decoration: none;
+  }
+  
+  .api-help a:hover {
+    text-decoration: underline;
+  }
