@@ -53,11 +53,16 @@ public/
 src/
   components/
     adapters/
+      AdapterFactory.js
+      AnthropicAdapter.js
       APIAdapter.js
+      OpenAIAdapter.js
       ProxyAdapter.js
       WebLLMAdapter.js
     APIKeySetup.css
     APIKeySetup.jsx
+    BackendStatus.jsx
+    ChatService.js
     LLMSelector.css
     LLMSelector.jsx
     OllamaSetup.css
@@ -82,10 +87,247 @@ Files
 ================================================================
 
 ================
+File: public/index.html
+================
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#3498db" />
+    <meta
+      name="description"
+      content="TRAILS Chatbot with multiple LLM backends"
+    />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>TRAILS Chatbot</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+
+================
+File: public/manifest.json
+================
+{
+    "short_name": "TRAILS Chatbot",
+    "name": "TRAILS Chatbot with Multiple LLM Options",
+    "icons": [
+      {
+        "src": "favicon.ico",
+        "sizes": "64x64 32x32 24x24 16x16",
+        "type": "image/x-icon"
+      },
+      {
+        "src": "logo192.png",
+        "type": "image/png",
+        "sizes": "192x192"
+      },
+      {
+        "src": "logo512.png",
+        "type": "image/png",
+        "sizes": "512x512"
+      }
+    ],
+    "start_url": ".",
+    "display": "standalone",
+    "theme_color": "#3498db",
+    "background_color": "#ffffff"
+  }
+
+================
+File: public/robots.txt
+================
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+
+================
+File: src/components/adapters/AdapterFactory.js
+================
+import ollmaAdapter from './ProxyAdapter'; // Rename for consistency
+import webllmAdapter from './WebLLMAdapter';
+import openaiAdapter from './OpenAIAdapter';
+import anthropicAdapter from './AnthropicAdapter';
+
+/**
+ * Factory for creating LLM adapters
+ */
+class AdapterFactory {
+  /**
+   * Get the appropriate adapter based on backend type and provider
+   * @param {string} backend - Backend type ('ollama', 'webllm', 'api')
+   * @param {string} provider - Provider name (for API backend)
+   * @returns {Object} - The appropriate adapter instance
+   */
+  static getAdapter(backend, provider = null) {
+    switch (backend) {
+      case 'ollama':
+        return ollmaAdapter;
+      
+      case 'webllm':
+        return webllmAdapter;
+      
+      case 'api':
+        return this.getApiAdapter(provider);
+      
+      default:
+        throw new Error(`Unsupported backend: ${backend}`);
+    }
+  }
+  
+  /**
+   * Get the appropriate API adapter based on provider
+   * @param {string} provider - Provider name
+   * @returns {Object} - The appropriate API adapter instance
+   */
+  static getApiAdapter(provider) {
+    switch (provider) {
+      case 'openai':
+        return openaiAdapter;
+      
+      case 'anthropic':
+        return anthropicAdapter;
+      
+      // Add additional providers here as they're implemented
+      
+      default:
+        throw new Error(`Unsupported API provider: ${provider}`);
+    }
+  }
+}
+
+export default AdapterFactory;
+
+================
+File: src/components/adapters/AnthropicAdapter.js
+================
+import APIAdapter from './APIAdapter';
+
+/**
+ * Adapter specifically for Anthropic Claude API
+ */
+class AnthropicAdapter extends APIAdapter {
+  constructor() {
+    super();
+    this.provider = 'anthropic';
+  }
+
+  /**
+   * Initialize the Anthropic adapter
+   * @param {Object} config - Configuration object
+   * @returns {boolean} - Whether initialization was successful
+   */
+  initialize(config) {
+    // Set default base URL if not provided
+    if (!config.baseUrl) {
+      config.baseUrl = 'https://api.anthropic.com/v1';
+    }
+    
+    // Set provider explicitly
+    config.provider = 'anthropic';
+    
+    return super.initialize(config);
+  }
+
+  /**
+   * Format messages for Anthropic API
+   * @param {Array} messages - Array of message objects
+   * @returns {Array} - Formatted messages for Anthropic
+   */
+  formatMessages(messages) {
+    messages = super.formatMessages(messages);
+    
+    // Claude uses 'user', 'assistant', and 'system' roles
+    // No additional transformation needed for now
+    
+    return messages;
+  }
+
+  /**
+   * Process the response from Anthropic API
+   * @param {Object} responseData - Raw response from API
+   * @returns {Object} - Formatted response for TRAILS-Chatbot
+   */
+  processResponse(responseData) {
+    if (!responseData.content || responseData.content.length === 0) {
+      throw new Error('Invalid response from Anthropic API');
+    }
+    
+    return {
+      statusCode: 200,
+      body: {
+        message: {
+          role: 'assistant',
+          content: responseData.content[0].text
+        },
+        finish_reason: responseData.stop_reason || 'stop'
+      }
+    };
+  }
+
+  /**
+   * Override processChat to add Anthropic-specific headers
+   * @param {Object} requestData - Chat request data from TRAILS-Chatbot
+   * @returns {Promise<Object>} - Formatted response for TRAILS-Chatbot
+   */
+  async processChat(requestData) {
+    try {
+      if (!this.apiKey || !this.provider || !this.model) {
+        throw new Error('API adapter not initialized properly');
+      }
+
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': this.apiKey,
+          'X-API-Provider': this.provider,
+          'X-API-Model': this.model,
+          'X-API-Base-URL': this.baseUrl,
+          'X-Anthropic-Version': '2023-06-01' // Anthropic-specific header
+        },
+        body: JSON.stringify(requestData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'API request failed');
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('API processing error:', error);
+      
+      // Return error in the format expected by TRAILS-Chatbot
+      return {
+        statusCode: 500,
+        error: `Anthropic API error: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: `I apologize, but I encountered an error when trying to communicate with Anthropic Claude. Please check your API key and settings.`
+          },
+          finish_reason: 'error'
+        }
+      };
+    }
+  }
+}
+
+// Create a singleton instance
+const anthropicAdapter = new AnthropicAdapter();
+export default anthropicAdapter;
+
+================
 File: src/components/adapters/APIAdapter.js
 ================
 /**
- * Adapter to handle API-based LLM providers like OpenAI, Anthropic, etc.
+ * Base adapter for API-based LLM providers
  */
 class APIAdapter {
     constructor() {
@@ -198,489 +440,98 @@ class APIAdapter {
         };
       }
     }
-  }
   
-  // Create a singleton instance
-  const apiAdapter = new APIAdapter();
-  export default apiAdapter;
-
-================
-File: src/components/APIKeySetup.css
-================
-.api-key-setup {
-    background-color: #f9f9f9;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-  }
-  
-  .api-key-setup h4 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    color: #333;
-    font-size: 1.1rem;
-  }
-  
-  .provider-selection {
-    margin-bottom: 20px;
-  }
-  
-  .provider-selection label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: 500;
-    color: #555;
-  }
-  
-  .provider-options {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-bottom: 15px;
-  }
-  
-  .provider-option {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 120px;
-    height: 100px;
-    padding: 15px;
-    border: 2px solid #e0e0e0;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  
-  .provider-option:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    border-color: #d0d0d0;
-  }
-  
-  .provider-option.selected {
-    border-color: #3498db;
-    background-color: #ebf5fb;
-  }
-  
-  .provider-logo {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 10px;
-  }
-  
-  .provider-logo img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-  }
-  
-  .provider-name {
-    font-size: 0.9rem;
-    text-align: center;
-    color: #333;
-  }
-  
-  .api-key-input {
-    display: flex;
-    align-items: center;
-  }
-  
-  .api-key-input input {
-    flex: 1;
-    padding: 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px 0 0 4px;
-    font-size: 1rem;
-    background-color: white;
-    font-family: monospace;
-  }
-  
-  .toggle-visibility {
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    border-left: none;
-    padding: 10px 15px;
-    border-radius: 0 4px 4px 0;
-    cursor: pointer;
-    font-size: 0.9rem;
-    color: #555;
-    transition: background-color 0.2s ease;
-  }
-  
-  .toggle-visibility:hover {
-    background-color: #e0e0e0;
-  }
-  
-  .test-button {
-    background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 10px 15px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background-color 0.2s ease;
-    margin-top: 24px;
-  }
-  
-  .test-button:hover:not(:disabled) {
-    background-color: #2980b9;
-  }
-  
-  .test-button:disabled {
-    background-color: #bdc3c7;
-    cursor: not-allowed;
-  }
-  
-  .api-test-container {
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .test-result {
-    margin-top: 10px;
-    padding: 10px;
-    border-radius: 4px;
-    font-size: 0.9rem;
-  }
-  
-  .test-result.success {
-    background-color: #d5f5e3;
-    color: #27ae60;
-    border: 1px solid #27ae60;
-  }
-  
-  .test-result.error {
-    background-color: #f5d5d5;
-    color: #e74c3c;
-    border: 1px solid #e74c3c;
-  }
-  
-  .api-help {
-    margin-top: 25px;
-    padding: 15px;
-    background-color: #f0f4f8;
-    border-radius: 6px;
-    border-left: 4px solid #3498db;
-  }
-  
-  .api-help h5 {
-    margin-top: 0;
-    margin-bottom: 10px;
-    color: #2c3e50;
-  }
-  
-  .api-help ul {
-    margin: 0;
-    padding-left: 20px;
-  }
-  
-  .api-help li {
-    margin-bottom: 5px;
-    font-size: 0.9rem;
-  }
-  
-  .api-help a {
-    color: #3498db;
-    text-decoration: none;
-  }
-  
-  .api-help a:hover {
-    text-decoration: underline;
-  }
-
-================
-File: src/components/APIKeySetup.jsx
-================
-import React, { useState } from 'react';
-import './APIKeySetup.css';
-
-// List of available API providers
-const API_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', logo: '/openai-logo.png', fallbackLogo: 'https://openai.com/content/images/2022/05/openai-logo-1.svg' },
-  { id: 'anthropic', name: 'Anthropic', logo: '/anthropic-logo.png', fallbackLogo: 'https://assets-global.website-files.com/62a295c7120a7e4c6220712a/62a2b61930dc1b42a9ee1ad2_Logo%20Icon%20for%20Favicon.svg' },
-  { id: 'cohere', name: 'Cohere', logo: '/cohere-logo.png', fallbackLogo: 'https://cohere.com/favicon/favicon.ico' },
-  { id: 'gemini', name: 'Google Gemini', logo: '/gemini-logo.png', fallbackLogo: 'https://gemini.google.com/favicon.ico' }
-];
-
-// List of available models per provider
-const PROVIDER_MODELS = {
-  openai: [
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'gpt-4', name: 'GPT-4' },
-    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-  ],
-  anthropic: [
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
-    { id: 'claude-2.1', name: 'Claude 2.1' }
-  ],
-  cohere: [
-    { id: 'command-r-plus', name: 'Command R+' },
-    { id: 'command-r', name: 'Command R' },
-    { id: 'command', name: 'Command' }
-  ],
-  gemini: [
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
-  ]
-};
-
-// API base URLs
-const API_BASE_URLS = {
-  openai: 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com/v1',
-  cohere: 'https://api.cohere.ai/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta'
-};
-
-function APIKeySetup({ config, setConfig }) {
-  const [testStatus, setTestStatus] = useState(null);
-  const [isTestingKey, setIsTestingKey] = useState(false);
-  const [showKey, setShowKey] = useState(false);
-  
-  // Handle form field changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    
-    if (name === 'provider') {
-      // When provider changes, update the model to the first available model
-      const newProvider = value;
-      const firstModel = PROVIDER_MODELS[newProvider]?.[0]?.id || '';
-      const baseUrl = API_BASE_URLS[newProvider] || '';
-      
-      setConfig({
-        ...config,
-        provider: newProvider,
-        model: firstModel,
-        baseUrl: baseUrl
-      });
-    } else {
-      setConfig({
-        ...config,
-        [name]: value
-      });
-    }
-  };
-  
-  // Handle API key display toggle
-  const toggleKeyVisibility = () => {
-    setShowKey(!showKey);
-  };
-  
-  // Test the API key by making a simple request
-  const testApiKey = async () => {
-    setIsTestingKey(true);
-    setTestStatus(null);
-    
-    try {
-      const response = await fetch('/api/test-api-key', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          provider: config.provider,
-          apiKey: config.apiKey,
-          model: config.model,
-          baseUrl: config.baseUrl
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setTestStatus({ success: true, message: 'API key is valid!' });
-      } else {
-        setTestStatus({ success: false, message: `Error: ${data.error || 'Unknown error'}` });
+    /**
+     * Format messages according to provider requirements
+     * This should be overridden by specific provider adapters
+     * @param {Array} messages - Array of message objects
+     * @returns {Array} - Formatted messages
+     */
+    formatMessages(messages) {
+      // Default implementation - just ensure there's a system message
+      if (!messages.some(msg => msg.role === 'system')) {
+        messages = [
+          { role: 'system', content: 'You are a helpful assistant.' },
+          ...messages
+        ];
       }
-    } catch (error) {
-      setTestStatus({ success: false, message: `Error: ${error.message}` });
-    } finally {
-      setIsTestingKey(false);
+      return messages;
     }
-  };
+  }
   
-  return (
-    <div className="api-key-setup">
-      <h4>API Configuration</h4>
-      
-      <div className="provider-selection">
-        <label htmlFor="provider">Select API Provider:</label>
-        <div className="provider-options">
-          {API_PROVIDERS.map(provider => (
-            <div 
-              key={provider.id} 
-              className={`provider-option ${config.provider === provider.id ? 'selected' : ''}`}
-              onClick={() => handleChange({ target: { name: 'provider', value: provider.id } })}
-            >
-              <div className="provider-logo">
-                <img 
-                  src={provider.logo} 
-                  alt={provider.name} 
-                  onError={(e) => {e.target.src = provider.fallbackLogo}}
-                />
-              </div>
-              <div className="provider-name">{provider.name}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="apiKey">API Key:</label>
-          <div className="api-key-input">
-            <input
-              type={showKey ? "text" : "password"}
-              id="apiKey"
-              name="apiKey"
-              value={config.apiKey}
-              onChange={handleChange}
-              placeholder="Enter your API key"
-            />
-            <button 
-              type="button" 
-              className="toggle-visibility" 
-              onClick={toggleKeyVisibility}
-            >
-              {showKey ? "Hide" : "Show"}
-            </button>
-          </div>
-          <p className="field-hint">Your API key is stored locally in your browser</p>
-        </div>
-        
-        <div className="form-group">
-          <label htmlFor="model">Model:</label>
-          <select
-            id="model"
-            name="model"
-            value={config.model}
-            onChange={handleChange}
-          >
-            {PROVIDER_MODELS[config.provider]?.map(model => (
-              <option key={model.id} value={model.id}>
-                {model.name}
-              </option>
-            ))}
-          </select>
-          <p className="field-hint">Select the model to use</p>
-        </div>
-      </div>
-      
-      <div className="form-row">
-        <div className="form-group">
-          <label htmlFor="baseUrl">API Base URL:</label>
-          <input
-            type="text"
-            id="baseUrl"
-            name="baseUrl"
-            value={config.baseUrl}
-            onChange={handleChange}
-            placeholder="https://api.example.com/v1"
-          />
-          <p className="field-hint">For API proxy or compatible services</p>
-        </div>
-        
-        <div className="form-group api-test-container">
-          <button 
-            onClick={testApiKey} 
-            disabled={isTestingKey || !config.apiKey} 
-            className="test-button"
-          >
-            {isTestingKey ? "Testing..." : "Test API Key"}
-          </button>
-          
-          {testStatus && (
-            <div className={`test-result ${testStatus.success ? 'success' : 'error'}`}>
-              {testStatus.message}
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="api-help">
-        <h5>How to get an API key</h5>
-        <ul>
-          <li><strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from OpenAI</a></li>
-          <li><strong>Anthropic:</strong> <a href="https://console.anthropic.com/account/keys" target="_blank" rel="noopener noreferrer">Get API key from Anthropic</a></li>
-          <li><strong>Cohere:</strong> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from Cohere</a></li>
-          <li><strong>Google Gemini:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get API key from Google AI Studio</a></li>
-        </ul>
-      </div>
-    </div>
-  );
+  export default APIAdapter;
+
+================
+File: src/components/adapters/OpenAIAdapter.js
+================
+import APIAdapter from './APIAdapter';
+
+/**
+ * Adapter specifically for OpenAI API
+ */
+class OpenAIAdapter extends APIAdapter {
+  constructor() {
+    super();
+    this.provider = 'openai';
+  }
+
+  /**
+   * Initialize the OpenAI adapter
+   * @param {Object} config - Configuration object
+   * @returns {boolean} - Whether initialization was successful
+   */
+  initialize(config) {
+    // Set default base URL if not provided
+    if (!config.baseUrl) {
+      config.baseUrl = 'https://api.openai.com/v1';
+    }
+    
+    // Set provider explicitly
+    config.provider = 'openai';
+    
+    return super.initialize(config);
+  }
+
+  /**
+   * Format messages for OpenAI API
+   * @param {Array} messages - Array of message objects
+   * @returns {Array} - Formatted messages for OpenAI
+   */
+  formatMessages(messages) {
+    messages = super.formatMessages(messages);
+    
+    // OpenAI uses 'system', 'user', and 'assistant' roles as is
+    // No additional formatting needed
+    
+    return messages;
+  }
+
+  /**
+   * Process the response from OpenAI API
+   * @param {Object} responseData - Raw response from API
+   * @returns {Object} - Formatted response for TRAILS-Chatbot
+   */
+  processResponse(responseData) {
+    if (!responseData.choices || responseData.choices.length === 0) {
+      throw new Error('Invalid response from OpenAI API');
+    }
+    
+    return {
+      statusCode: 200,
+      body: {
+        message: {
+          role: 'assistant',
+          content: responseData.choices[0].message.content
+        },
+        finish_reason: responseData.choices[0].finish_reason || 'stop'
+      }
+    };
+  }
 }
 
-export default APIKeySetup;
-
-================
-File: public/index.html
-================
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#3498db" />
-    <meta
-      name="description"
-      content="TRAILS Chatbot with multiple LLM backends"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>TRAILS Chatbot</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
-</html>
-
-================
-File: public/manifest.json
-================
-{
-    "short_name": "TRAILS Chatbot",
-    "name": "TRAILS Chatbot with Multiple LLM Options",
-    "icons": [
-      {
-        "src": "favicon.ico",
-        "sizes": "64x64 32x32 24x24 16x16",
-        "type": "image/x-icon"
-      },
-      {
-        "src": "logo192.png",
-        "type": "image/png",
-        "sizes": "192x192"
-      },
-      {
-        "src": "logo512.png",
-        "type": "image/png",
-        "sizes": "512x512"
-      }
-    ],
-    "start_url": ".",
-    "display": "standalone",
-    "theme_color": "#3498db",
-    "background_color": "#ffffff"
-  }
-
-================
-File: public/robots.txt
-================
-# https://www.robotstxt.org/robotstxt.html
-User-agent: *
-Disallow:
+// Create a singleton instance
+const openaiAdapter = new OpenAIAdapter();
+export default openaiAdapter;
 
 ================
 File: src/components/adapters/ProxyAdapter.js
@@ -910,198 +761,636 @@ const webllmAdapter = new WebLLMAdapter();
 export default webllmAdapter;
 
 ================
-File: src/components/LLMSelector.css
+File: src/components/APIKeySetup.css
 ================
-.llm-selector {
-  margin-bottom: 25px;
-}
-
-.llm-selector h4 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: #333;
-  font-size: 1.1rem;
-}
-
-.backend-options {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-}
-
-.backend-option {
-  display: flex;
-  align-items: center;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 15px;
-  width: 300px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.backend-option:hover {
-  background-color: #f5f5f5;
-  border-color: #d0d0d0;
-  transform: translateY(-2px);
-}
-
-.backend-option.selected {
-  border-color: #3498db;
-  background-color: #ebf5fb;
-}
-
-.backend-icon {
-  flex-shrink: 0;
-  width: 50px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 15px;
-}
-
-.backend-icon img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.backend-details {
-  flex: 1;
-}
-
-.backend-details h5 {
-  margin: 0 0 5px 0;
-  font-size: 1rem;
-}
-
-.backend-details p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #555;
-}
-
-.feature-banner {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
-  justify-content: center;
-}
-
-.feature-item {
-  background-color: #f0f4f8;
-  padding: 8px 15px;
-  border-radius: 20px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  color: #2c3e50;
-}
-
-.feature-icon {
-  font-size: 1.1rem;
-}
-
-.coming-soon {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: #f8f9fa;
-  border-radius: 5px;
-  text-align: center;
-}
-
-.coming-soon p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #666;
-  font-style: italic;
-}
-
-@media (max-width: 768px) {
-  .backend-option {
-    width: 100%;
+.api-key-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
   }
   
-  .feature-banner {
+  .api-key-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .provider-selection {
+    margin-bottom: 20px;
+  }
+  
+  .provider-selection label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+    color: #555;
+  }
+  
+  .provider-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 15px;
+  }
+  
+  .provider-option {
+    display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    width: 120px;
+    height: 100px;
+    padding: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
   }
-}
+  
+  .provider-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-color: #d0d0d0;
+  }
+  
+  .provider-option.selected {
+    border-color: #3498db;
+    background-color: #ebf5fb;
+  }
+  
+  .provider-logo {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+  
+  .provider-logo img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+  
+  .provider-name {
+    font-size: 0.9rem;
+    text-align: center;
+    color: #333;
+  }
+  
+  .api-key-input {
+    display: flex;
+    align-items: center;
+  }
+  
+  .api-key-input input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px 0 0 4px;
+    font-size: 1rem;
+    background-color: white;
+    font-family: monospace;
+  }
+  
+  .toggle-visibility {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    border-left: none;
+    padding: 10px 15px;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: #555;
+    transition: background-color 0.2s ease;
+  }
+  
+  .toggle-visibility:hover {
+    background-color: #e0e0e0;
+  }
+  
+  .test-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s ease;
+    margin-top: 24px;
+  }
+  
+  .test-button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .test-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  .api-test-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .test-result {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  
+  .test-result.success {
+    background-color: #d5f5e3;
+    color: #27ae60;
+    border: 1px solid #27ae60;
+  }
+  
+  .test-result.error {
+    background-color: #f5d5d5;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+  }
+  
+  .api-help {
+    margin-top: 25px;
+    padding: 15px;
+    background-color: #f0f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #3498db;
+  }
+  
+  .api-help h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #2c3e50;
+  }
+  
+  .api-help ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  
+  .api-help li {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+  }
+  
+  .api-help a {
+    color: #3498db;
+    text-decoration: none;
+  }
+  
+  .api-help a:hover {
+    text-decoration: underline;
+  }
 
 ================
-File: src/components/LLMSelector.jsx
+File: src/components/APIKeySetup.jsx
 ================
-import React from 'react';
-import './LLMSelector.css';
+import React, { useState, useEffect } from 'react';
+import './APIKeySetup.css';
 
-function LLMSelector({ backend, setBackend }) {
-  return (
-    <div className="llm-selector">
-      <h4>Choose LLM Provider</h4>
+// List of available API providers
+const API_PROVIDERS = [
+  { id: 'openai', name: 'OpenAI', logo: '/openai-logo.png', fallbackLogo: 'https://openai.com/content/images/2022/05/openai-logo-1.svg' },
+  { id: 'anthropic', name: 'Anthropic', logo: '/anthropic-logo.png', fallbackLogo: 'https://assets-global.website-files.com/62a295c7120a7e4c6220712a/62a2b61930dc1b42a9ee1ad2_Logo%20Icon%20for%20Favicon.svg' },
+  { id: 'cohere', name: 'Cohere', logo: '/cohere-logo.png', fallbackLogo: 'https://cohere.com/favicon/favicon.ico' },
+  { id: 'gemini', name: 'Google Gemini', logo: '/gemini-logo.png', fallbackLogo: 'https://gemini.google.com/favicon.ico' }
+];
+
+// List of available models per provider
+const PROVIDER_MODELS = {
+  openai: [
+    { id: 'gpt-4o', name: 'GPT-4o' },
+    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+    { id: 'gpt-4', name: 'GPT-4' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+  ],
+  anthropic: [
+    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
+    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
+    { id: 'claude-2.1', name: 'Claude 2.1' }
+  ],
+  cohere: [
+    { id: 'command-r-plus', name: 'Command R+' },
+    { id: 'command-r', name: 'Command R' },
+    { id: 'command', name: 'Command' }
+  ],
+  gemini: [
+    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+    { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
+  ]
+};
+
+// API base URLs
+const API_BASE_URLS = {
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  cohere: 'https://api.cohere.ai/v1',
+  gemini: 'https://generativelanguage.googleapis.com/v1beta'
+};
+
+function APIKeySetup({ config, setConfig }) {
+  const [testStatus, setTestStatus] = useState(null);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+  
+  // Log when the component receives updated config props
+  useEffect(() => {
+    console.log('API_SETUP: Current config:', {
+      provider: config.provider,
+      model: config.model,
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey ? `***${config.apiKey.slice(-4)}` : 'undefined'
+    });
+  }, [config]);
+  
+  // Handle form field changes
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    console.log(`API_SETUP: Field "${name}" changed to "${name === 'apiKey' ? '***' : value}"`);
+    
+    if (name === 'provider') {
+      // When provider changes, update the model to the first available model
+      const newProvider = value;
+      const firstModel = PROVIDER_MODELS[newProvider]?.[0]?.id || '';
+      const baseUrl = API_BASE_URLS[newProvider] || '';
       
-      <div className="backend-options">
-        <div 
-          className={`backend-option ${backend === 'ollama' ? 'selected' : ''}`}
-          onClick={() => setBackend('ollama')}
-        >
-          <div className="backend-icon ollama-icon">
-            <img src="/ollama-logo.png" alt="Ollama" onError={(e) => e.target.src = "https://ollama.com/public/ollama.png"} />
-          </div>
-          <div className="backend-details">
-            <h5>Ollama</h5>
-            <p>Use locally hosted models via Ollama</p>
-          </div>
-        </div>
-        
-        <div 
-          className={`backend-option ${backend === 'webllm' ? 'selected' : ''}`}
-          onClick={() => setBackend('webllm')}
-        >
-          <div className="backend-icon webllm-icon">
-            <img src="/webllm-logo.png" alt="WebLLM" onError={(e) => e.target.src = "https://raw.githubusercontent.com/mlc-ai/web-llm/main/site/img/webllm-logo.png"} />
-          </div>
-          <div className="backend-details">
-            <h5>WebLLM</h5>
-            <p>Run LLMs directly in your browser</p>
-          </div>
-        </div>
-        
-        <div 
-          className={`backend-option ${backend === 'api' ? 'selected' : ''}`}
-          onClick={() => setBackend('api')}
-        >
-          <div className="backend-icon api-icon">
-            <img src="/api-logo.png" alt="API" onError={(e) => e.target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxwYXRoIGQ9Ik05LjA5IDlhMyAzIDAgMCAxIDUuODMgMWMwIDItMyAzLTMgM00xMiAxN2guMDEiLz48L3N2Zz4="} />
-          </div>
-          <div className="backend-details">
-            <h5>API Key</h5>
-            <p>Use commercial LLM APIs (OpenAI, Claude, etc.)</p>
-          </div>
+      console.log(`API_SETUP: Provider changed to "${newProvider}"`);
+      console.log(`API_SETUP: Setting default model to "${firstModel}"`);
+      console.log(`API_SETUP: Setting default baseUrl to "${baseUrl}"`);
+      
+      setConfig({
+        ...config,
+        provider: newProvider,
+        model: firstModel,
+        baseUrl: baseUrl
+      });
+    } else {
+      setConfig({
+        ...config,
+        [name]: value
+      });
+    }
+  };
+  
+  // Handle API key display toggle
+  const toggleKeyVisibility = () => {
+    setShowKey(!showKey);
+  };
+  
+  // Test the API key by making a simple request
+  const testApiKey = async () => {
+    setIsTestingKey(true);
+    setTestStatus(null);
+    
+    console.log(`API_SETUP: Testing API key for ${config.provider}`);
+    console.log(`API_SETUP: Using model "${config.model}" and baseUrl "${config.baseUrl}"`);
+    
+    try {
+      const response = await fetch('/api/test-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          provider: config.provider,
+          apiKey: config.apiKey,
+          model: config.model,
+          baseUrl: config.baseUrl
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log('API_SETUP: API key test succeeded');
+        setTestStatus({ success: true, message: 'API key is valid!' });
+      } else {
+        console.error('API_SETUP: API key test failed', data.error);
+        setTestStatus({ success: false, message: `Error: ${data.error || 'Unknown error'}` });
+      }
+    } catch (error) {
+      console.error('API_SETUP: API key test exception', error);
+      setTestStatus({ success: false, message: `Error: ${error.message}` });
+    } finally {
+      setIsTestingKey(false);
+    }
+  };
+  
+  return (
+    <div className="api-key-setup">
+      <h4>API Configuration</h4>
+      
+      <div className="provider-selection">
+        <label htmlFor="provider">Select API Provider:</label>
+        <div className="provider-options">
+          {API_PROVIDERS.map(provider => (
+            <div 
+              key={provider.id} 
+              className={`provider-option ${config.provider === provider.id ? 'selected' : ''}`}
+              onClick={() => handleChange({ target: { name: 'provider', value: provider.id } })}
+              data-testid={`provider-${provider.id}`}
+            >
+              <div className="provider-logo">
+                <img 
+                  src={provider.logo} 
+                  alt={provider.name} 
+                  onError={(e) => {e.target.src = provider.fallbackLogo}}
+                />
+              </div>
+              <div className="provider-name">{provider.name}</div>
+            </div>
+          ))}
         </div>
       </div>
       
-      <div className="feature-banner">
-        <div className="feature-item">
-          <span className="feature-icon">🔒</span>
-          <span className="feature-text">API keys are stored locally in your browser</span>
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="apiKey">API Key:</label>
+          <div className="api-key-input">
+            <input
+              type={showKey ? "text" : "password"}
+              id="apiKey"
+              name="apiKey"
+              value={config.apiKey}
+              onChange={handleChange}
+              placeholder="Enter your API key"
+              data-testid="api-key-input"
+            />
+            <button 
+              type="button" 
+              className="toggle-visibility" 
+              onClick={toggleKeyVisibility}
+            >
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
+          <p className="field-hint">Your API key is stored locally in your browser</p>
         </div>
-        <div className="feature-item">
-          <span className="feature-icon">🌐</span>
-          <span className="feature-text">Support for multiple API providers</span>
+        
+        <div className="form-group">
+          <label htmlFor="model">Model:</label>
+          <select
+            id="model"
+            name="model"
+            value={config.model}
+            onChange={handleChange}
+            data-testid="model-select"
+          >
+            {PROVIDER_MODELS[config.provider]?.map(model => (
+              <option key={model.id} value={model.id}>
+                {model.name}
+              </option>
+            ))}
+          </select>
+          <p className="field-hint">Select the model to use</p>
         </div>
-        <div className="feature-item">
-          <span className="feature-icon">⚙️</span>
-          <span className="feature-text">Compatible with API proxies</span>
+      </div>
+      
+      <div className="form-row">
+        <div className="form-group">
+          <label htmlFor="baseUrl">API Base URL:</label>
+          <input
+            type="text"
+            id="baseUrl"
+            name="baseUrl"
+            value={config.baseUrl}
+            onChange={handleChange}
+            placeholder="https://api.example.com/v1"
+            data-testid="base-url-input"
+          />
+          <p className="field-hint">For API proxy or compatible services</p>
         </div>
+        
+        <div className="form-group api-test-container">
+          <button 
+            onClick={testApiKey} 
+            disabled={isTestingKey || !config.apiKey} 
+            className="test-button"
+            data-testid="test-api-button"
+          >
+            {isTestingKey ? "Testing..." : "Test API Key"}
+          </button>
+          
+          {testStatus && (
+            <div className={`test-result ${testStatus.success ? 'success' : 'error'}`}>
+              {testStatus.message}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="api-help">
+        <h5>How to get an API key</h5>
+        <ul>
+          <li><strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from OpenAI</a></li>
+          <li><strong>Anthropic:</strong> <a href="https://console.anthropic.com/account/keys" target="_blank" rel="noopener noreferrer">Get API key from Anthropic</a></li>
+          <li><strong>Cohere:</strong> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from Cohere</a></li>
+          <li><strong>Google Gemini:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get API key from Google AI Studio</a></li>
+        </ul>
       </div>
     </div>
   );
 }
 
-export default LLMSelector;
+export default APIKeySetup;
+
+================
+File: src/components/BackendStatus.jsx
+================
+import React from 'react';
+
+/**
+ * Component to display the current backend status
+ * Modified to ensure it doesn't block interactions with the chatbot
+ */
+const BackendStatus = ({ backend, config }) => {
+  let statusText = '';
+  let statusDetails = '';
+  
+  switch (backend) {
+    case 'ollama':
+      statusText = 'Using Ollama';
+      statusDetails = `${config.model} @ ${config.url}`;
+      break;
+    case 'webllm':
+      statusText = 'Using WebLLM';
+      statusDetails = `${config.model} (${config.quantized ? 'Quantized' : 'Full precision'})`;
+      break;
+    case 'api':
+      statusText = `Using ${config.provider}`;
+      statusDetails = `${config.model}`;
+      break;
+    default:
+      statusText = 'No backend selected';
+  }
+  
+  const statusStyles = {
+    container: {
+      position: 'fixed',
+      bottom: '10px',
+      right: '10px',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      color: 'white',
+      padding: '8px 12px',
+      borderRadius: '4px',
+      fontSize: '0.8rem',
+      zIndex: 1000,
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
+      pointerEvents: 'none', // This makes the component ignore mouse events
+      userSelect: 'none',    // Prevents text selection
+      maxWidth: '200px',     // Limit width to ensure it stays compact
+      textAlign: 'right'     // Right-align text
+    },
+    title: {
+      fontWeight: 'bold',
+      marginBottom: '4px'
+    },
+    details: {
+      opacity: 0.8,
+      fontSize: '0.7rem'
+    }
+  };
+  
+  return (
+    <div style={statusStyles.container} aria-hidden="true">
+      <div style={statusStyles.title}>{statusText}</div>
+      <div style={statusStyles.details}>{statusDetails}</div>
+    </div>
+  );
+};
+
+export default BackendStatus;
+
+================
+File: src/components/ChatService.js
+================
+import AdapterFactory from './adapters/AdapterFactory';
+
+/**
+ * Service for handling chat interactions with different LLM backends
+ */
+class ChatService {
+  constructor() {
+    this.currentAdapter = null;
+    this.initialized = false;
+    this.currentBackend = null;
+    this.currentConfig = null;
+  }
+
+  /**
+   * Initialize the chat service with a specific backend and configuration
+   * @param {string} backend - Backend type ('ollama', 'webllm', 'api')
+   * @param {Object} config - Configuration for the backend
+   * @param {Function} onProgress - Optional progress callback for initialization
+   * @returns {Promise<boolean>} - Whether initialization was successful
+   */
+  async initialize(backend, config, onProgress = null) {
+    try {
+      this.currentBackend = backend;
+      this.currentConfig = config;
+      
+      // Get the appropriate adapter
+      const provider = backend === 'api' ? config.provider : null;
+      this.currentAdapter = AdapterFactory.getAdapter(backend, provider);
+      
+      // Initialize the adapter
+      const initSuccess = await this.currentAdapter.initialize({
+        ...config,
+        onProgress
+      });
+      
+      this.initialized = initSuccess;
+      return initSuccess;
+    } catch (error) {
+      console.error('Error initializing chat service:', error);
+      this.initialized = false;
+      return false;
+    }
+  }
+
+  /**
+   * Process a chat message using the current adapter
+   * @param {Object} requestData - Chat request data
+   * @returns {Promise<Object>} - Response data
+   */
+  async processChat(requestData) {
+    if (!this.initialized || !this.currentAdapter) {
+      return {
+        statusCode: 500,
+        error: 'Chat service not initialized',
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'The chat service is not properly initialized. Please check your configuration and try again.'
+          },
+          finish_reason: 'error'
+        }
+      };
+    }
+    
+    try {
+      // Use the current adapter to process the chat
+      return await this.currentAdapter.processChat(requestData);
+    } catch (error) {
+      console.error('Error processing chat:', error);
+      return {
+        statusCode: 500,
+        error: `Chat processing error: ${error.message}`,
+        body: {
+          message: {
+            role: 'assistant',
+            content: 'I apologize, but I encountered an error while processing your request. Please try again later.'
+          },
+          finish_reason: 'error'
+        }
+      };
+    }
+  }
+
+  /**
+   * Clean up and prepare for shutdown
+   * @returns {Promise<void>}
+   */
+  async cleanup() {
+    if (this.currentAdapter && typeof this.currentAdapter.cleanup === 'function') {
+      await this.currentAdapter.cleanup();
+    }
+    this.initialized = false;
+    this.currentAdapter = null;
+  }
+
+  /**
+   * Check if the current backend is of a specified type
+   * @param {string} backendType - Backend type to check
+   * @returns {boolean} - Whether the current backend matches
+   */
+  isBackendType(backendType) {
+    return this.currentBackend === backendType;
+  }
+
+  /**
+   * Get the current backend type
+   * @returns {string|null} - Current backend type
+   */
+  getBackendType() {
+    return this.currentBackend;
+  }
+}
+
+// Create a singleton instance
+const chatService = new ChatService();
+export default chatService;
 
 ================
 File: src/components/OllamaSetup.css
@@ -1653,170 +1942,6 @@ function WebLLMSetup({ config, setConfig }) {
 export default WebLLMSetup;
 
 ================
-File: src/utils/WebLLMClient.js
-================
-import { ChatModule } from '@mlc-ai/web-llm';
-
-class WebLLMClient {
-  constructor() {
-    this.chat = null;
-    this.initialized = false;
-    this.modelName = '';
-    this.initializationPromise = null;
-  }
-
-  /**
-   * Initialize the WebLLM client with the specified model
-   * @param {string} modelName - Name of the model to use
-   * @param {boolean} quantized - Whether to use the quantized model version
-   * @param {Function} progressCallback - Optional callback for progress updates
-   */
-  async initialize(modelName, quantized = true, progressCallback = null) {
-    // If already initializing with the same model, return the existing promise
-    if (this.initializationPromise && this.modelName === modelName) {
-      return this.initializationPromise;
-    }
-
-    // Create a new initialization promise
-    this.initializationPromise = new Promise(async (resolve, reject) => {
-      try {
-        // Clean up any existing instance
-        if (this.chat) {
-          await this.chat.unload();
-          this.chat = null;
-        }
-
-        this.modelName = modelName;
-        this.initialized = false;
-
-        // Create a new chat instance
-        this.chat = new ChatModule();
-
-        // Configure the model options
-        const modelOptions = {
-          // Prefer quantized models to save bandwidth, unless specifically requested otherwise
-          model: quantized ? `${modelName}-q4f32_1` : modelName
-        };
-
-        // Set up progress handling if a callback was provided
-        if (progressCallback && typeof progressCallback === 'function') {
-          this.chat.setInitProgressCallback((report) => {
-            const progress = {
-              progress: report.progress,
-              timeElapsed: report.timeElapsed,
-              text: `${report.text} (${Math.round(report.progress * 100)}%)`
-            };
-            progressCallback(progress);
-          });
-        }
-
-        // Initialize the model
-        await this.chat.reload(modelOptions);
-        this.initialized = true;
-        resolve(true);
-      } catch (error) {
-        console.error('WebLLM initialization error:', error);
-        reject(error);
-      }
-    });
-
-    return this.initializationPromise;
-  }
-
-  /**
-   * Generate a response for the given conversation
-   * @param {Array} messages - Array of message objects with role and content
-   * @returns {Promise<string>} - The generated response
-   */
-  async chat(messages) {
-    if (!this.initialized || !this.chat) {
-      throw new Error('WebLLM client not initialized');
-    }
-
-    // Format messages for WebLLM
-    let prompt = '';
-    
-    // Implement proper prompt formatting based on the model type
-    if (this.modelName.includes('Llama')) {
-      // Llama format
-      messages.forEach(msg => {
-        if (msg.role === 'system') {
-          prompt += `<s>[INST] <<SYS>>\n${msg.content}\n<</SYS>>\n\n`;
-        } else if (msg.role === 'user') {
-          prompt += `${msg.content} [/INST]\n`;
-        } else if (msg.role === 'assistant') {
-          prompt += `${msg.content}</s>\n<s>[INST] `;
-        }
-      });
-      // Add final user instruction if the last message is from the user
-      if (messages[messages.length - 1].role === 'user') {
-        prompt += ' [/INST]\n';
-      }
-    } else if (this.modelName.includes('Gemma')) {
-      // Gemma format
-      messages.forEach(msg => {
-        if (msg.role === 'system') {
-          prompt += `<start_of_turn>system\n${msg.content}<end_of_turn>\n`;
-        } else if (msg.role === 'user') {
-          prompt += `<start_of_turn>user\n${msg.content}<end_of_turn>\n`;
-        } else if (msg.role === 'assistant') {
-          prompt += `<start_of_turn>model\n${msg.content}<end_of_turn>\n`;
-        }
-      });
-      prompt += `<start_of_turn>model\n`;
-    } else {
-      // Generic format for other models (Mistral, etc.)
-      messages.forEach(msg => {
-        if (msg.role === 'system') {
-          prompt += `<|im_start|>system\n${msg.content}<|im_end|>\n`;
-        } else if (msg.role === 'user') {
-          prompt += `<|im_start|>user\n${msg.content}<|im_end|>\n`;
-        } else if (msg.role === 'assistant') {
-          prompt += `<|im_start|>assistant\n${msg.content}<|im_end|>\n`;
-        }
-      });
-      prompt += `<|im_start|>assistant\n`;
-    }
-
-    try {
-      // Generate the response
-      const response = await this.chat.generate(prompt, {
-        temperature: 0.7,
-        max_gen_length: 2048
-      });
-
-      return response.trim();
-    } catch (error) {
-      console.error('WebLLM generation error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if the browser supports WebGPU
-   * @returns {boolean} - True if WebGPU is supported
-   */
-  static isWebGPUSupported() {
-    return navigator && 'gpu' in navigator;
-  }
-
-  /**
-   * Unload the model and free resources
-   */
-  async unload() {
-    if (this.chat) {
-      await this.chat.unload();
-      this.chat = null;
-      this.initialized = false;
-    }
-  }
-}
-
-// Create a singleton instance
-const webllmClient = new WebLLMClient();
-export default webllmClient;
-
-================
 File: src/App.css
 ================
 .app-container {
@@ -2012,204 +2137,6 @@ File: src/App.css
   }
 
 ================
-File: src/App.jsx
-================
-import React, { useState, useEffect } from 'react';
-import { App as TrailsChatbot } from 'trails-ui-chatbot';
-import LLMSelector from './components/LLMSelector';
-import OllamaSetup from './components/OllamaSetup';
-import WebLLMSetup from './components/WebLLMSetup';
-import APIKeySetup from './components/APIKeySetup';
-import './App.css';
-
-function App() {
-  // LLM backend configuration
-  const [backend, setBackend] = useState('ollama'); // 'ollama', 'webllm', 'api'
-  const [showConfig, setShowConfig] = useState(true);
-  const [configApplied, setConfigApplied] = useState(false);
-  
-  // Ollama config
-  const [ollamaConfig, setOllamaConfig] = useState({
-    url: 'http://localhost:11434',
-    model: 'llama3',
-    proxyUrl: 'http://localhost:3000'
-  });
-  
-  // WebLLM config
-  const [webLLMConfig, setWebLLMConfig] = useState({
-    model: 'Llama-3-8B-Instruct',
-    quantized: true
-  });
-  
-  // API config
-  const [apiConfig, setApiConfig] = useState({
-    provider: 'openai',
-    apiKey: '',
-    model: 'gpt-3.5-turbo',
-    baseUrl: 'https://api.openai.com/v1'
-  });
-  
-  // User ID for the chatbot (normally would come from auth)
-  const [userId] = useState('user-' + Math.random().toString(36).substring(2, 9));
-  
-  // Load saved configuration on mount
-  useEffect(() => {
-    const savedConfig = localStorage.getItem('llmConfig');
-    if (savedConfig) {
-      const config = JSON.parse(savedConfig);
-      if (config.backend) {
-        setBackend(config.backend);
-      }
-      if (config.ollama) {
-        setOllamaConfig(config.ollama);
-      }
-      if (config.webllm) {
-        setWebLLMConfig(config.webllm);
-      }
-      if (config.api) {
-        setApiConfig(config.api);
-      }
-      
-      // Auto-apply saved config if it exists
-      setConfigApplied(true);
-      setShowConfig(false);
-    }
-  }, []);
-  
-  // Handle configuration save
-  const saveConfig = () => {
-    const config = {
-      backend,
-      ollama: ollamaConfig,
-      webllm: webLLMConfig,
-      api: apiConfig
-    };
-    localStorage.setItem('llmConfig', JSON.stringify(config));
-    setConfigApplied(true);
-    setShowConfig(false);
-  };
-  
-  // Handle audit completion event
-  const handleAuditFinished = (event) => {
-    console.log('Audit finished:', event.detail);
-    
-    // Display consent dialog for data collection (implementation placeholder)
-    const consentToShare = window.confirm(
-      "Would you be willing to share your audit data with the developers to improve the system? " +
-      "No personal information will be shared, only the conversation and audit responses."
-    );
-    
-    if (consentToShare) {
-      console.log("User consented to share data. This would send data to a server in a real implementation.");
-      // Here you would implement the data sharing functionality
-    } else {
-      console.log("User declined to share data.");
-    }
-  };
-  
-  // Set up event listener for audit completion
-  useEffect(() => {
-    document.addEventListener('trails-chatbot:audit-finished', handleAuditFinished);
-    return () => {
-      document.removeEventListener('trails-chatbot:audit-finished', handleAuditFinished);
-    };
-  }, []);
-  
-  // Get the proxy URL based on current backend
-  const getProxyUrl = () => {
-    if (backend === 'ollama') {
-      // Return the full proxy URL - IMPORTANT: no /api prefix for Ollama
-      return ollamaConfig.proxyUrl;
-    } else if (backend === 'api') {
-      // For API keys, return the absolute URL to our server
-      return 'http://localhost:3000';
-    }
-    // For WebLLM, return the absolute URL to our server
-    return 'http://localhost:3000';
-  };
-
-  return (
-    <div className="app-container">
-      <header>
-        <h1>TRAILS Chatbot</h1>
-        <button 
-          onClick={() => setShowConfig(!showConfig)} 
-          className="config-toggle"
-        >
-          {showConfig ? 'Hide' : 'Show'} Settings
-        </button>
-      </header>
-      
-      {showConfig && (
-        <div className="config-panel">
-          <h3>Chatbot Settings</h3>
-          
-          <LLMSelector 
-            backend={backend} 
-            setBackend={setBackend} 
-          />
-          
-          {backend === 'ollama' && (
-            <OllamaSetup 
-              config={ollamaConfig}
-              setConfig={setOllamaConfig}
-            />
-          )}
-          
-          {backend === 'webllm' && (
-            <WebLLMSetup 
-              config={webLLMConfig}
-              setConfig={setWebLLMConfig}
-            />
-          )}
-          
-          {backend === 'api' && (
-            <APIKeySetup 
-              config={apiConfig}
-              setConfig={setApiConfig}
-            />
-          )}
-          
-          <button onClick={saveConfig} className="save-button">
-            Save Configuration
-          </button>
-        </div>
-      )}
-      
-      {configApplied && (
-        <div className="chatbot-container">
-          <TrailsChatbot
-            userId={userId}
-            llmProxyServerUrl={getProxyUrl()}
-            debugMode={false}
-            config={{
-              timerMaxOverallChatTimeSeconds: 30 * 60, // 30 minutes total
-              timerChatsMaxSeconds: [7 * 60, 7 * 60],  // 7 minutes per chat
-              timerWarningChatTimeIsUpSeconds: 2 * 60,  // 2 min warning
-              timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60 // 3 min minimum
-            }}
-          />
-        </div>
-      )}
-      
-      {!configApplied && !showConfig && (
-        <div className="config-prompt">
-          <p>Please configure your LLM settings to continue.</p>
-          <button 
-            onClick={() => setShowConfig(true)} 
-            className="config-button"
-          >
-            Configure
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default App;
-
-================
 File: src/index.css
 ================
 body {
@@ -2278,6 +2205,693 @@ module.exports = function override(config, env) {
   
     return config;
   };
+
+================
+File: src/components/LLMSelector.css
+================
+.llm-selector {
+  margin-bottom: 25px;
+}
+
+.llm-selector h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.backend-options {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.backend-option {
+  display: flex;
+  align-items: center;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 15px;
+  width: 300px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.backend-option:hover {
+  background-color: #f5f5f5;
+  border-color: #d0d0d0;
+  transform: translateY(-2px);
+}
+
+.backend-option.selected {
+  border-color: #3498db;
+  background-color: #ebf5fb;
+}
+
+.backend-icon {
+  flex-shrink: 0;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+}
+
+.backend-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.backend-details {
+  flex: 1;
+}
+
+.backend-details h5 {
+  margin: 0 0 5px 0;
+  font-size: 1rem;
+}
+
+.backend-details p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.feature-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+  justify-content: center;
+}
+
+.feature-item {
+  background-color: #f0f4f8;
+  padding: 8px 15px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #2c3e50;
+}
+
+.feature-icon {
+  font-size: 1.1rem;
+}
+
+.coming-soon {
+  margin-top: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.coming-soon p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+}
+
+@media (max-width: 768px) {
+  .backend-option {
+    width: 100%;
+  }
+  
+  .feature-banner {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+================
+File: src/components/LLMSelector.jsx
+================
+import React, { useEffect } from 'react';
+import './LLMSelector.css';
+
+function LLMSelector({ backend, setBackend }) {
+  // Log when the component receives a new backend prop
+  useEffect(() => {
+    console.log(`LLM_SELECTOR: Current backend is "${backend}"`);
+  }, [backend]);
+  
+  // Enhanced handler with logging
+  const handleBackendSelect = (newBackend) => {
+    console.log(`LLM_SELECTOR: User clicked "${newBackend}" (previous: "${backend}")`);
+    
+    if (newBackend === backend) {
+      console.log('LLM_SELECTOR: No change in backend selection');
+      return;
+    }
+    
+    console.log(`LLM_SELECTOR: Setting backend to "${newBackend}"`);
+    setBackend(newBackend);
+  };
+
+  return (
+    <div className="llm-selector">
+      <h4>Choose LLM Provider</h4>
+      
+      <div className="backend-options">
+        <div 
+          className={`backend-option ${backend === 'ollama' ? 'selected' : ''}`}
+          onClick={() => handleBackendSelect('ollama')}
+          data-testid="ollama-option"
+        >
+          <div className="backend-icon ollama-icon">
+            <img src="/ollama-logo.png" alt="Ollama" onError={(e) => e.target.src = "https://ollama.com/public/ollama.png"} />
+          </div>
+          <div className="backend-details">
+            <h5>Ollama</h5>
+            <p>Use locally hosted models via Ollama</p>
+          </div>
+        </div>
+        
+        <div 
+          className={`backend-option ${backend === 'webllm' ? 'selected' : ''}`}
+          onClick={() => handleBackendSelect('webllm')}
+          data-testid="webllm-option"
+        >
+          <div className="backend-icon webllm-icon">
+            <img src="/webllm-logo.png" alt="WebLLM" onError={(e) => e.target.src = "https://raw.githubusercontent.com/mlc-ai/web-llm/main/site/img/webllm-logo.png"} />
+          </div>
+          <div className="backend-details">
+            <h5>WebLLM</h5>
+            <p>Run LLMs directly in your browser</p>
+          </div>
+        </div>
+        
+        <div 
+          className={`backend-option ${backend === 'api' ? 'selected' : ''}`}
+          onClick={() => handleBackendSelect('api')}
+          data-testid="api-option"
+        >
+          <div className="backend-icon api-icon">
+            <img src="/api-logo.png" alt="API" onError={(e) => e.target.src = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxMCIvPjxwYXRoIGQ9Ik05LjA5IDlhMyAzIDAgMCAxIDUuODMgMWMwIDItMyAzLTMgM00xMiAxN2guMDEiLz48L3N2Zz4="} />
+          </div>
+          <div className="backend-details">
+            <h5>API Key</h5>
+            <p>Use commercial LLM APIs (OpenAI, Claude, etc.)</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="feature-banner">
+        <div className="feature-item">
+          <span className="feature-icon">🔒</span>
+          <span className="feature-text">API keys are stored locally in your browser</span>
+        </div>
+        <div className="feature-item">
+          <span className="feature-icon">🌐</span>
+          <span className="feature-text">Support for multiple API providers</span>
+        </div>
+        <div className="feature-item">
+          <span className="feature-icon">⚙️</span>
+          <span className="feature-text">Compatible with API proxies</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default LLMSelector;
+
+================
+File: src/utils/WebLLMClient.js
+================
+import { Chat } from '@mlc-ai/web-llm';
+
+class WebLLMClient {
+  constructor() {
+    this.chat = null;
+    this.initialized = false;
+    this.modelName = '';
+    this.initializationPromise = null;
+  }
+
+  /**
+   * Initialize the WebLLM client with the specified model
+   * @param {string} modelName - Name of the model to use
+   * @param {boolean} quantized - Whether to use the quantized model version
+   * @param {Function} progressCallback - Optional callback for progress updates
+   */
+  async initialize(modelName, quantized = true, progressCallback = null) {
+    // If already initializing with the same model, return the existing promise
+    if (this.initializationPromise && this.modelName === modelName) {
+      return this.initializationPromise;
+    }
+
+    // Create a new initialization promise
+    this.initializationPromise = new Promise(async (resolve, reject) => {
+      try {
+        // Clean up any existing instance
+        if (this.chat) {
+          await this.chat.unload();
+          this.chat = null;
+        }
+
+        this.modelName = modelName;
+        this.initialized = false;
+
+        // Create a new chat instance - using Chat instead of ChatModule
+        this.chat = new Chat();
+
+        // Configure the model options
+        const modelOptions = {
+          // Prefer quantized models to save bandwidth, unless specifically requested otherwise
+          model: quantized ? `${modelName}-q4f32_1` : modelName
+        };
+
+        // Set up progress handling if a callback was provided
+        if (progressCallback && typeof progressCallback === 'function') {
+          this.chat.setInitProgressCallback((report) => {
+            const progress = {
+              progress: report.progress,
+              timeElapsed: report.timeElapsed,
+              text: `${report.text} (${Math.round(report.progress * 100)}%)`
+            };
+            progressCallback(progress);
+          });
+        }
+
+        // Initialize the model
+        await this.chat.reload(modelOptions);
+        this.initialized = true;
+        resolve(true);
+      } catch (error) {
+        console.error('WebLLM initialization error:', error);
+        reject(error);
+      }
+    });
+
+    return this.initializationPromise;
+  }
+
+  /**
+   * Generate a response for the given conversation
+   * @param {Array} messages - Array of message objects with role and content
+   * @returns {Promise<string>} - The generated response
+   */
+  async chat(messages) {
+    if (!this.initialized || !this.chat) {
+      throw new Error('WebLLM client not initialized');
+    }
+
+    // Format messages for WebLLM
+    let prompt = '';
+    
+    // Implement proper prompt formatting based on the model type
+    if (this.modelName.includes('Llama')) {
+      // Llama format
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<s>[INST] <<SYS>>\n${msg.content}\n<</SYS>>\n\n`;
+        } else if (msg.role === 'user') {
+          prompt += `${msg.content} [/INST]\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `${msg.content}</s>\n<s>[INST] `;
+        }
+      });
+      // Add final user instruction if the last message is from the user
+      if (messages[messages.length - 1].role === 'user') {
+        prompt += ' [/INST]\n';
+      }
+    } else if (this.modelName.includes('Gemma')) {
+      // Gemma format
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<start_of_turn>system\n${msg.content}<end_of_turn>\n`;
+        } else if (msg.role === 'user') {
+          prompt += `<start_of_turn>user\n${msg.content}<end_of_turn>\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `<start_of_turn>model\n${msg.content}<end_of_turn>\n`;
+        }
+      });
+      prompt += `<start_of_turn>model\n`;
+    } else {
+      // Generic format for other models (Mistral, etc.)
+      messages.forEach(msg => {
+        if (msg.role === 'system') {
+          prompt += `<|im_start|>system\n${msg.content}<|im_end|>\n`;
+        } else if (msg.role === 'user') {
+          prompt += `<|im_start|>user\n${msg.content}<|im_end|>\n`;
+        } else if (msg.role === 'assistant') {
+          prompt += `<|im_start|>assistant\n${msg.content}<|im_end|>\n`;
+        }
+      });
+      prompt += `<|im_start|>assistant\n`;
+    }
+
+    try {
+      // Generate the response
+      const response = await this.chat.generate(prompt, {
+        temperature: 0.7,
+        max_gen_length: 2048
+      });
+
+      return response.trim();
+    } catch (error) {
+      console.error('WebLLM generation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if the browser supports WebGPU
+   * @returns {boolean} - True if WebGPU is supported
+   */
+  static isWebGPUSupported() {
+    return navigator && 'gpu' in navigator;
+  }
+
+  /**
+   * Unload the model and free resources
+   */
+  async unload() {
+    if (this.chat) {
+      await this.chat.unload();
+      this.chat = null;
+      this.initialized = false;
+    }
+  }
+}
+
+// Create a singleton instance
+const webllmClient = new WebLLMClient();
+export default webllmClient;
+
+================
+File: src/App.jsx
+================
+import React, { useState, useEffect } from 'react';
+import { App as TrailsChatbot } from 'trails-ui-chatbot';
+import LLMSelector from './components/LLMSelector';
+import OllamaSetup from './components/OllamaSetup';
+import WebLLMSetup from './components/WebLLMSetup';
+import APIKeySetup from './components/APIKeySetup';
+import BackendStatus from './components/BackendStatus';
+import './App.css';
+
+function App() {
+  // LLM backend configuration
+  const [backend, setBackend] = useState('ollama'); // 'ollama', 'webllm', 'api'
+  const [showConfig, setShowConfig] = useState(true);
+  const [configApplied, setConfigApplied] = useState(false);
+  const [configSyncedWithServer, setConfigSyncedWithServer] = useState(false);
+  
+  // Ollama config
+  const [ollamaConfig, setOllamaConfig] = useState({
+    url: 'http://localhost:11434',
+    model: 'llama3',
+    proxyUrl: 'http://localhost:3000'
+  });
+  
+  // WebLLM config
+  const [webLLMConfig, setWebLLMConfig] = useState({
+    model: 'Llama-3-8B-Instruct',
+    quantized: true
+  });
+  
+  // API config
+  const [apiConfig, setApiConfig] = useState({
+    provider: 'openai',
+    apiKey: '',
+    model: 'gpt-3.5-turbo',
+    baseUrl: 'https://api.openai.com/v1'
+  });
+  
+  // User ID for the chatbot (normally would come from auth)
+  const [userId] = useState('user-' + Math.random().toString(36).substring(2, 9));
+  
+  // Handle backend selection change
+  const handleBackendChange = (newBackend) => {
+    console.log(`BACKEND CHANGED: ${backend} -> ${newBackend}`);
+    setBackend(newBackend);
+    // Reset config sync status when backend changes
+    setConfigSyncedWithServer(false);
+  };
+  
+  // Load saved configuration on mount
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('llmConfig');
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig);
+      console.log('LOADING SAVED CONFIG:', config);
+      
+      if (config.backend) {
+        console.log(`SETTING BACKEND FROM STORAGE: ${config.backend}`);
+        setBackend(config.backend);
+      }
+      if (config.ollama) {
+        setOllamaConfig(config.ollama);
+      }
+      if (config.webllm) {
+        setWebLLMConfig(config.webllm);
+      }
+      if (config.api) {
+        setApiConfig(config.api);
+      }
+      
+      // Auto-apply saved config if it exists
+      setConfigApplied(true);
+      setShowConfig(false);
+    }
+  }, []);
+  
+  // Sync configuration with server when applied
+  useEffect(() => {
+    if (configApplied && !configSyncedWithServer) {
+      // Get the current configuration based on selected backend
+      let currentConfig;
+      
+      switch (backend) {
+        case 'ollama':
+          currentConfig = ollamaConfig;
+          break;
+        case 'webllm':
+          currentConfig = webLLMConfig;
+          break;
+        case 'api':
+          currentConfig = apiConfig;
+          break;
+        default:
+          console.error('Unknown backend:', backend);
+          return;
+      }
+      
+      console.log(`SYNCING CONFIGURATION WITH SERVER - Backend: ${backend}`);
+      
+      // Send the configuration to the server
+      fetch('/api/set-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: userId,
+          backend: backend,
+          config: currentConfig
+        })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          console.log('CONFIGURATION SYNCED WITH SERVER SUCCESSFULLY');
+          setConfigSyncedWithServer(true);
+        } else {
+          console.error('FAILED TO SYNC CONFIGURATION WITH SERVER', data.error);
+        }
+      })
+      .catch(error => {
+        console.error('ERROR SYNCING CONFIGURATION WITH SERVER', error);
+      });
+    }
+  }, [configApplied, configSyncedWithServer, backend, ollamaConfig, webLLMConfig, apiConfig, userId]);
+  
+  // Handle configuration save
+  const saveConfig = () => {
+    console.log(`SAVING CONFIGURATION - Selected Backend: ${backend}`);
+    
+    if (backend === 'api') {
+      console.log('API CONFIG:', apiConfig);
+    } else if (backend === 'ollama') {
+      console.log('OLLAMA CONFIG:', ollamaConfig);
+    } else if (backend === 'webllm') {
+      console.log('WEBLLM CONFIG:', webLLMConfig);
+    }
+    
+    const config = {
+      backend,
+      ollama: ollamaConfig,
+      webllm: webLLMConfig,
+      api: apiConfig
+    };
+    localStorage.setItem('llmConfig', JSON.stringify(config));
+    setConfigApplied(true);
+    // Reset config sync status to trigger a new sync
+    setConfigSyncedWithServer(false);
+    setShowConfig(false);
+  };
+  
+  // Handle audit completion event
+  const handleAuditFinished = (event) => {
+    console.log('Audit finished:', event.detail);
+    
+    // Display consent dialog for data collection (implementation placeholder)
+    const consentToShare = window.confirm(
+      "Would you be willing to share your audit data with the developers to improve the system? " +
+      "No personal information will be shared, only the conversation and audit responses."
+    );
+    
+    if (consentToShare) {
+      console.log("User consented to share data. This would send data to a server in a real implementation.");
+      // Here you would implement the data sharing functionality
+    } else {
+      console.log("User declined to share data.");
+    }
+  };
+  
+  // Set up event listener for audit completion
+  useEffect(() => {
+    document.addEventListener('trails-chatbot:audit-finished', handleAuditFinished);
+    return () => {
+      document.removeEventListener('trails-chatbot:audit-finished', handleAuditFinished);
+    };
+  }, []);
+  
+  // Get the proxy URL based on current backend
+  const getProxyUrl = () => {
+    if (backend === 'ollama') {
+      // Return the full proxy URL - IMPORTANT: no /api prefix for Ollama
+      return ollamaConfig.proxyUrl;
+    } else if (backend === 'api') {
+      // For API keys, return the absolute URL to our server
+      return 'http://localhost:3000';
+    }
+    // For WebLLM, return the absolute URL to our server
+    return 'http://localhost:3000';
+  };
+
+  // Get the current backend configuration
+  const getCurrentConfig = () => {
+    switch(backend) {
+      case 'ollama': return ollamaConfig;
+      case 'webllm': return webLLMConfig;
+      case 'api': return apiConfig;
+      default: return {};
+    }
+  };
+
+  return (
+    <div className="app-container">
+      <header>
+        <h1>TRAILS Chatbot</h1>
+        <button 
+          onClick={() => setShowConfig(!showConfig)} 
+          className="config-toggle"
+        >
+          {showConfig ? 'Hide' : 'Show'} Settings
+        </button>
+      </header>
+      
+      {showConfig && (
+        <div className="config-panel">
+          <h3>Chatbot Settings</h3>
+          
+          <LLMSelector 
+            backend={backend} 
+            setBackend={handleBackendChange} 
+          />
+          
+          {backend === 'ollama' && (
+            <OllamaSetup 
+              config={ollamaConfig}
+              setConfig={setOllamaConfig}
+            />
+          )}
+          
+          {backend === 'webllm' && (
+            <WebLLMSetup 
+              config={webLLMConfig}
+              setConfig={setWebLLMConfig}
+            />
+          )}
+          
+          {backend === 'api' && (
+            <APIKeySetup 
+              config={apiConfig}
+              setConfig={setApiConfig}
+            />
+          )}
+          
+          <button onClick={saveConfig} className="save-button">
+            Save Configuration
+          </button>
+        </div>
+      )}
+      
+      {configApplied && (
+        <div className="chatbot-container">
+          <TrailsChatbot
+            userId={userId}
+            llmProxyServerUrl={getProxyUrl()}
+            debugMode={true} // Enable debug mode to see more logs
+            config={{
+              timerMaxOverallChatTimeSeconds: 30 * 60, // 30 minutes total
+              timerChatsMaxSeconds: [7 * 60, 7 * 60],  // 7 minutes per chat
+              timerWarningChatTimeIsUpSeconds: 2 * 60,  // 2 min warning
+              timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60 // 3 min minimum
+            }}
+          />
+          
+          {/* Display backend status indicator */}
+          <BackendStatus 
+            backend={backend} 
+            config={getCurrentConfig()} 
+          />
+          
+          {/* Display sync status if needed */}
+          {configApplied && !configSyncedWithServer && (
+            <div style={{
+              position: 'fixed',
+              top: '70px',
+              right: '10px',
+              backgroundColor: '#fff3cd',
+              color: '#856404',
+              padding: '8px 12px',
+              borderRadius: '4px',
+              fontSize: '0.8rem',
+              zIndex: 1000,
+              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+              pointerEvents: 'none'
+            }}>
+              Syncing configuration...
+            </div>
+          )}
+        </div>
+      )}
+      
+      {!configApplied && !showConfig && (
+        <div className="config-prompt">
+          <p>Please configure your LLM settings to continue.</p>
+          <button 
+            onClick={() => setShowConfig(true)} 
+            className="config-button"
+          >
+            Configure
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default App;
 
 ================
 File: src/index.js
@@ -2699,47 +3313,156 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
+// Simple in-memory session store to keep track of user configurations
+const sessionStore = {
+  sessions: {},
+  
+  // Store a user's configuration
+  setUserConfig(userId, config) {
+    console.log(`SETTING USER CONFIG for ${userId}:`, config);
+    this.sessions[userId] = {
+      ...config,
+      lastUpdated: new Date()
+    };
+    return true;
+  },
+  
+  // Get a user's configuration
+  getUserConfig(userId) {
+    const config = this.sessions[userId];
+    if (config) {
+      console.log(`RETRIEVED USER CONFIG for ${userId}:`, config);
+    } else {
+      console.log(`NO CONFIG FOUND for ${userId}`);
+    }
+    return config;
+  },
+  
+  // Clean up old sessions (can be called periodically)
+  cleanup() {
+    const now = new Date();
+    const expireTime = 24 * 60 * 60 * 1000; // 24 hours
+    
+    Object.keys(this.sessions).forEach(userId => {
+      const session = this.sessions[userId];
+      if (now - session.lastUpdated > expireTime) {
+        delete this.sessions[userId];
+      }
+    });
+  }
+};
+
 // Enable CORS
 app.use(cors());
 
 // Parse JSON request bodies
 app.use(express.json());
 
-// Log all requests for debugging
+// Enhanced request logging middleware
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
+  const startTime = Date.now();
+  const originalSend = res.send;
+  
+  // Pretty formatting for the method + URL in logs
+  const methodColor = '\x1b[36m'; // Cyan
+  const resetColor = '\x1b[0m';
+  console.log(`${methodColor}${req.method} ${req.url}${resetColor}`);
+  
+  // Add header logging for important requests
+  if (req.url === '/chat') {
+    console.log('REQUEST HEADERS:', {
+      'x-api-provider': req.headers['x-api-provider'],
+      'x-api-model': req.headers['x-api-model'],
+      'x-api-base-url': req.headers['x-api-base-url'],
+      // Only show the last 4 chars of API key for security
+      'x-api-key': req.headers['x-api-key'] ? 
+        '***' + req.headers['x-api-key'].slice(-4) : undefined,
+      'x-ollama-url': req.headers['x-ollama-url'],
+      'x-ollama-model': req.headers['x-ollama-model']
+    });
+  }
+  
+  // Add response logging
+  res.send = function(body) {
+    const duration = Date.now() - startTime;
+    console.log(`Response sent in ${duration}ms - Status: ${res.statusCode}`);
+    return originalSend.call(this, body);
+  };
+  
   next();
 });
 
+// Endpoint to save user configuration
+app.post('/api/set-config', (req, res) => {
+  const { userId, backend, config } = req.body;
+  
+  if (!userId || !backend || !config) {
+    return res.status(400).json({ 
+      error: 'Missing required parameters' 
+    });
+  }
+  
+  console.log(`RECEIVED CONFIG UPDATE for user ${userId}`);
+  console.log(`BACKEND: ${backend}`);
+  console.log('CONFIG:', config);
+  
+  // Store the configuration
+  sessionStore.setUserConfig(userId, { backend, config });
+  
+  res.json({ success: true });
+});
+
 // IMPORTANT: This is the main chat endpoint that TRAILS-Chatbot uses
-// It must be at /chat, not /api/chat
 app.post('/chat', async (req, res) => {
   try {
     // Extract the relevant information from the request
-    const { pid, messages } = req.body;
-    console.log(`Processing chat request for pid: ${pid}`);
-    console.log(`Messages count: ${messages?.length || 0}`);
+    const { pid: userId, messages } = req.body;
+    console.log(`CHAT REQUEST - User ID: ${userId}, Messages: ${messages?.length || 0}`);
     
-    // Check if this is an API provider request
+    // Get the user's configuration from the session store
+    const userConfig = sessionStore.getUserConfig(userId);
+    
+    // Check if we have API configuration in the headers (legacy support)
     const apiProvider = req.headers['x-api-provider'];
     const apiKey = req.headers['x-api-key'];
     const apiModel = req.headers['x-api-model'];
     const apiBaseUrl = req.headers['x-api-base-url'];
     
-    if (apiProvider && apiKey) {
-      // Handle API provider request
+    // Use the session store config if available, otherwise fall back to headers
+    if (userConfig && userConfig.backend === 'api') {
+      console.log(`USING STORED CONFIG: Backend ${userConfig.backend}, Provider ${userConfig.config.provider}`);
+      
+      // Get the API config from the session store
+      const apiConfig = userConfig.config;
+      
+      return handleApiProviderRequest(req, res, 
+        apiConfig.provider, 
+        apiConfig.apiKey, 
+        apiConfig.model, 
+        apiConfig.baseUrl
+      );
+    } else if (apiProvider && apiKey) {
+      console.log(`USING HEADER CONFIG: Provider ${apiProvider}`);
       return handleApiProviderRequest(req, res, apiProvider, apiKey, apiModel, apiBaseUrl);
     }
     
     // Otherwise, handle Ollama request
-    // Get Ollama URL from request header or use default
-    const ollamaUrl = req.headers['x-ollama-url'] || 'http://localhost:11434';
+    // If there's a stored config for Ollama, use that
+    let ollamaUrl = 'http://localhost:11434';
+    let ollamaModel = 'llama3';
     
-    // Get Ollama model from request or use default
-    const ollamaModel = req.headers['x-ollama-model'] || 'llama3';
+    if (userConfig && userConfig.backend === 'ollama') {
+      ollamaUrl = userConfig.config.url || ollamaUrl;
+      ollamaModel = userConfig.config.model || ollamaModel;
+      console.log(`USING STORED OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+    } else {
+      // For backward compatibility, get from headers if available
+      ollamaUrl = req.headers['x-ollama-url'] || ollamaUrl;
+      ollamaModel = req.headers['x-ollama-model'] || ollamaModel;
+      console.log(`USING DEFAULT/HEADER OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+    }
     
-    console.log(`Proxying request to Ollama (${ollamaUrl})`);
-    console.log(`Using model: ${ollamaModel}`);
+    console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
     
     // Format messages for Ollama API
     const ollamaMessages = messages.map(msg => ({
@@ -2756,6 +3479,7 @@ app.post('/chat', async (req, res) => {
     }
     
     try {
+      console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
       // Call Ollama API
       const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
         model: ollamaModel,
@@ -2766,6 +3490,8 @@ app.post('/chat', async (req, res) => {
           num_predict: 2000
         }
       });
+      
+      console.log('RECEIVED RESPONSE FROM OLLAMA');
       
       // Format response to match what the TRAILS chatbot expects
       const responseData = {
@@ -2779,6 +3505,7 @@ app.post('/chat', async (req, res) => {
         }
       };
       
+      console.log('RETURNING RESPONSE TO CLIENT');
       res.json(responseData);
     } catch (error) {
       console.error('Error calling Ollama API:', error.message);
@@ -2813,7 +3540,7 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
   const { messages } = req.body;
   
   try {
-    console.log(`Processing ${provider} API request for model: ${model}`);
+    console.log(`PROCESSING ${provider.toUpperCase()} API REQUEST - Model: ${model}`);
     
     // Format messages according to provider requirements
     const formattedMessages = formatMessagesForProvider(messages, provider);
@@ -2896,8 +3623,12 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         throw new Error(`Unsupported provider: ${provider}`);
     }
     
+    console.log(`SENDING REQUEST TO ${provider.toUpperCase()} API at ${apiEndpoint}`);
+    
     // Make the API request
     const apiResponse = await axios.post(apiEndpoint, requestBody, { headers });
+    
+    console.log(`RECEIVED RESPONSE FROM ${provider.toUpperCase()} API`);
     
     // Extract and format the response based on provider
     let assistantResponse;
@@ -2930,6 +3661,7 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
       }
     };
     
+    console.log('RETURNING API RESPONSE TO CLIENT');
     res.json(responseData);
   } catch (error) {
     console.error(`Error processing ${provider} API request:`, error.message);
@@ -2964,6 +3696,8 @@ function formatMessagesForProvider(messages, provider) {
     });
   }
   
+  console.log(`FORMATTING MESSAGES FOR ${provider.toUpperCase()}`);
+  
   // Provider-specific formatting
   switch (provider) {
     case 'anthropic':
@@ -2996,6 +3730,8 @@ app.post('/api/test-api-key', async (req, res) => {
     return res.status(400).json({ error: 'Provider and API key are required' });
   }
   
+  console.log(`TESTING API KEY FOR ${provider.toUpperCase()} - Model: ${model}`);
+  
   try {
     // Create test request based on provider
     let testEndpoint;
@@ -3022,12 +3758,16 @@ app.post('/api/test-api-key', async (req, res) => {
         return res.status(400).json({ error: 'Unsupported provider' });
     }
     
+    console.log(`SENDING TEST REQUEST TO ${testEndpoint}`);
+    
     // Make test request
     const response = await axios.get(testEndpoint, { headers });
     
     if (response.status === 200) {
+      console.log(`API KEY TEST SUCCESSFUL FOR ${provider.toUpperCase()}`);
       res.json({ success: true });
     } else {
+      console.log(`API KEY TEST FAILED FOR ${provider.toUpperCase()} - Status: ${response.status}`);
       res.status(response.status).json({ error: 'API key validation failed' });
     }
   } catch (error) {
@@ -3072,6 +3812,15 @@ app.use('/api/ollama', createProxyMiddleware({
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0' });
 });
+
+// Clean up old sessions periodically
+setInterval(() => {
+  try {
+    sessionStore.cleanup();
+  } catch (error) {
+    console.error('Error cleaning up session store:', error);
+  }
+}, 3600000); // Once per hour
 
 // In development mode, don't try to serve the static build files
 if (!isDevelopment) {
