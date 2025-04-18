@@ -1,0 +1,32 @@
+.instructions-container {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  margin: 20px 0;
+}
+
+.instructions-container ul {
+  list-style-type: none;
+  padding-left: 20px;
+}
+
+.instructions-container li {
+  margin-bottom: 10px;
+}
+
+.instructions-container li::before {
+  content: '•';
+  color: #3498db;
+  font-weight: bold;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 10002;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+  pointer-events: auto !important;
+}

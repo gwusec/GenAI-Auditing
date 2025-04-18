@@ -1,0 +1,72 @@
+/* rename as .chatHistory__messageContent; Element: Container for message content within chatHistory block. */
+.message-content {
+    font-family: monospace;
+    font-size: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-family: monospace !important;
+}
+
+/* rename as */
+.message-content mark {
+    background-color: yellow;
+    color: inherit;
+    font-size: inherit;
+    font-family: inherit;
+    padding: 0 2px;
+}
+
+/* rename as .chatHistory__highlight; Element: Styles highlighted text within chatHistory.*/
+.highlight {
+    background-color: yellow;
+    color: inherit;
+    display: inline;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* rename as .chatHistory__highlightContainer; Element: Container for highlighted text and handles within chatHistory. */
+.highlightContainer {
+    position: relative;
+    display: inline-block;
+}
+
+/* rename as .chatHistory__highlightHandle; Element: Styles the handle for resizing highlights within chatHistory. */
+.highlightHandle {
+    position: absolute;
+    width: 6px;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.3);
+    cursor: ew-resize;
+    z-index: 1;
+}
+
+/* rename as .chatHistory__highlightHandle--start; Modifier: Positions the start handle within chatHistory. */
+.highlightHandleStart {
+    left: -3px;
+}
+
+/* rename as .chatHistory__highlightHandle--end; Modifier: Positions the end handle within chatHistory. */
+.highlightHandleEnd {
+    right: -3px;
+}
+
+/* rename as .chatHistory__statusChip--restart; Modifier: Specifies the chip is for "Restarted Conversation". */
+.restart-chip {
+    background-color: #4caf50 !important;
+    color: white !important;
+    margin-bottom: 8px !important;
+
+}
+
+/* rename as .chatHistory__statusChip--edit; Modifier: Specifies the chip is for "Edited Message". */
+.edit-chip {
+    background-color: #ff9800 !important;
+    color: white !important;
+    margin-bottom: 8px !important;
+    user-select: none;
+}
+
