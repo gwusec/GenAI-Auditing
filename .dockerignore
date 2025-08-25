@@ -58,3 +58,6 @@ __tests__
 # Temporary files
 tmp/
 temp/
+
+.build
+.env

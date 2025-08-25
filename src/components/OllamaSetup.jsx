@@ -3,10 +3,12 @@ import './OllamaSetup.css';
 
 function OllamaSetup({ config, setConfig }) {
   const [connectionStatus, setConnectionStatus] = useState('unknown');
-  const [modelStatus, setModelStatus] = useState('unknown'); // Track model availability separately
+  const [modelStatus, setModelStatus] = useState('unknown');
+  const [triedUrls, setTriedUrls] = useState([]); // Track which URLs we've tried
+  const [autoConfiguredUrl, setAutoConfiguredUrl] = useState(null); // Track if URL was auto-configured
   
   // Use the correct Ollama model name
-  const FIXED_MODEL = 'llama3.1';  // Changed from 'llama3.1:8b-instruct'
+  const FIXED_MODEL = 'llama3.1';
   
   // Ensure the model is always set to the fixed value
   useEffect(() => {
@@ -36,55 +38,102 @@ function OllamaSetup({ config, setConfig }) {
   const checkOllamaConnection = async () => {
     setConnectionStatus('checking');
     setModelStatus('checking');
+    setTriedUrls([]);
+    setAutoConfiguredUrl(null); // Reset auto-config status
     
-    try {
-      // First try a direct connection to check if Ollama is running
-      let response = await fetch(`${config.url}/api/tags`, { 
-        signal: AbortSignal.timeout(3000) 
-      });
+    // Store original URL to check if we auto-configured later
+    const originalUrl = config.url;
+    
+    // URLs to try in order of preference
+    const urlsToTry = [
+      config.url, // User's current setting
+      'http://localhost:11434', // Standard local
+      'http://host.docker.internal:11434', // Docker Desktop (Mac/Windows)
+      'http://172.17.0.1:11434', // Docker default bridge (Linux)
+      'http://192.168.65.2:11434', // Docker Desktop alternative
+    ].filter((url, index, self) => 
+      // Remove duplicates and empty URLs
+      url && url.trim() && self.indexOf(url) === index
+    );
+    
+    console.log('Trying Ollama URLs in order:', urlsToTry);
+    
+    for (const url of urlsToTry) {
+      console.log(`Attempting connection to: ${url}`);
+      setTriedUrls(prev => [...prev, { url, status: 'trying' }]);
       
-      // If direct connection fails, try via proxy
-      if (!response.ok) {
-        console.log('Direct connection failed, trying proxy...');
-        response = await fetch(`${config.proxyUrl}/api/ollama/api/tags`, {
-          headers: { 'x-ollama-url': config.url },
-          signal: AbortSignal.timeout(3000)
+      try {
+        // First try direct connection
+        let response = await fetch(`${url}/api/tags`, { 
+          signal: AbortSignal.timeout(3000) 
         });
-      }
-      
-      if (!response.ok) {
-        throw new Error('Failed to connect to Ollama');
-      }
-      
-      const data = await response.json();
-      setConnectionStatus('connected');
-      console.log('Connected to Ollama. Available models:', data.models?.map(m => m.name));
-
-      // Check if the required model is available
-      if (data.models) {
-        const modelNames = data.models.map(model => model.name);
-        const hasRequiredModel = modelNames.some(name => 
-          name === FIXED_MODEL || 
-          name === `${FIXED_MODEL}:latest` ||
-          name === `${FIXED_MODEL}:8b` ||
-          name.startsWith(`${FIXED_MODEL}:`)
-        );
         
-        if (hasRequiredModel) {
-          setModelStatus('available');
-          console.log(`Model ${FIXED_MODEL} is available`);
-        } else {
-          setModelStatus('not_pulled');
-          console.warn(`Model ${FIXED_MODEL} not found. Available models:`, modelNames);
+        // If direct connection fails, try via proxy
+        if (!response.ok) {
+          console.log(`Direct connection to ${url} failed, trying proxy...`);
+          response = await fetch(`${config.proxyUrl}/api/ollama/api/tags`, {
+            headers: { 'x-ollama-url': url },
+            signal: AbortSignal.timeout(3000)
+          });
         }
-      } else {
-        setModelStatus('unknown');
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          console.log(`✅ Successfully connected to Ollama at: ${url}`);
+          console.log('Available models:', data.models?.map(m => m.name));
+          
+          // Update the config with the working URL if it's different
+          if (originalUrl !== url) {
+            console.log(`Auto-updating Ollama URL from ${originalUrl} to ${url}`);
+            setAutoConfiguredUrl(url); // Track that we auto-configured
+            setConfig(prevConfig => ({
+              ...prevConfig,
+              url: url
+            }));
+          }
+          
+          setConnectionStatus('connected');
+          setTriedUrls(prev => prev.map(item => 
+            item.url === url ? { ...item, status: 'success' } : item
+          ));
+
+          // Check if the required model is available
+          if (data.models) {
+            const modelNames = data.models.map(model => model.name);
+            const hasRequiredModel = modelNames.some(name => 
+              name === FIXED_MODEL || 
+              name === `${FIXED_MODEL}:latest` ||
+              name === `${FIXED_MODEL}:8b` ||
+              name.startsWith(`${FIXED_MODEL}:`)
+            );
+            
+            if (hasRequiredModel) {
+              setModelStatus('available');
+              console.log(`✅ Model ${FIXED_MODEL} is available`);
+            } else {
+              setModelStatus('not_pulled');
+              console.warn(`⚠️  Model ${FIXED_MODEL} not found. Available models:`, modelNames);
+            }
+          } else {
+            setModelStatus('unknown');
+          }
+          
+          return; // Success! Exit the loop
+        }
+        
+      } catch (error) {
+        console.log(`❌ Failed to connect to ${url}:`, error.message);
+        setTriedUrls(prev => prev.map(item => 
+          item.url === url ? { ...item, status: 'failed', error: error.message } : item
+        ));
       }
-    } catch (error) {
-      console.error('Error connecting to Ollama:', error);
-      setConnectionStatus('disconnected');
-      setModelStatus('unknown');
     }
+    
+    // If we get here, all URLs failed
+    console.error('❌ Failed to connect to Ollama on any URL');
+    setConnectionStatus('disconnected');
+    setModelStatus('unknown');
   };
   
   // Function to copy pull command to clipboard
@@ -108,7 +157,9 @@ function OllamaSetup({ config, setConfig }) {
             onChange={handleChange}
             placeholder="http://localhost:11434"
           />
-          <p className="field-hint">Local Ollama server URL</p>
+          <p className="field-hint">
+            Local Ollama server URL (will auto-detect best URL)
+          </p>
         </div>
         
         <div className="form-group">
@@ -165,6 +216,31 @@ function OllamaSetup({ config, setConfig }) {
         </div>
       </div>
       
+      {/* Show connection attempts for debugging */}
+      {triedUrls.length > 0 && connectionStatus === 'checking' && (
+        <div className="ollama-help" style={{ backgroundColor: '#f0f4f8', borderColor: '#3498db' }}>
+          <h5>🔍 Connection Attempts</h5>
+          {triedUrls.map((item, index) => (
+            <p key={index} style={{ margin: '5px 0', fontSize: '0.8rem' }}>
+              <strong>{item.url}:</strong> {
+                item.status === 'trying' ? '🔄 Trying...' :
+                item.status === 'success' ? '✅ Connected!' :
+                item.status === 'failed' ? `❌ Failed (${item.error})` : '⏳ Pending'
+              }
+            </p>
+          ))}
+        </div>
+      )}
+      
+      {connectionStatus === 'connected' && autoConfiguredUrl && (
+        <div className="ollama-help" style={{ backgroundColor: '#d1ecf1', borderColor: '#17a2b8' }}>
+          <h5>🔄 Auto-Configuration</h5>
+          <p style={{ color: '#0c5460' }}>
+            Automatically found Ollama at <strong>{autoConfiguredUrl}</strong>
+          </p>
+        </div>
+      )}
+      
       {modelStatus === 'not_pulled' && (
         <div className="ollama-help" style={{ backgroundColor: '#fff3cd', borderColor: '#ffc107' }}>
           <h5 style={{ color: '#856404' }}>⚠️ Model Not Found</h5>
@@ -204,21 +280,25 @@ function OllamaSetup({ config, setConfig }) {
       
       {modelStatus === 'available' && (
         <div className="ollama-help" style={{ backgroundColor: '#d4edda', borderColor: '#28a745' }}>
-          <h5 style={{ color: '#155724' }}>✓ Ready to Use</h5>
+          <h5 style={{ color: '#155724' }}>✅ Ready to Use</h5>
           <p style={{ color: '#155724' }}>
             Ollama is connected and the {FIXED_MODEL} model is installed. You're ready to start chatting!
           </p>
         </div>
       )}
       
-      {(modelStatus === 'unknown' || connectionStatus === 'disconnected') && (
+      {connectionStatus === 'disconnected' && (
         <div className="ollama-help">
           <h5>Setup Instructions</h5>
           <p>
-            1. <a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a><br/>
-            2. Run: <code>ollama pull {FIXED_MODEL}</code><br/>
-            3. Start Ollama: <code>ollama serve</code>
+            The app tried multiple connection methods but couldn't find Ollama. Please ensure:
           </p>
+          <ol style={{ margin: '10px 0', paddingLeft: '20px' }}>
+            <li><a href="https://ollama.com/download" target="_blank" rel="noopener noreferrer">Download Ollama</a></li>
+            <li>Start Ollama: <code>ollama serve</code></li>
+            <li>Install the model: <code>ollama pull {FIXED_MODEL}</code></li>
+            <li>Click "Check Connection" again</li>
+          </ol>
         </div>
       )}
     </div>

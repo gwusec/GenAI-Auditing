@@ -254,7 +254,7 @@ return (
         <TrailsChatbot
           userId={userId}
           llmProxyServerUrl={getProxyUrl()}
-          debugMode={false}
+          debugMode={true}
           config={{
             timerMaxOverallChatTimeSeconds: 30 * 60,
             timerChatsMaxSeconds: [7 * 60, 7 * 60],

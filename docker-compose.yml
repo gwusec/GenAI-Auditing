@@ -1,0 +1,8 @@
+# docker-compose.yml
+services:
+  app:
+    image: chatbot:osf   # we'll retag the loaded image to this name
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production

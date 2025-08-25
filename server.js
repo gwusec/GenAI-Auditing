@@ -48,6 +48,59 @@ const sessionStore = {
   }
 };
 
+/**
+ * Smart connection logic for Ollama - tries multiple URLs to find a working connection
+ */
+async function findWorkingOllamaUrl(configUrl, model = 'llama3.1') {
+  const urlsToTry = [
+    configUrl, // User's configured URL
+    'http://localhost:11434', // Standard local
+    'http://host.docker.internal:11434', // Docker Desktop (Mac/Windows)
+    'http://172.17.0.1:11434', // Docker default bridge (Linux)
+    'http://192.168.65.2:11434', // Docker Desktop alternative
+  ].filter((url, index, self) => 
+    // Remove duplicates and empty URLs
+    url && url.trim() && self.indexOf(url) === index
+  );
+
+  console.log('🔍 Trying Ollama URLs:', urlsToTry);
+
+  for (const url of urlsToTry) {
+    try {
+      console.log(`   Attempting: ${url}`);
+      
+      // Test connection with a simple request
+      const response = await axios.get(`${url}/api/tags`, {
+        timeout: 3000,
+        validateStatus: (status) => status === 200
+      });
+      
+      if (response.data && response.data.models) {
+        // Check if the required model is available
+        const modelNames = response.data.models.map(model => model.name);
+        const hasRequiredModel = modelNames.some(name => 
+          name === model || 
+          name === `${model}:latest` ||
+          name === `${model}:8b` ||
+          name.startsWith(`${model}:`)
+        );
+        
+        if (hasRequiredModel) {
+          console.log(`✅ Found working Ollama with ${model} at: ${url}`);
+          return url;
+        } else {
+          console.log(`⚠️  Ollama at ${url} doesn't have model ${model}`);
+        }
+      }
+    } catch (error) {
+      console.log(`   ❌ Failed: ${error.message}`);
+    }
+  }
+  
+  console.log('❌ No working Ollama URL found');
+  return null;
+}
+
 // Enable CORS
 app.use(cors());
 
@@ -142,23 +195,57 @@ app.post('/chat', async (req, res) => {
       return handleApiProviderRequest(req, res, apiProvider, apiKey, apiModel, apiBaseUrl);
     }
     
-    // Otherwise, handle Ollama request
-    // If there's a stored config for Ollama, use that
-    let ollamaUrl = 'http://localhost:11434';
-    let ollamaModel = 'llama3';
-    
-    if (userConfig && userConfig.backend === 'ollama') {
-      ollamaUrl = userConfig.config.url || ollamaUrl;
-      ollamaModel = userConfig.config.model || ollamaModel;
-      console.log(`USING STORED OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
-    } else {
-      // For backward compatibility, get from headers if available
-      ollamaUrl = req.headers['x-ollama-url'] || ollamaUrl;
-      ollamaModel = req.headers['x-ollama-model'] || ollamaModel;
-      console.log(`USING DEFAULT/HEADER OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+// Otherwise, handle Ollama request with smart connection logic
+let ollamaUrl = 'http://localhost:11434';
+let ollamaModel = 'llama3.1';
+
+if (userConfig && userConfig.backend === 'ollama') {
+  ollamaUrl = userConfig.config.url || ollamaUrl;
+  ollamaModel = userConfig.config.model || ollamaModel;
+  console.log(`USING STORED OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+} else {
+  // For backward compatibility, get from headers if available
+  ollamaUrl = req.headers['x-ollama-url'] || ollamaUrl;
+  ollamaModel = req.headers['x-ollama-model'] || ollamaModel;
+  console.log(`USING DEFAULT/HEADER OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
+}
+
+// 🚀 NEW: Use smart connection logic to find working URL
+console.log(`🔍 Using smart connection logic for Ollama...`);
+const workingUrl = await findWorkingOllamaUrl(ollamaUrl, ollamaModel);
+
+if (!workingUrl) {
+  console.error('❌ Could not find any working Ollama installation');
+  return res.status(500).json({
+    statusCode: 500,
+    error: 'Could not connect to Ollama. Please make sure Ollama is running and the model is installed.',
+    body: {
+      message: {
+        role: 'assistant',
+        content: `I couldn't connect to Ollama. Please ensure:\n\n1. Ollama is running (ollama serve)\n2. The model is installed (ollama pull ${ollamaModel})\n3. Ollama is accessible from Docker\n\nTried these URLs: ${[ollamaUrl, 'http://host.docker.internal:11434', 'http://172.17.0.1:11434'].join(', ')}`
+      },
+      finish_reason: 'error'
     }
-    
-    console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
+  });
+}
+
+// Update the URL to the working one (and optionally save it back to config)
+ollamaUrl = workingUrl;
+console.log(`✅ Using working Ollama URL: ${ollamaUrl}`);
+
+// Update user config with working URL if it's different
+if (userConfig && userConfig.config.url !== workingUrl) {
+  console.log(`💾 Auto-updating user config with working URL: ${workingUrl}`);
+  sessionStore.setUserConfig(userId, {
+    ...userConfig,
+    config: {
+      ...userConfig.config,
+      url: workingUrl
+    }
+  });
+}
+
+console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
     
     // Format messages for Ollama API
     const ollamaMessages = messages.map(msg => ({
