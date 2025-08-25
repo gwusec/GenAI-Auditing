@@ -1,52 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import './APIKeySetup.css';
 
-// List of available API providers
+// List of available API providers - ONLY OPENAI
 const API_PROVIDERS = [
-  { id: 'openai', name: 'OpenAI', logo: '/openai-logo.png', fallbackLogo: 'https://openai.com/content/images/2022/05/openai-logo-1.svg' },
-  { id: 'anthropic', name: 'Anthropic', logo: '/anthropic-logo.png', fallbackLogo: 'https://assets-global.website-files.com/62a295c7120a7e4c6220712a/62a2b61930dc1b42a9ee1ad2_Logo%20Icon%20for%20Favicon.svg' },
-  { id: 'cohere', name: 'Cohere', logo: '/cohere-logo.png', fallbackLogo: 'https://cohere.com/favicon/favicon.ico' },
-  { id: 'gemini', name: 'Google Gemini', logo: '/gemini-logo.png', fallbackLogo: 'https://gemini.google.com/favicon.ico' }
+  { id: 'openai', name: 'OpenAI', logo: '/openai-logo.png', fallbackLogo: 'https://openai.com/content/images/2022/05/openai-logo-1.svg' }
 ];
 
 // List of available models per provider
 const PROVIDER_MODELS = {
   openai: [
-    { id: 'gpt-4o', name: 'GPT-4o' },
-    { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-    { id: 'gpt-4', name: 'GPT-4' },
-    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-  ],
-  anthropic: [
-    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus' },
-    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet' },
-    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' },
-    { id: 'claude-2.1', name: 'Claude 2.1' }
-  ],
-  cohere: [
-    { id: 'command-r-plus', name: 'Command R+' },
-    { id: 'command-r', name: 'Command R' },
-    { id: 'command', name: 'Command' }
-  ],
-  gemini: [
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
-    { id: 'gemini-1.0-pro', name: 'Gemini 1.0 Pro' }
+    { id: 'gpt-4o', name: 'GPT-4o' }
+    // { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+    // { id: 'gpt-4', name: 'GPT-4' },
+    // { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
   ]
 };
 
 // API base URLs
 const API_BASE_URLS = {
-  openai: 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com/v1',
-  cohere: 'https://api.cohere.ai/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta'
+  openai: 'https://api.openai.com/v1'
 };
 
 function APIKeySetup({ config, setConfig }) {
   const [testStatus, setTestStatus] = useState(null);
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  
+  // Initialize with OpenAI as default since it's the only option
+  useEffect(() => {
+    if (!config.provider || config.provider !== 'openai') {
+      const newConfig = {
+        ...config,
+        provider: 'openai',
+        model: config.model || PROVIDER_MODELS.openai[0].id,
+        baseUrl: config.baseUrl || API_BASE_URLS.openai
+      };
+      setConfig(newConfig);
+    }
+  }, []);
   
   // Log when the component receives updated config props
   useEffect(() => {
@@ -64,28 +55,10 @@ function APIKeySetup({ config, setConfig }) {
     
     console.log(`API_SETUP: Field "${name}" changed to "${name === 'apiKey' ? '***' : value}"`);
     
-    if (name === 'provider') {
-      // When provider changes, update the model to the first available model
-      const newProvider = value;
-      const firstModel = PROVIDER_MODELS[newProvider]?.[0]?.id || '';
-      const baseUrl = API_BASE_URLS[newProvider] || '';
-      
-      console.log(`API_SETUP: Provider changed to "${newProvider}"`);
-      console.log(`API_SETUP: Setting default model to "${firstModel}"`);
-      console.log(`API_SETUP: Setting default baseUrl to "${baseUrl}"`);
-      
-      setConfig({
-        ...config,
-        provider: newProvider,
-        model: firstModel,
-        baseUrl: baseUrl
-      });
-    } else {
-      setConfig({
-        ...config,
-        [name]: value
-      });
-    }
+    setConfig({
+      ...config,
+      [name]: value
+    });
   };
   
   // Handle API key display toggle
@@ -134,28 +107,32 @@ function APIKeySetup({ config, setConfig }) {
   
   return (
     <div className="api-key-setup">
-      <h4>API Configuration</h4>
+      <h4>OpenAI API Configuration</h4>
       
+      {/* Since we only have OpenAI, we can show it as a simple header instead of selection */}
       <div className="provider-selection">
-        <label htmlFor="provider">Select API Provider:</label>
-        <div className="provider-options">
-          {API_PROVIDERS.map(provider => (
-            <div 
-              key={provider.id} 
-              className={`provider-option ${config.provider === provider.id ? 'selected' : ''}`}
-              onClick={() => handleChange({ target: { name: 'provider', value: provider.id } })}
-              data-testid={`provider-${provider.id}`}
-            >
-              <div className="provider-logo">
-                <img 
-                  src={provider.logo} 
-                  alt={provider.name} 
-                  onError={(e) => {e.target.src = provider.fallbackLogo}}
-                />
-              </div>
-              <div className="provider-name">{provider.name}</div>
-            </div>
-          ))}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '15px',
+          marginBottom: '20px',
+          padding: '15px',
+          backgroundColor: '#f0f4f8',
+          borderRadius: '8px',
+          border: '2px solid #3498db'
+        }}>
+          <img 
+            src={API_PROVIDERS[0].logo} 
+            alt={API_PROVIDERS[0].name} 
+            onError={(e) => {e.target.src = API_PROVIDERS[0].fallbackLogo}}
+            style={{ width: '40px', height: '40px', objectFit: 'contain' }}
+          />
+          <div>
+            <h5 style={{ margin: 0, color: '#333' }}>OpenAI</h5>
+            <p style={{ margin: 0, fontSize: '0.9rem', color: '#666' }}>
+              Using OpenAI's GPT models
+            </p>
+          </div>
         </div>
       </div>
       
@@ -169,7 +146,7 @@ function APIKeySetup({ config, setConfig }) {
               name="apiKey"
               value={config.apiKey}
               onChange={handleChange}
-              placeholder="Enter your API key"
+              placeholder="Enter your OpenAI API key"
               data-testid="api-key-input"
             />
             <button 
@@ -192,29 +169,29 @@ function APIKeySetup({ config, setConfig }) {
             onChange={handleChange}
             data-testid="model-select"
           >
-            {PROVIDER_MODELS[config.provider]?.map(model => (
+            {PROVIDER_MODELS.openai.map(model => (
               <option key={model.id} value={model.id}>
                 {model.name}
               </option>
             ))}
           </select>
-          <p className="field-hint">Select the model to use</p>
+          <p className="field-hint">Select the OpenAI model to use</p>
         </div>
       </div>
       
       <div className="form-row">
         <div className="form-group">
-          <label htmlFor="baseUrl">API Base URL:</label>
+          <label htmlFor="baseUrl">API Base URL (Optional):</label>
           <input
             type="text"
             id="baseUrl"
             name="baseUrl"
             value={config.baseUrl}
             onChange={handleChange}
-            placeholder="https://api.example.com/v1"
+            placeholder="https://api.openai.com/v1"
             data-testid="base-url-input"
           />
-          <p className="field-hint">For API proxy or compatible services</p>
+          <p className="field-hint">For API proxy or compatible services (leave default for OpenAI)</p>
         </div>
         
         <div className="form-group api-test-container">
@@ -236,12 +213,15 @@ function APIKeySetup({ config, setConfig }) {
       </div>
       
       <div className="api-help">
-        <h5>How to get an API key</h5>
+        <h5>How to get an OpenAI API key</h5>
         <ul>
-          <li><strong>OpenAI:</strong> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from OpenAI</a></li>
-          <li><strong>Anthropic:</strong> <a href="https://console.anthropic.com/account/keys" target="_blank" rel="noopener noreferrer">Get API key from Anthropic</a></li>
-          <li><strong>Cohere:</strong> <a href="https://dashboard.cohere.com/api-keys" target="_blank" rel="noopener noreferrer">Get API key from Cohere</a></li>
-          <li><strong>Google Gemini:</strong> <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get API key from Google AI Studio</a></li>
+          <li>
+            1. Go to <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform</a>
+          </li>
+          <li>2. Sign in or create an account</li>
+          <li>3. Click "Create new secret key"</li>
+          <li>4. Copy the key and paste it above</li>
+          <li>5. Keep your API key secure and never share it</li>
         </ul>
       </div>
     </div>

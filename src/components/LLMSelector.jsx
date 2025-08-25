@@ -5,7 +5,13 @@ function LLMSelector({ backend, setBackend }) {
   // Log when the component receives a new backend prop
   useEffect(() => {
     console.log(`LLM_SELECTOR: Current backend is "${backend}"`);
+    if (backend === 'webllm') {
+      console.log('LLM_SELECTOR: WebLLM no longer available, switching to Ollama');
+      setBackend('ollama');
+    }
   }, [backend]);
+
+  
   
   // Enhanced handler with logging
   const handleBackendSelect = (newBackend) => {
@@ -20,7 +26,7 @@ function LLMSelector({ backend, setBackend }) {
     setBackend(newBackend);
   };
 
-  return (
+return (
     <div className="llm-selector">
       <h4>Choose LLM Provider</h4>
       
@@ -35,21 +41,7 @@ function LLMSelector({ backend, setBackend }) {
           </div>
           <div className="backend-details">
             <h5>Ollama</h5>
-            <p>Use locally hosted models via Ollama</p>
-          </div>
-        </div>
-        
-        <div 
-          className={`backend-option ${backend === 'webllm' ? 'selected' : ''}`}
-          onClick={() => handleBackendSelect('webllm')}
-          data-testid="webllm-option"
-        >
-          <div className="backend-icon webllm-icon">
-            <img src="/webllm-logo.png" alt="WebLLM" onError={(e) => e.target.src = "https://raw.githubusercontent.com/mlc-ai/web-llm/main/site/img/webllm-logo.png"} />
-          </div>
-          <div className="backend-details">
-            <h5>WebLLM</h5>
-            <p>Run LLMs directly in your browser</p>
+            <p>Use locally hosted Llama 3.1 model</p>
           </div>
         </div>
         
@@ -63,7 +55,7 @@ function LLMSelector({ backend, setBackend }) {
           </div>
           <div className="backend-details">
             <h5>API Key</h5>
-            <p>Use commercial LLM APIs (OpenAI, Claude, etc.)</p>
+            <p>Use cloud-based GPT models via API</p>
           </div>
         </div>
       </div>
@@ -71,15 +63,11 @@ function LLMSelector({ backend, setBackend }) {
       <div className="feature-banner">
         <div className="feature-item">
           <span className="feature-icon">🔒</span>
-          <span className="feature-text">API keys are stored locally in your browser</span>
+          <span className="feature-text">Secure local processing with Ollama</span>
         </div>
         <div className="feature-item">
-          <span className="feature-icon">🌐</span>
-          <span className="feature-text">Support for multiple API providers</span>
-        </div>
-        <div className="feature-item">
-          <span className="feature-icon">⚙️</span>
-          <span className="feature-text">Compatible with API proxies</span>
+          <span className="feature-icon">⚡</span>
+          <span className="feature-text">Fast cloud-based inference with API</span>
         </div>
       </div>
     </div>

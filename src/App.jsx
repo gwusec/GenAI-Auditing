@@ -9,7 +9,7 @@ import './App.css';
 
 function App() {
   // LLM backend configuration
-  const [backend, setBackend] = useState('ollama'); // 'ollama', 'webllm', 'api'
+  const [backend, setBackend] = useState('ollama'); // 'ollama', or 'api'
   const [showConfig, setShowConfig] = useState(true);
   const [configApplied, setConfigApplied] = useState(false);
   const [configSyncedWithServer, setConfigSyncedWithServer] = useState(false);
@@ -17,7 +17,7 @@ function App() {
   // Ollama config
   const [ollamaConfig, setOllamaConfig] = useState({
     url: 'http://localhost:11434',
-    model: 'llama3',
+    model: 'llama3.1',
     proxyUrl: 'http://localhost:3000'
   });
   
@@ -31,7 +31,7 @@ function App() {
   const [apiConfig, setApiConfig] = useState({
     provider: 'openai',
     apiKey: '',
-    model: 'gpt-3.5-turbo',
+    model: 'gpt-4o',
     baseUrl: 'https://api.openai.com/v1'
   });
   
@@ -197,108 +197,111 @@ function App() {
     }
   };
 
-  return (
-    <div className="app-container">
-      <header>
-        <h1>TRAILS Chatbot</h1>
-        <button 
-          onClick={() => setShowConfig(!showConfig)} 
-          className="config-toggle"
-        >
-          {showConfig ? 'Hide' : 'Show'} Settings
+return (
+  <div className="app-container">
+    <header>
+      <h1>Chatbot</h1>
+      <button 
+        onClick={() => {
+          console.log('Settings button clicked. Current showConfig:', showConfig);
+          setShowConfig(!showConfig);
+        }} 
+        className="config-toggle"
+      >
+        {showConfig ? 'Hide' : 'Show'} Settings
+      </button>
+    </header>
+    
+    {showConfig && (
+      <div className="config-panel">
+        <h3>Chatbot Settings</h3>
+        
+        <LLMSelector 
+          backend={backend} 
+          setBackend={handleBackendChange} 
+        />
+        
+        {backend === 'ollama' && (
+          <OllamaSetup 
+            config={ollamaConfig}
+            setConfig={setOllamaConfig}
+          />
+        )}
+        
+        {backend === 'webllm' && (
+          <WebLLMSetup 
+            config={webLLMConfig}
+            setConfig={setWebLLMConfig}
+          />
+        )}
+        
+        {backend === 'api' && (
+          <APIKeySetup 
+            config={apiConfig}
+            setConfig={setApiConfig}
+          />
+        )}
+        
+        <button onClick={saveConfig} className="save-button">
+          Save Configuration
         </button>
-      </header>
-      
-      {showConfig && (
-        <div className="config-panel">
-          <h3>Chatbot Settings</h3>
-          
-          <LLMSelector 
-            backend={backend} 
-            setBackend={handleBackendChange} 
-          />
-          
-          {backend === 'ollama' && (
-            <OllamaSetup 
-              config={ollamaConfig}
-              setConfig={setOllamaConfig}
-            />
-          )}
-          
-          {backend === 'webllm' && (
-            <WebLLMSetup 
-              config={webLLMConfig}
-              setConfig={setWebLLMConfig}
-            />
-          )}
-          
-          {backend === 'api' && (
-            <APIKeySetup 
-              config={apiConfig}
-              setConfig={setApiConfig}
-            />
-          )}
-          
-          <button onClick={saveConfig} className="save-button">
-            Save Configuration
-          </button>
-        </div>
-      )}
-      
-      {configApplied && (
-        <div className="chatbot-container">
-          <TrailsChatbot
-            userId={userId}
-            llmProxyServerUrl={getProxyUrl()}
-            debugMode={true} // Enable debug mode to see more logs
-            config={{
-              timerMaxOverallChatTimeSeconds: 30 * 60, // 30 minutes total
-              timerChatsMaxSeconds: [7 * 60, 7 * 60],  // 7 minutes per chat
-              timerWarningChatTimeIsUpSeconds: 2 * 60,  // 2 min warning
-              timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60 // 3 min minimum
-            }}
-          />
-          
-          {/* Display backend status indicator */}
-          <BackendStatus 
-            backend={backend} 
-            config={getCurrentConfig()} 
-          />
-          
-          {/* Display sync status if needed */}
-          {configApplied && !configSyncedWithServer && (
-            <div style={{
-              position: 'fixed',
-              top: '70px',
-              right: '10px',
-              backgroundColor: '#fff3cd',
-              color: '#856404',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              fontSize: '0.8rem',
-              zIndex: 1000,
-              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-              pointerEvents: 'none'
-            }}>
-              Syncing configuration...
-            </div>
-          )}
-        </div>
-      )}
-      
-      {!configApplied && !showConfig && (
-        <div className="config-prompt">
-          <p>Please configure your LLM settings to continue.</p>
-          <button 
-            onClick={() => setShowConfig(true)} 
-            className="config-button"
-          >
-            Configure
-          </button>
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+    
+    {/* Only show chatbot if config is applied AND settings panel is hidden */}
+    {configApplied && !showConfig && (
+      <div className="chatbot-container">
+        <TrailsChatbot
+          userId={userId}
+          llmProxyServerUrl={getProxyUrl()}
+          debugMode={false}
+          config={{
+            timerMaxOverallChatTimeSeconds: 30 * 60,
+            timerChatsMaxSeconds: [7 * 60, 7 * 60],
+            timerWarningChatTimeIsUpSeconds: 2 * 60,
+            timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60
+          }}
+        />
+        
+        {/* <BackendStatus 
+          backend={backend} 
+          config={getCurrentConfig()} 
+        /> */}
+        
+        {configApplied && !configSyncedWithServer && (
+          <div style={{
+            position: 'fixed',
+            top: '70px',
+            right: '10px',
+            backgroundColor: '#fff3cd',
+            color: '#856404',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            fontSize: '0.8rem',
+            zIndex: 1000,
+            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+            pointerEvents: 'none'
+          }}>
+            Syncing configuration...
+          </div>
+        )}
+      </div>
+    )}
+    
+    {/* Show prompt if no config and settings panel is hidden */}
+    {!configApplied && !showConfig && (
+      <div className="config-prompt">
+        <p>Please configure your LLM settings to continue.</p>
+        <button 
+          onClick={() => setShowConfig(true)} 
+          className="config-button"
+        >
+          Configure
+        </button>
+      </div>
+    )}
+  </div>
+);
 }
 
 export default App;
