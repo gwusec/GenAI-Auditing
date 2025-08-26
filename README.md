@@ -313,3 +313,40 @@ The TRAILS-Chatbot component requires React 19, which is still in alpha/beta. Th
 2. Examine the server logs for API-related issues
 3. Use the network tab to inspect request/response patterns
 4. Try different models to isolate issues
+
+## To create dockers for deployement
+
+setup ssh for importing private github file:
+
+```bash
+ssh -T git@github.com 
+eval "$(ssh-agent -s)"    
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519       
+ssh-add -l  
+```
+
+
+Create a docker image to test:
+
+for your own machine:
+
+```bash
+docker build --ssh default -t chatbot:test .
+docker run --rm -p 3000:3000 --add-host host.docker.internal:host-gateway chatbot:test
+```
+
+for different architectures and save it locally:
+
+```bash
+docker build --ssh default --platform linux/arm64 -t chatbot:arm64 .
+docker run --rm -p 3000:3000 --add-host host.docker.internal:host-gateway chatbot:arm64
+docker build --ssh default --platform linux/amd64 -t chatbot:amd64 .
+docker run --rm -p 3000:3000 --add-host host.docker.internal:host-gateway chatbot:amd64
+```
+
+to compress them:
+
+```bash
+docker save chatbot:arm64 | gzip > chatbot_arm64.tar.gz
+docker save chatbot:amd64 | gzip > chatbot_amd64.tar.gz
+```

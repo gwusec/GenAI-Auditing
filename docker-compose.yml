@@ -1,8 +1,15 @@
 # docker-compose.yml
 services:
-  app:
-    image: chatbot:osf   # we'll retag the loaded image to this name
+  chatbot:
+    image: chatbot:osf
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
+    extra_hosts:
+      # For Mac/Windows Docker Desktop:
+      - "host.docker.internal:host-gateway"
+      
+      # For Linux, comment the line above and uncomment below:
+      # - "host.docker.internal:172.17.0.1"
+    restart: unless-stopped
