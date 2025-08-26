@@ -272,6 +272,8 @@ console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
           temperature: 0.7,
           num_predict: 2000
         }
+      }, {
+        timeout: 120000
       });
       
       console.log('RECEIVED RESPONSE FROM OLLAMA');
