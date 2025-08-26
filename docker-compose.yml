@@ -7,9 +7,5 @@ services:
     environment:
       NODE_ENV: production
     extra_hosts:
-      # For Mac/Windows Docker Desktop:
-      - "host.docker.internal:host-gateway"
-      
-      # For Linux, comment the line above and uncomment below:
-      # - "host.docker.internal:172.17.0.1"
+      - host.docker.internal:host-gateway
     restart: unless-stopped

@@ -38,36 +38,24 @@ docker --version
 
 ## 📥 Download and Extract Files
 
-1. **Download from OSF:** Download these files to your computer:
+1. **Download from OSF:** 
+
+Download the zip file - chatbot_osf to your computer. It will contain the following files:
    - `chatbot_arm64.tar.gz` (for Apple M1/M2)
    - `chatbot_amd64.tar.gz` (for Intel/AMD)
    - `docker-compose.yml`
-   - `README-REVIEWERS.md`
+   - `README.md`
 
-2. **Create a folder:** Create a new folder for the project:
+2. **Move to the directory:** 
    ```bash
-   mkdir chatbot-review
-   cd chatbot-review
+   cd chatbot_osf
    ```
 
-3. **Move files:** Move the downloaded files into this folder
-
-4. **Verify files:** Check that you have the files:
+3. **Verify files:** Check that you have the files:
    ```bash
    ls -la
-   # Should show: chatbot_arm64.tar.gz, chatbot_amd64.tar.gz, docker-compose.yml, README-REVIEWERS.md
+   # Should show: chatbot_arm64.tar.gz, chatbot_amd64.tar.gz, docker-compose.yml, README.md
    ```
-
-## 📁 Files to Download from OSF
-
-Download all these files to the same folder on your computer:
-
-- `chatbot_arm64.tar.gz` - Docker image for Apple M1/M2 processors (~300MB)
-- `chatbot_amd64.tar.gz` - Docker image for Intel/AMD processors (~300MB)
-- `docker-compose.yml` - Easy deployment configuration
-- `README-REVIEWERS.md` - This documentation file
-
-*Note: You only need one of the .tar.gz files based on your processor, but it's fine to download both.*
 
 ## 🚀 Quick Start (5 minutes)
 
