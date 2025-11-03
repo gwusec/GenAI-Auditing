@@ -2,7 +2,7 @@
 # TRAILS Chatbot Auditing Tool
 
 This is the chatbot auditing interface using the Material-UI for the frontend interface.
-The chatbot auditing tool communicates with the [TRAILS-ui-llm-proxy](https://github.com:gwusec/TRAILS-ui-llm-proxy.git). 
+The chatbot auditing tool communicates with the [TRAILS-ui-llm-proxy](https://github.com/gwusec/TRAILS-ui-llm-proxy.git). 
 
 ## Setup
 
@@ -41,7 +41,7 @@ The application should open in your web browser.
 
 ### Option 2 - Dev with proxy server
 
-1. Setup and run [TRAILS-ui-llm-proxy](https://github.com:gwusec/TRAILS-ui-llm-proxy.git)
+1. Setup and run [TRAILS-ui-llm-proxy](https://github.com/gwusec/TRAILS-ui-llm-proxy.git)
 1. Add required environment variables to `.env` file:
    ```bash
    touch .env
