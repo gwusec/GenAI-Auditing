@@ -1,27 +1,19 @@
 import Debugger from "../components/Debugger";
-import React from "react";
-import SurveyMaker from "../components/SurveyMaker";
-import {AppState} from "../App";
-import {Alert, CssBaseline} from "@mui/material";
+import SurveyMaker from "../components/SurveyMaker/SurveyMaker";
+import { Alert, CssBaseline } from "@mui/material";
 import ErrorDialog from "../components/ErrorDialog";
 
-function Survey(
-    {
-        isViewOnly = false,
-        debugMode = false,
-        setCurrentAppState,
-        setSurveyQuestions,
-        error,
-        setError,
-        showAPIErrorDialog,
-        handleCloseErrorDialog
-    }
-) {
-    const handleSurveySave = (survey) => {
-        setSurveyQuestions(survey);
-        setCurrentAppState(AppState.CHAT);
-    };
-
+function SurveyLayout({
+    isViewOnly = false,
+    debugMode = false,
+    setCurrentAppState,
+    setSurveyQuestions,
+    error,
+    setError,
+    showAPIErrorDialog,
+    handleCloseErrorDialog,
+    handleSurveySave
+}) {
     return (
         <>
             {debugMode && <Debugger/>}
@@ -45,4 +37,4 @@ function Survey(
     )
 }
 
-export default Survey;
+export default SurveyLayout;

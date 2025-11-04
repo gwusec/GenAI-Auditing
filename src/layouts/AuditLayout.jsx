@@ -1,15 +1,12 @@
 import AuditForm from "../components/AuditForm";
-import React from "react";
 
-function Audit(
-    {
-        activeConversation,
-        handleAuditComplete,
-        setIsLoading,
-        handleTutorialComplete,
-        surveyQuestions
-    }
-) {
+function AuditLayout({
+    activeConversation,
+    handleAuditComplete,
+    setIsLoading,
+    handleTutorialComplete,
+    surveyQuestions
+}) {
     return (
         <>
             {activeConversation && (
@@ -25,4 +22,4 @@ function Audit(
     )
 }
 
-export default Audit;
+export default AuditLayout;

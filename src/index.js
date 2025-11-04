@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import { BrowserRouter } from 'react-router';
 
 
 const getCurrentUserId = () => {
@@ -172,6 +173,7 @@ const exportedData = [
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   // <React.StrictMode>
+  //<BrowserRouter>  
     <App
       userId={getCurrentUserId()}
       llmProxyServerUrl={`http://${process.env.REACT_APP_LLM_PROXY_HOST_AND_PORT}`}
@@ -186,5 +188,6 @@ root.render(
         timerMinChatTimeRemainingToStartNewChatSeconds: [] // need at least 3 min left to start a new chat
       }}
     />
+  //</BrowserRouter>
   // </React.StrictMode>
 );

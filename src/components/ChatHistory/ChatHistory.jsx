@@ -1,8 +1,8 @@
 // src/components/ChatHistory.jsx
 
 import React, { useEffect, useState } from "react";
-import conversationHandler from "../tools/ConversationHandler";
-import ChatMessages from './ChatMessages';
+import conversationHandler from "../../tools/ConversationHandler";
+import ChatMessages from '../ChatMessages';
 import styles from "./ChatHistory.module.css";
 
 

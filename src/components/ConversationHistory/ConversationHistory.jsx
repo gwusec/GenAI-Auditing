@@ -1,7 +1,7 @@
 // src/components/ConversationHistory.jsx
 import React from 'react';
 import { Typography, Paper, TextField, Chip, Box } from '@mui/material';
-import ChatHistory from './ChatHistory';
+import ChatHistory from '../ChatHistory/ChatHistory';
 import styles from './ConversationHistory.module.css';
 
 const ConversationHistory = ({ conversation, surveyQuestions }) => {

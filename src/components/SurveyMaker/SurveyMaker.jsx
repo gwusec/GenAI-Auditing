@@ -24,7 +24,7 @@ import {
     MatrixQuestion,
     FreeResponseQuestion,
     TextHighlightQuestion,
-} from '../tools/SurveyConfiguration';
+} from '../../tools/SurveyConfiguration';
 import styles from './SurveyMaker.module.css';
 
 const SurveyMaker = ({ onSurveySave }) => {

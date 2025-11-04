@@ -3,15 +3,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient from './tools/APIClient';
 import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
 import conversationHandler from './tools/ConversationHandler';
-import ChatBox from './components/ChatBox';
-import AuditForm from './components/AuditForm';
-import ConversationHistory from './components/ConversationHistory';
+import ChatBox from './components/ChatBox/ChatBox';
+import AuditForm from './components/AuditForm/AuditForm';
+import ConversationHistory from './components/ConversationHistory/ConversationHistory';
 import ErrorDialog from './components/ErrorDialog';
 import AppConfig from './tools/AppConfig';
 import ChatDialog from './components/ChatDialog';
 import Debugger from './components/Debugger';
 import ChatTimerSystem from './tools/ChatTimerSystem';
-import SurveyMaker from './components/SurveyMaker';
+import SurveyMaker from './components/SurveyMaker/SurveyMaker';
 import {
     Dialog,
     DialogTitle,
@@ -28,10 +28,10 @@ import {
     LinearProgress,
 } from '@mui/material';
 import styles from './App.module.css';
-import Survey from "./pages/Survey";
-import Chat from "./pages/Chat";
-import Audit from "./pages/Audit";
-import Complete from "./pages/Complete";
+import SurveyPage from "./pages/SurveyPage";
+import ChatPage from "./pages/ChatPage";
+import AuditPage from "./pages/AuditPage";
+import CompletePage from "./pages/CompletePage";
 
 const AppState = {
     SURVEY: 'survey',
@@ -350,7 +350,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     return (
         <Box sx={{ display: 'flex', height: '100vh' }}>
             {currentAppState === AppState.SURVEY && (
-                <Survey
+                <SurveyPage
                     debugMode={debugMode}
                     isViewOnly={isViewOnly}
                     setCurrentAppState={setCurrentAppState}
@@ -361,7 +361,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
             {(currentAppState !== AppState.SURVEY || isViewOnly) && (
                 <>
                     {!isViewOnly && currentAppState === AppState.CHAT && showTimerChatTimeUpDialog && (
-                        <Chat
+                        <ChatPage
                             {...{
                                 isViewOnly,
                                 activeConversation,
@@ -519,7 +519,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                 />
                             )}
                             {currentAppState === AppState.AUDIT && (
-                                <Audit {...{
+                                <AuditPage {...{
                                         activeConversation,
                                         handleAuditComplete,
                                         setIsLoading,
@@ -529,7 +529,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                             )}
                             {currentAppState === AppState.COMPLETE && (
                                 <>
-                                    <Complete
+                                    <CompletePage
                                         {...{
                                             isViewOnly,
                                             showAfterChatOneDialog,
