@@ -1,4 +1,4 @@
-import AuditForm from "../components/AuditForm";
+import AuditForm from "../components/AuditForm/AuditForm";
 
 function AuditLayout({
     activeConversation,

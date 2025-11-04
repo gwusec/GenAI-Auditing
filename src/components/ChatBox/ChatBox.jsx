@@ -7,7 +7,7 @@ import MessageForm from '../MessageForm/MessageForm';
 import { fairnessProperties } from '../../tools/principles';
 import ChatBoxTutorial from '../tutorials/ChatBoxTutorial';
 import styles from './ChatBox.module.css';
-import ChatMessages from '../ChatMessages';
+import ChatMessages from '../ChatMessages/ChatMessages';
 import {
     Typography,
     Box,

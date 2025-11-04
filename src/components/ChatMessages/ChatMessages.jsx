@@ -21,7 +21,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import LoadingDots from './LoadingDots';
+import LoadingDots from '../LoadingDots/LoadingDots';
 import styles from './ChatMessages.module.css';
 
 const ChatMessages = ({

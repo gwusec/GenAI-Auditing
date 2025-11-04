@@ -520,12 +520,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                             )}
                             {currentAppState === AppState.AUDIT && (
                                 <AuditPage {...{
-                                        activeConversation,
-                                        handleAuditComplete,
-                                        setIsLoading,
-                                        handleTutorialComplete,
-                                        surveyQuestions
-                                    }}/>
+                                    activeConversation,
+                                    handleAuditComplete,
+                                    setIsLoading,
+                                    handleTutorialComplete,
+                                    surveyQuestions
+                                }} />
                             )}
                             {currentAppState === AppState.COMPLETE && (
                                 <>
@@ -540,7 +540,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                             handleCloseChatTwoDialogWithTime,
                                             activeConversation,
                                             surveyQuestions
-                                        }}/>
+                                        }} />
                                 </>
                             )}
                         </Box>
@@ -552,4 +552,4 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 }
 
 export default App;
-export {AppState};
+export { AppState };
