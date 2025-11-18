@@ -2,28 +2,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient from './tools/APIClient';
 import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
-import conversationHandler from './tools/ConversationHandler';
 import ChatBox from './components/ChatBox/ChatBox';
-import AuditForm from './components/AuditForm/AuditForm';
-import ConversationHistory from './components/ConversationHistory/ConversationHistory';
-import ErrorDialog from './components/ErrorDialog';
 import AppConfig from './tools/AppConfig';
-import ChatDialog from './components/ChatDialog';
-import Debugger from './components/Debugger';
 import ChatTimerSystem from './tools/ChatTimerSystem';
-import SurveyMaker from './components/SurveyMaker/SurveyMaker';
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    CssBaseline,
     Box,
     Button,
     Typography,
     Tabs,
     Tab,
-    Alert,
     Tooltip,
     LinearProgress,
 } from '@mui/material';
@@ -32,6 +19,7 @@ import SurveyPage from "./pages/SurveyPage";
 import ChatPage from "./pages/ChatPage";
 import AuditPage from "./pages/AuditPage";
 import CompletePage from "./pages/CompletePage";
+import conversationHandler from "tools/ConversationHandler"
 
 const AppState = {
     SURVEY: 'survey',
@@ -49,9 +37,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     const [isLoading, setIsLoading] = useState(false);
     const [surveyQuestions, setSurveyQuestions] = useState(null);
     const [showAPIErrorDialog, setShowAPIErrorDialog] = useState(false);
-    const [showAfterChatOneDialog, setShowAfterChatOneDialog] = useState(false);
-    const [showAfterChatTwoDialogNoTime, setShowAfterChatTwoDialogNoTime] = useState(false);
-    const [showAfterChatTwoDialogWithTime, setShowAfterChatTwoDialogWithTime] = useState(false);
     const [showTimerChatTimeUpDialog, setShowTimerChatTimeUpDialog] = useState(false);
 
     const steps = ["Survey Creation", "Conversation", "Reporting"];
@@ -155,48 +140,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         };
     }, []);
 
-    useEffect(() => {
-        if (conversations.length === 1 && conversations[0].state === STATE.COMPLETE) {
-            setShowAfterChatOneDialog(true);
-        } else if (
-            conversations.length === 2 &&
-            conversations[0].state === STATE.COMPLETE &&
-            conversations[1].state === STATE.COMPLETE &&
-            timerSystem.canStartNewChat()
-        ) {
-            setShowAfterChatTwoDialogWithTime(true);
-        } else if (
-            conversations.length === 2 &&
-            conversations[0].state === STATE.COMPLETE &&
-            conversations[1].state === STATE.COMPLETE &&
-            !timerSystem.canStartNewChat()
-        ) {
-            setShowAfterChatTwoDialogNoTime(true);
-            setShowAfterChatTwoDialogWithTime(false);
-            setShowAfterChatOneDialog(false);
-        } else if (
-            conversations.length > 2 &&
-            conversations[0].state === STATE.COMPLETE &&
-            conversations[1].state === STATE.COMPLETE &&
-            conversations[conversations.length - 1].state === STATE.COMPLETE &&
-            timerSystem.canStartNewChat()
-        ) {
-            setShowAfterChatTwoDialogNoTime(false);
-            setShowAfterChatTwoDialogWithTime(true);
-            setShowAfterChatOneDialog(false);
-        } else if (
-            conversations.length > 2 &&
-            conversations[0].state === STATE.COMPLETE &&
-            conversations[1].state === STATE.COMPLETE &&
-            conversations[conversations.length - 1].state === STATE.COMPLETE &&
-            !timerSystem.canStartNewChat()
-        ) {
-            setShowAfterChatTwoDialogNoTime(true);
-            setShowAfterChatTwoDialogWithTime(false);
-            setShowAfterChatOneDialog(false);
-        }
-    }, [conversations, timerSystem]);
-
     const updateAppStateBasedOnConversation = useCallback((conversationState) => {
         console.log("Updating app state based on conversation state:", conversationState);
         if (conversationState === STATE.CHAT) {
@@ -290,22 +233,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         }
     };
 
-    const handleAuditComplete = async () => {
-        try {
-            const exportData = await conversationHandler.exportConversations(conversations);
-            console.log('Completed Conversation Export Data:', exportData);
-            let existingConversations = await conversationHandler.getExistingConversations();
-            await conversationHandler.setActiveConversation(existingConversations[existingConversations.length - 1].id);
-            setConversations(existingConversations);
-            setActiveConversation(existingConversations[existingConversations.length - 1]);
-            setActiveConversationIndex(existingConversations.length - 1);
-            updateAppStateBasedOnConversation(existingConversations[existingConversations.length - 1].state);
-        } catch (error) {
-            console.error("Error handling audit completion:", error);
-            setError("Failed to complete audit. Please try again.");
-        }
-    };
-
     const handleTabChange = async (event, newValue) => {
         setActiveConversationIndex(newValue);
         const selectedConversation = conversations[newValue];
@@ -323,20 +250,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         setShowAPIErrorDialog(false);
     };
 
-    const handleCloseChatOneDialog = () => {
-        setShowAfterChatOneDialog(false);
-        startNextConversation();
-    };
-
-    const handleCloseChatTwoDialogNoTime = () => {
-        setShowAfterChatTwoDialogNoTime(false);
-    };
-
-    const handleCloseChatTwoDialogWithTime = () => {
-        setShowAfterChatTwoDialogWithTime(false);
-        startNextConversation();
-    };
-
     const handleCloseTimerChatTimeUpDialog = () => {
         setShowTimerChatTimeUpDialog(false);
         handleEndChat();
@@ -351,10 +264,16 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         <Box sx={{ display: 'flex', height: '100vh' }}>
             {currentAppState === AppState.SURVEY && (
                 <SurveyPage
-                    debugMode={debugMode}
-                    isViewOnly={isViewOnly}
-                    setCurrentAppState={setCurrentAppState}
-                    setSurveyQuestions={setSurveyQuestions}
+                    {...{
+                        isViewOnly,
+                        debugMode,
+                        setCurrentAppState,
+                        setSurveyQuestions,
+                        error,
+                        setError,
+                        showAPIErrorDialog,
+                        handleCloseErrorDialog
+                    }}
                 />
             )}
 
@@ -520,11 +439,16 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                             )}
                             {currentAppState === AppState.AUDIT && (
                                 <AuditPage {...{
-                                    activeConversation,
-                                    handleAuditComplete,
-                                    setIsLoading,
                                     handleTutorialComplete,
-                                    surveyQuestions
+                                    surveyQuestions,
+                                    conversations,
+                                    setConversations,
+                                    setActiveConversation,
+                                    setActiveConversationIndex,
+                                    updateAppStateBasedOnConversation,
+                                    setError,
+                                    activeConversation,
+                                    setIsLoading,
                                 }} />
                             )}
                             {currentAppState === AppState.COMPLETE && (
@@ -532,14 +456,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                     <CompletePage
                                         {...{
                                             isViewOnly,
-                                            showAfterChatOneDialog,
-                                            handleCloseChatOneDialog,
-                                            showAfterChatTwoDialogNoTime,
-                                            handleCloseChatTwoDialogNoTime,
-                                            showAfterChatTwoDialogWithTime,
-                                            handleCloseChatTwoDialogWithTime,
                                             activeConversation,
-                                            surveyQuestions
+                                            surveyQuestions,
+                                            conversations,
+                                            timerSystem,
+                                            STATE,
+                                            startNextConversation
                                         }} />
                                 </>
                             )}
