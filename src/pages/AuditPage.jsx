@@ -1,10 +1,11 @@
 import AuditLayout from "../layouts/AuditLayout";
 import conversationHandler from './tools/ConversationHandler';
+import { useCallback } from "react";
 import React from "react";
 
 function AuditPage(
     { // take these from App.jsx
-        handleTutorialComplete,
+        // handleTutorialComplete,
         surveyQuestions,
         conversations,
         setConversations,
@@ -16,6 +17,15 @@ function AuditPage(
         setIsLoading,
     }
 ) {
+    const handleTutorialComplete = useCallback(() => {
+            if (currentAppState === AppState.CHAT) {
+                if (timerSystem.state.isPaused) {
+                    console.log("Resuming timer during tutorial completion...");
+                    timerSystem.resume();
+                }
+            }
+        }, [timerSystem, currentAppState]);
+
     const handleAuditComplete = async () => {
         try {
             const exportData = await conversationHandler.exportConversations(conversations);

@@ -70,3 +70,7 @@ Make dashboard more "interesting"
 - Light LLM - look into thsi later
 - modularized
 
+## Tues Nov 18
+
+- review my changes, make sure i didn't break anything
+- try to look in existing bugs
