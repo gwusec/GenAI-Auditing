@@ -19,7 +19,7 @@ import SurveyPage from "./pages/SurveyPage";
 import ChatPage from "./pages/ChatPage";
 import AuditPage from "./pages/AuditPage";
 import CompletePage from "./pages/CompletePage";
-import conversationHandler from "tools/ConversationHandler"
+import conversationHandler from "./tools/ConversationHandler";
 
 const AppState = {
     SURVEY: 'survey',
