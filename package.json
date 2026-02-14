@@ -50,7 +50,7 @@
   },
   "scripts": {
     "start": "cross-env PORT=3001 react-app-rewired start",
-    "build": "react-app-rewired build",
+    "build": "react-app-rewired.cmd build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "server": "nodemon server/server.js",
