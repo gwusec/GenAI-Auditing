@@ -276,6 +276,20 @@ class SurveyConfigurationManager {
         return this.questions.find(q => q.getId() === id);
     }
 
+    clear() {
+        this.questions = [];
+    }
+
+    loadFromJSON(json) {
+        this.clear();
+        if (json && json.questions
+            && Array.isArray(json.questions)) {
+            json.questions.forEach(q => {
+                this.addQuestion(q.type, q.content, q.settings);
+            });
+        }
+    }
+
     toJSON() {
         return {
             questions: this.questions.map(q => q.toJSON()),

@@ -27,11 +27,20 @@ import {
 } from '../tools/SurveyConfiguration';
 import styles from './SurveyMaker.module.css';
 
-const SurveyMaker = ({ onSurveySave }) => {
+const SurveyMaker = ({ onSurveySave, initialSurvey }) => {
     const [manager] = useState(new SurveyConfigurationManager());
     const [questions, setQuestions] = useState(manager.getQuestions());
     const [newQuestionType, setNewQuestionType] = useState('matrix');
     const [errors, setErrors] = useState({});
+
+    // Load initial survey if provided
+    React.useEffect(() => {
+        if (initialSurvey) {
+            manager.loadFromJSON(initialSurvey);
+            setQuestions([...manager.getQuestions()]);
+        }
+    }, [initialSurvey, manager]);
+
 
     // Add a new question
     const addQuestion = () => {

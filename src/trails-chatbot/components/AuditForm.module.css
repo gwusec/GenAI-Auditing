@@ -1,0 +1,90 @@
+/* Chat container; rename as .chatBox; Block: Represents the main chat container. */
+/* .chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: transparent;
+  border-radius: 4px;
+  overflow: hidden;
+} */
+
+.container {
+  height: 100vh;
+}
+
+/* Main content area; rename as .chatBox__mainContent; Element: Main content area within chatBox.*/
+.main-content {
+  display: flex;
+  height: 95%;
+}
+
+/* Chat header; rename as .chatBox__header; Element: Header section within chatBox. */
+.header {
+  background-color: #3498db;
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+  font-size: 1.2em;
+}
+
+.audit-form-container {
+  width: 100%;
+}
+
+.highlight-chip {
+  margin: 5px;
+}
+
+.free-response-field {
+  margin-top: 20px;
+}
+
+.free-response-field textarea {
+  user-select: none;
+}
+
+.submit-button {
+  margin-top: 20px;
+}
+
+/* Disable text selection for free response fields */
+.MuiInputBase-input {
+  user-select: none !important;
+}
+
+/* Ensure table doesn't overflow on smaller screens */
+@media (max-width: 1200px) {
+  .MuiTable-root {
+    font-size: 0.85rem;
+  }
+  .MuiTableCell-root {
+    padding: 8px 4px;
+  }
+}
+
+/* Improve readability of Likert scale options */
+.MuiTableCell-root.likert-option {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 4px 2px;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.fairness-properties {
+  padding: 10px;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+  background-color: #f5f5f5;
+}
+
+.principles-list {
+  margin: 0;
+  padding-left: 20px;
+  column-count: 2;
+  column-gap: 20px;
+}
+
+.principles-list li {
+  margin-bottom: 5px;
+}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { App as TrailsChatbot } from 'trails-ui-chatbot';
+// import { App as TrailsChatbot } from 'trails-ui-chatbot';
+import TrailsChatbot from './trails-chatbot/App';
 import LLMSelector from './components/LLMSelector';
 import OllamaSetup from './components/OllamaSetup';
 import WebLLMSetup from './components/WebLLMSetup';
@@ -292,7 +293,10 @@ function App() {
       <div className="main-content">
         {appState === AppState.SURVEY_DESIGN && (
           <>
-            <SurveyMaker onSurveySave={handleSurveySave} />
+            <SurveyMaker
+              onSurveySave={handleSurveySave}
+              initialSurvey={surveyConfig}
+            />
             <Debugger />
           </>
         )}
