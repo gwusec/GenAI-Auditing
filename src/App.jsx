@@ -7,6 +7,7 @@ import WebLLMSetup from './components/WebLLMSetup';
 import APIKeySetup from './components/APIKeySetup';
 import SurveyMaker from './components/SurveyMaker';
 import Debugger from './components/Debugger';
+import db from './trails-chatbot/tools/db';
 
 import './App.css';
 
@@ -50,7 +51,10 @@ function App() {
   });
 
   // User ID for the chatbot (normally would come from auth)
-  const [userId, setUserId] = useState('user-' + Math.random().toString(36).substring(2, 9));
+  const [userId, setUserId] = useState(() => {
+    const savedUserId = localStorage.getItem('chatbotUserId');
+    return savedUserId || ('user-' + Math.random().toString(36).substring(2, 9));
+  });
 
   // Handle backend selection change
   const handleBackendChange = (newBackend) => {
@@ -69,6 +73,7 @@ function App() {
     // Generate a new User ID to ensure a fresh session
     const newUserId = 'user-' + Math.random().toString(36).substring(2, 9);
     setUserId(newUserId);
+    localStorage.setItem('chatbotUserId', newUserId);
     console.log('Starting new session with UserID:', newUserId);
 
     // Ensure configuration is applied (using defaults if not set)
@@ -113,6 +118,12 @@ function App() {
     if (savedSurvey) {
       try {
         setSurveyConfig(JSON.parse(savedSurvey));
+
+        // If we have both configs, and a user ID from a previous run, assume they are resuming an active chat
+        if (savedConfig && localStorage.getItem('chatbotUserId')) {
+          console.log("Found existing configs and userId, resuming chat phase directly.");
+          setAppState(AppState.CHAT);
+        }
       } catch (e) {
         console.error('Failed to parse saved survey config', e);
       }
@@ -242,7 +253,14 @@ function App() {
         {appState === AppState.CHAT && (
           <button
             onClick={() => {
-              window.location.reload();
+              if (window.confirm("Are you sure you want to completely restart? This will erase the current chat history.")) {
+                window.__isRestarting = true;
+                localStorage.removeItem('chatbotUserId');
+                localStorage.removeItem('chatTimerState');
+                db.resetDatabase().then(() => {
+                  window.location.reload();
+                });
+              }
             }}
             className="config-toggle"
             style={{ marginLeft: '10px' }}

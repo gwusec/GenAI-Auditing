@@ -6,10 +6,9 @@ import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
 import conversationHandler from './tools/ConversationHandler';
 import ChatBox from "./components/ChatBox";
 import AuditForm from './components/AuditForm';
-import ConversationHistory from './components/ConversationHistory';
+import SummaryPage from './components/SummaryPage';
 import ErrorDialog from "./components/ErrorDialog";
 import AppConfig from "./tools/AppConfig";
-import ChatDialog from "./components/ChatDialog";
 import Debugger from './components/Debugger';
 import ChatTimerSystem from './tools/ChatTimerSystem';
 
@@ -52,6 +51,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
   const [showAfterChatTwoDialogNoTime, setShowAfterChatTwoDialogNoTime] = useState(false);
   const [showAfterChatTwoDialogWithTime, setShowAfterChatTwoDialogWithTime] = useState(false);
   const [showTimerChatTimeUpDialog, setShowTimerChatTimeUpDialog] = useState(false);
+  const [showOverallTimeUpDialog, setShowOverallTimeUpDialog] = useState(false);
 
   // Steps for the Stepper
   const steps = ["Conversation", "Reporting"];
@@ -75,23 +75,28 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
       console.log("useTimer received warning event. Nothing happens here.");
     };
 
-    // Define a handler for when a chat expires // onexpired event triggers this 
-    const handleChatExpired = () => {
-      console.log("Chat has expired.");
-      timerSystem.pause();
+    const handlePhaseExpired = () => {
+      console.log("Phase Chat has expired.");
+      if (!timerSystem.state.isPaused) timerSystem.pause();
       setShowTimerChatTimeUpDialog(true);
+    };
+
+    const handleOverallExpired = () => {
+      console.log("Overall Chat has expired.");
+      if (!timerSystem.state.isPaused) timerSystem.pause();
+      setShowOverallTimeUpDialog(true);
     };
 
     timerSystem.on('onTick', handleTick);
     timerSystem.on('onWarning', handleWarning);
-    timerSystem.on('onExpired', handleChatExpired);
-    timerSystem.on('onOverallExpired', handleChatExpired);
+    timerSystem.on('onExpired', handlePhaseExpired);
+    timerSystem.on('onOverallExpired', handleOverallExpired);
 
     return () => {
       timerSystem.off('onTick', handleTick);
       timerSystem.off('onWarning', handleWarning);
-      timerSystem.off('onExpired', handleChatExpired);
-      timerSystem.off('onOverallExpired', handleChatExpired);
+      timerSystem.off('onExpired', handlePhaseExpired);
+      timerSystem.off('onOverallExpired', handleOverallExpired);
     };
   }, []);
 
@@ -149,7 +154,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         if (existingConversations.length === 0) {
           // Create a new conversation if none exists
           await startNextConversation();
-          timerSystem.pause();
         } else {
           // Use the first existing conversation (CHANGE: use last one)
           await conversationHandler.setActiveConversation(existingConversations[existingConversations.length - 1].id);
@@ -246,7 +250,8 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
       try {
         console.log("Conversation state updating:", newState);
         const updatedConversation = await conversationHandler.getActiveConversation();
-        setActiveConversation(updatedConversation)
+        setActiveConversation(updatedConversation);
+        setConversations(prev => prev.map(c => c.id === updatedConversation.id ? updatedConversation : c));
         console.log("Conversation state updated:", updatedConversation);
         updateAppStateBasedOnConversation(newState);
       } catch (error) {
@@ -272,22 +277,14 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 
   // Pause the timer when the app state changes
   useEffect(() => {
-    if (currentAppState === AppState.AUDIT || showTimerChatTimeUpDialog || showAPIErrorDialog) {
+    if (currentAppState === AppState.AUDIT || currentAppState === AppState.COMPLETE || showTimerChatTimeUpDialog || showOverallTimeUpDialog || showAPIErrorDialog) {
       console.log("Pausing timer during state transition...");
       if (!timerSystem.state.isPaused) {
         timerSystem.pause();
       }
     } else {
-      // If we are in CHAT state and the timer is paused, resume it
-      if (currentAppState === AppState.CHAT && timerSystem.state.isPaused) {
-        // only do this if the timer is already initialized
-        if (timerSystem.state.hasStarted && !showTimerChatTimeUpDialog && !showAPIErrorDialog) {
-          console.log("Resuming timer during state transition...");
-          timerSystem.resume();
-        }
-      }
     }
-  }, [currentAppState, timerSystem]);
+  }, [currentAppState, timerSystem, showTimerChatTimeUpDialog, showOverallTimeUpDialog, showAPIErrorDialog]);
 
   const handleEndChat = async () => {
     console.log("Ending chat...");
@@ -386,6 +383,14 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     handleEndChat();
   };
 
+  const formatTime = (ms) => {
+    if (ms <= 0) return "0:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
   return (
     <Box sx={{ display: "flex", height: "100vh" }}>
       {debugMode && (
@@ -448,6 +453,49 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         </Dialog>
       )}
 
+      {!isViewOnly && currentAppState === AppState.CHAT && showOverallTimeUpDialog && (
+        <Dialog
+          open={true}
+          disableEscapeKeyDown
+          onClose={(event, reason) => {
+            if (reason !== "backdropClick") {
+              setShowOverallTimeUpDialog(false);
+              handleEndChat();
+            }
+          }}
+          aria-labelledby="overall-time-up-dialog" maxWidth="sm" fullWidth>
+          <DialogTitle id="overall-time-up-dialog-title">You have reached the overall time limit for this study</DialogTitle>
+          <DialogContent>
+            <Typography variant="body1" color="textSecondary">
+              Your overall time has expired. Please end the current conversation and process your data.
+            </Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => {
+                setShowOverallTimeUpDialog(false);
+                handleEndChat();
+              }}
+              sx={{
+                mt: 2,
+                padding: "20px",
+                marginTop: "15vh",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: "4px",
+                height: "10vh",
+                marginBottom: "1vh",
+              }}
+            >
+              End Conversation & Export Data
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+
 
       {shouldShowSidebar() && (
         <Box
@@ -502,7 +550,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                     {timerSystem.state.currentChatIndex <= 1 ?
                       <>
                         <Typography variant="body1" sx={{ mt: 1 }}>
-                          Time remaining: {timerState.currentChatTimeRemaining / 1000 / 60 > 1 ? Math.ceil(timerState.currentChatTimeRemaining / 1000 / 60) + " minutes" : timerState.currentChatTimeRemaining / 1000 == 0 ? " no time" : " less than 1 minute"}
+                          Phase Time remaining: {formatTime(timerState.currentChatTimeRemaining)}
                         </Typography>
                         <Tooltip
                           title={`${Math.ceil(timerSystem.state.currentChatTimeRemaining / 1000 / 60)} minute(s) remaining`}
@@ -516,7 +564,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                       </> :
                       <>
                         <Typography variant="body1" sx={{ mt: 1 }}>
-                          Time remaining: {timerState.overallTimeRemaining / 1000 / 60 > 1 ? Math.ceil(timerState.overallTimeRemaining / 1000 / 60) + " minutes" : timerState.overallTimeRemaining / 1000 == 0 ? " no time" : " less than 1 minute"}
+                          Overall Time remaining: {formatTime(timerState.overallTimeRemaining)}
                         </Typography>
                         <Tooltip
                           title={`${Math.ceil(timerSystem.state.overallTimeRemaining / 1000 / 60)} minute(s) remaining`}
@@ -613,7 +661,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
           )}
           {activeConversation && currentAppState === AppState.COMPLETE && (
             <>
-              {!isViewOnly && (
+              {/* !isViewOnly && (
                 <>
                   <ChatDialog
                     open={showAfterChatOneDialog}
@@ -636,8 +684,16 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                     showExportManager={true}
                   />
                 </>
-              )}
-              <ConversationHistory conversation={activeConversation} />
+              ) */}
+              <SummaryPage
+                conversation={activeConversation}
+                initialSurvey={initialSurvey}
+                startNextConversation={startNextConversation}
+                showNewChat={showAfterChatOneDialog || showAfterChatTwoDialogWithTime}
+                showExportManager={showAfterChatTwoDialogNoTime || showAfterChatTwoDialogWithTime}
+                overallTimeRemaining={timerState.overallTimeRemaining}
+                formatTime={formatTime}
+              />
             </>
           )}
         </Box>

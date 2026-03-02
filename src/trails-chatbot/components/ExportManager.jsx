@@ -29,7 +29,7 @@ const ExportManager = ({ conversations }) => {
       color="primary"
       onClick={handleExport}
       fullWidth
-      sx={{ mt: 2 }}
+      sx={{ height: '100%', py: 1.5 }}
     >
       Finish audit. Export conversation data.
     </Button>

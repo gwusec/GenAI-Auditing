@@ -125,6 +125,7 @@ class ChatTimerSystem {
             }
 
             this.persistState();
+            this.forceTickUpdate();
             return true;
         }
         return false;
@@ -149,7 +150,7 @@ class ChatTimerSystem {
         console.log("Starting overall timer...");
 
         const tick = () => {
-            if (this.state.isPaused) return;
+            // Overall timer never pauses once started
             const prevOverallTimeRemaining = this.state.overallTimeRemaining;
             this.state.overallTimeRemaining = Math.max(0, prevOverallTimeRemaining - 1000);
 
@@ -174,8 +175,8 @@ class ChatTimerSystem {
             this.notifyListeners('onTick', {
                 percentageChatTimeRemaining:
                     this.state.currentChatIndex < this.config.chatDurations.length ?
-                        this.state.currentChatTimeRemaining / 1000 / this.getCurrentChatDuration() * 100 :
-                        this.state.overallTimeRemaining / 1000 / this.getCurrentChatDuration() * 100,
+                        this.state.currentChatTimeRemaining / (this.getCurrentChatDuration() * 1000) * 100 :
+                        this.state.overallTimeRemaining / (this.config.overallDuration * 1000) * 100,
                 overallTimeRemaining: this.state.overallTimeRemaining,
                 currentChatTimeRemaining: this.state.currentChatTimeRemaining
             });
@@ -226,8 +227,8 @@ class ChatTimerSystem {
             this.notifyListeners('onTick', {
                 percentageChatTimeRemaining:
                     this.state.currentChatIndex < this.config.chatDurations.length ?
-                        this.state.currentChatTimeRemaining / 1000 / this.getCurrentChatDuration() * 100 :
-                        this.state.overallTimeRemaining / 1000 / this.getCurrentChatDuration() * 100,
+                        this.state.currentChatTimeRemaining / (this.getCurrentChatDuration() * 1000) * 100 :
+                        this.state.overallTimeRemaining / (this.config.overallDuration * 1000) * 100,
                 overallTimeRemaining: this.state.overallTimeRemaining,
                 currentChatTimeRemaining: this.state.currentChatTimeRemaining
             });
@@ -249,6 +250,7 @@ class ChatTimerSystem {
 
 
     persistState() {
+        if (window.__isRestarting) return;
         const stateToSave = {
             overallTimeRemaining: this.state.overallTimeRemaining,
             currentChatTimeRemaining: this.state.currentChatTimeRemaining,
@@ -258,6 +260,17 @@ class ChatTimerSystem {
             isWarningShown: this.state.isWarningShown
         };
         localStorage.setItem('chatTimerState', JSON.stringify(stateToSave));
+    }
+
+    forceTickUpdate() {
+        this.notifyListeners('onTick', {
+            percentageChatTimeRemaining:
+                this.state.currentChatIndex < this.config.chatDurations.length ?
+                    this.state.currentChatTimeRemaining / (this.getCurrentChatDuration() * 1000) * 100 :
+                    this.state.overallTimeRemaining / (this.config.overallDuration * 1000) * 100,
+            overallTimeRemaining: this.state.overallTimeRemaining,
+            currentChatTimeRemaining: this.state.currentChatTimeRemaining
+        });
     }
 
     loadPersistedState() {
