@@ -112,15 +112,26 @@ function APIKeySetup({ config, setConfig }) {
           baseUrl: normalizedBaseUrl
         })
       });
-      
-      const data = await response.json();
+
+      const rawBody = await response.text();
+      let data = {};
+      if (rawBody) {
+        try {
+          data = JSON.parse(rawBody);
+        } catch (parseError) {
+          data = { error: rawBody };
+        }
+      }
       
       if (response.ok) {
         console.log('API_SETUP: API key test succeeded');
         setTestStatus({ success: true, message: 'API key is valid!' });
       } else {
         console.error('API_SETUP: API key test failed', data.error);
-        setTestStatus({ success: false, message: `Error: ${data.error || 'Unknown error'}` });
+        setTestStatus({
+          success: false,
+          message: `Error (${response.status}): ${data.error || response.statusText || 'Unknown error'}`
+        });
       }
     } catch (error) {
       console.error('API_SETUP: API key test exception', error);

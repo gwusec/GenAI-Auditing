@@ -151,6 +151,13 @@ function chatRateLimit(req, res, next) {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: BODY_SIZE_LIMIT }));
 
+app.use((err, req, res, next) => {
+  if (err && err.message === 'CORS origin not allowed') {
+    return res.status(403).json({ error: 'CORS origin not allowed' });
+  }
+  return next(err);
+});
+
 app.use((req, res, next) => {
   const startTime = Date.now();
   res.setTimeout(REQUEST_TIMEOUT_MS, () => {
@@ -536,10 +543,11 @@ function formatMessagesForProvider(messages, provider) {
 
 // API endpoint to test API keys
 app.post('/api/test-api-key', async (req, res) => {
-  const provider = (req.body.provider || '').toLowerCase().trim();
-  const apiKey = (req.body.apiKey || '').trim();
-  const model = (req.body.model || '').trim();
-  const baseUrl = (req.body.baseUrl || '').trim();
+  const payload = req.body || {};
+  const provider = (payload.provider || '').toLowerCase().trim();
+  const apiKey = (payload.apiKey || '').trim();
+  const model = (payload.model || '').trim();
+  const baseUrl = (payload.baseUrl || '').trim();
   
   if (!provider || !apiKey) {
     return res.status(400).json({ error: 'Provider and API key are required' });
