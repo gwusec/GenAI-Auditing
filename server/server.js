@@ -541,6 +541,16 @@ app.post('/api/test-api-key', async (req, res) => {
   if (!provider || !apiKey) {
     return res.status(400).json({ error: 'Provider and API key are required' });
   }
+
+  if (!baseUrl || typeof baseUrl !== 'string') {
+    return res.status(400).json({ error: 'A valid baseUrl is required' });
+  }
+
+  try {
+    new URL(baseUrl);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid baseUrl format' });
+  }
   
   console.log(`TESTING API KEY FOR ${provider.toUpperCase()} - Model: ${model}`);
   

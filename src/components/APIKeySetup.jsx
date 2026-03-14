@@ -26,18 +26,23 @@ function APIKeySetup({ config, setConfig }) {
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
   
-  // Initialize with OpenAI as default since it's the only option
+  // Normalize config so persisted stale values do not break API testing.
   useEffect(() => {
-    if (!config.provider || config.provider !== 'openai') {
-      const newConfig = {
-        ...config,
-        provider: 'openai',
-        model: config.model || PROVIDER_MODELS.openai[0].id,
-        baseUrl: config.baseUrl || API_BASE_URLS.openai
-      };
-      setConfig(newConfig);
+    const normalizedConfig = {
+      ...config,
+      provider: 'openai',
+      model: config.model || PROVIDER_MODELS.openai[0].id,
+      baseUrl: (config.baseUrl || API_BASE_URLS.openai).trim()
+    };
+
+    if (
+      normalizedConfig.provider !== config.provider ||
+      normalizedConfig.model !== config.model ||
+      normalizedConfig.baseUrl !== config.baseUrl
+    ) {
+      setConfig(normalizedConfig);
     }
-  }, []);
+  }, [config, setConfig]);
   
   // Log when the component receives updated config props
   useEffect(() => {
@@ -70,9 +75,20 @@ function APIKeySetup({ config, setConfig }) {
   const testApiKey = async () => {
     setIsTestingKey(true);
     setTestStatus(null);
+
+    const normalizedBaseUrl = (config.baseUrl || API_BASE_URLS.openai).trim();
+
+    try {
+      // Validate early to show a friendly client-side message.
+      new URL(normalizedBaseUrl);
+    } catch (error) {
+      setTestStatus({ success: false, message: 'Error: API Base URL is invalid. Use https://api.openai.com/v1' });
+      setIsTestingKey(false);
+      return;
+    }
     
     console.log(`API_SETUP: Testing API key for ${config.provider}`);
-    console.log(`API_SETUP: Using model "${config.model}" and baseUrl "${config.baseUrl}"`);
+    console.log(`API_SETUP: Using model "${config.model}" and baseUrl "${normalizedBaseUrl}"`);
     
     try {
       const response = await fetch('/api/test-api-key', {
@@ -84,7 +100,7 @@ function APIKeySetup({ config, setConfig }) {
           provider: config.provider,
           apiKey: config.apiKey,
           model: config.model,
-          baseUrl: config.baseUrl
+          baseUrl: normalizedBaseUrl
         })
       });
       
