@@ -7,7 +7,7 @@ const apiClient = (() => {
   const createInstance = (hostUrl) => {
     const api = axios.create({
       baseURL: hostUrl,
-      timeout: 300000,
+      timeout: 120000,
     });
     return api;
   };
@@ -36,14 +36,20 @@ const apiClient = (() => {
       }));
 
       const userId = AppConfig.get("userId");
+      const appRuntimeConfig = AppConfig.get("config") || {};
+      const relay = appRuntimeConfig.llmRelay;
 
       try {
         if (!userId) {
           throw new Error('User ID not found');
         }
+        if (!relay || !relay.backend) {
+          throw new Error('LLM relay configuration is missing');
+        }
         const response = await instance.post('/chat', {
           messages: llmMessages,
-          pid: userId
+          pid: userId,
+          relay
         });
         return {status: "success", data: response.data};
       } catch (err) {
@@ -58,7 +64,8 @@ const apiClient = (() => {
             }
             const response = await instance.post('/chat', {
               messages: [testMessage],
-              pid: userId
+              pid: userId,
+              relay
             });
             if (response.data.statuCode === 200) {
               console.log("[INFO] API available - probably message exceeding limit.");

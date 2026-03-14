@@ -51,13 +51,14 @@
     "vm-browserify": "^1.1.2"
   },
   "scripts": {
-    "start": "cross-env PORT=3001 react-app-rewired start",
-    "build": "react-app-rewired.cmd build",
+    "client": "cross-env PORT=3001 react-app-rewired start",
+    "build": "react-app-rewired build",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "server": "nodemon server/server.js",
-    "dev": "concurrently \"npm run server\" \"npm run start\"",
-    "prod": "node server/server.js"
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "node server/server.js",
+    "prod": "npm run start"
   },
   "eslintConfig": {
     "extends": [

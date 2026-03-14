@@ -10,7 +10,13 @@ A wrapper application for the TRAILS Chatbot that provides multiple LLM backend 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Local Production Testing](#local-production-testing)
+- [Render Deployment](#render-deployment)
 - [Backend Options](#backend-options)
+- [OpenAI Setup](#openai-setup)
+- [Ollama Setup](#ollama-setup)
+- [Deployment Limitations](#deployment-limitations)
+- [Go-Live Checklist](#go-live-checklist)
 - [Implementation Details](#implementation-details)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
@@ -244,6 +250,49 @@ The application will be available at:
 
 The application will be available at http://localhost:3000.
 
+## Local Production Testing
+
+1. Copy environment variables:
+    ```bash
+    cp .env.example .env
+    ```
+
+2. Build the frontend:
+    ```bash
+    npm run build
+    ```
+
+3. Start the production server:
+    ```bash
+    npm run start
+    ```
+
+4. Verify health endpoint:
+    ```bash
+    curl http://localhost:3000/api/health
+    ```
+
+## Render Deployment
+
+Deploy this repository as a single Render Web Service (frontend build + Express relay in one service).
+
+1. Push this repository to GitHub.
+2. Create a new Web Service in Render from your repository.
+3. Set environment:
+    - `NODE_ENV=production`
+    - `ALLOWED_ORIGINS=https://<your-render-domain>.onrender.com`
+    - Optional tuning values from `.env.example`
+4. Set commands:
+    - Build Command: `npm install && npm run build`
+    - Start Command: `npm run start`
+5. Deploy and test:
+    - `GET /api/health`
+    - Open app URL and run one OpenAI request and one Ollama request.
+
+Notes:
+- Render injects `PORT` automatically; the server already binds to `process.env.PORT`.
+- Static build is served by Express in production.
+
 ## 🔧 Backend Options
 
 ### Ollama
@@ -255,6 +304,63 @@ To use Ollama:
 2. Pull your desired model: `ollama pull llama3`
 3. Run Ollama: `ollama serve`
 4. Configure the Ollama URL and model in the website settings
+
+### API Key
+
+Users can supply their own API keys. Requests are relayed through the Express backend and routed per request.
+
+Supported providers in the relay:
+- OpenAI
+- Anthropic
+- Cohere
+- Gemini
+
+## OpenAI Setup
+
+1. Choose `API` mode in the UI.
+2. Provider: `openai`.
+3. Base URL: `https://api.openai.com/v1`.
+4. Model: e.g. `gpt-4o`.
+5. Paste user-owned API key.
+
+The relay does not require server-side model hosting for OpenAI mode.
+
+## Ollama Setup
+
+For a public website, users should provide an Ollama endpoint reachable by the deployed server.
+
+Common pattern:
+1. User runs local Ollama:
+    ```bash
+    ollama serve
+    ollama pull llama3.1
+    ```
+2. User exposes local Ollama with a tunnel (for example Cloudflare Tunnel or ngrok).
+3. User pastes the tunnel URL into the Ollama URL field.
+
+Important:
+- The relay is request-scoped and uses the Ollama URL provided in each request.
+- There is no server-hosted model fallback in production behavior.
+
+## Deployment Limitations
+
+1. This deployment intentionally does not host any model server.
+2. Ollama mode requires a user-provided endpoint that is reachable from the deployed relay.
+3. Private/local Ollama endpoints can be blocked by policy (`ALLOW_PRIVATE_OLLAMA_URLS=false` by default).
+4. Free hosting tiers may cold-start and increase first-response latency.
+
+## Go-Live Checklist
+
+1. Confirm `.env` is set from `.env.example`.
+2. Set `ALLOWED_ORIGINS` to your production domain(s).
+3. Keep `ALLOW_PRIVATE_OLLAMA_URLS=false` unless you have a trusted private deployment.
+4. Validate `/api/health` returns status `ok`.
+5. Validate rate limiting by sending repeated `/chat` requests and checking `429` behavior.
+6. Validate OpenAI mode with a user-owned key.
+7. Validate Ollama mode with a user-owned reachable endpoint URL.
+8. Confirm logs do not expose full API keys.
+9. Confirm frontend static assets are served from Express in production.
+10. Verify restart behavior and error handling on failed provider calls.
 
 ### WebLLM
 

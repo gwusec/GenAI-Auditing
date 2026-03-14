@@ -27,7 +27,6 @@ function App() {
   const [backend, setBackend] = useState('ollama'); // 'ollama', or 'api'
   const [showConfig, setShowConfig] = useState(true);
   const [configApplied, setConfigApplied] = useState(false);
-  const [configSyncedWithServer, setConfigSyncedWithServer] = useState(false);
 
   // Ollama config
   const [ollamaConfig, setOllamaConfig] = useState({
@@ -60,8 +59,6 @@ function App() {
   const handleBackendChange = (newBackend) => {
     console.log(`BACKEND CHANGED: ${backend} -> ${newBackend}`);
     setBackend(newBackend);
-    // Reset config sync status when backend changes
-    setConfigSyncedWithServer(false);
   };
 
   // Handle Survey Save/Start Chat
@@ -130,56 +127,6 @@ function App() {
     }
   }, []);
 
-  // Sync configuration with server when applied
-  useEffect(() => {
-    if (configApplied && !configSyncedWithServer) {
-      // Get the current configuration based on selected backend
-      let currentConfig;
-
-      switch (backend) {
-        case 'ollama':
-          currentConfig = ollamaConfig;
-          break;
-        case 'webllm':
-          currentConfig = webLLMConfig;
-          break;
-        case 'api':
-          currentConfig = apiConfig;
-          break;
-        default:
-          console.error('Unknown backend:', backend);
-          return;
-      }
-
-      console.log(`SYNCING CONFIGURATION WITH SERVER - Backend: ${backend}`);
-
-      // Send the configuration to the server
-      fetch('/api/set-config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: userId,
-          backend: backend,
-          config: currentConfig
-        })
-      })
-        .then(response => response.json())
-        .then(data => {
-          if (data.success) {
-            console.log('CONFIGURATION SYNCED WITH SERVER SUCCESSFULLY');
-            setConfigSyncedWithServer(true);
-          } else {
-            console.error('FAILED TO SYNC CONFIGURATION WITH SERVER', data.error);
-          }
-        })
-        .catch(error => {
-          console.error('ERROR SYNCING CONFIGURATION WITH SERVER', error);
-        });
-    }
-  }, [configApplied, configSyncedWithServer, backend, ollamaConfig, webLLMConfig, apiConfig, userId]);
-
   // Handle configuration save
   const saveConfig = () => {
     console.log(`SAVING CONFIGURATION - Selected Backend: ${backend}`);
@@ -194,8 +141,6 @@ function App() {
     };
     localStorage.setItem('llmConfig', JSON.stringify(config));
     setConfigApplied(true);
-    // Reset config sync status to trigger a new sync
-    setConfigSyncedWithServer(false);
     setShowConfig(false);
   };
 
@@ -229,13 +174,35 @@ function App() {
   }, []);
 
   // Get the proxy URL based on current backend
+  // In production the React app is served by the same Express server,
+  // so we use a relative base URL (empty string = same origin).
+  // In development, proxy to the local Express server.
   const getProxyUrl = () => {
+    if (process.env.NODE_ENV === 'production') {
+      return '';
+    }
     if (backend === 'ollama') {
-      return ollamaConfig.proxyUrl;
-    } else if (backend === 'api') {
-      return 'http://localhost:3000';
+      return ollamaConfig.proxyUrl || 'http://localhost:3000';
     }
     return 'http://localhost:3000';
+  };
+
+  const getRelayConfig = () => {
+    if (backend === 'api') {
+      return {
+        backend: 'api',
+        provider: apiConfig.provider,
+        apiKey: apiConfig.apiKey,
+        model: apiConfig.model,
+        baseUrl: apiConfig.baseUrl
+      };
+    }
+
+    return {
+      backend: 'ollama',
+      ollamaUrl: ollamaConfig.url,
+      ollamaModel: ollamaConfig.model
+    };
   };
 
   return (
@@ -330,18 +297,11 @@ function App() {
                 timerMaxOverallChatTimeSeconds: 30 * 60,
                 timerChatsMaxSeconds: [7 * 60, 7 * 60],
                 timerWarningChatTimeIsUpSeconds: 2 * 60,
-                timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60
+                timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60,
+                llmRelay: getRelayConfig()
               }}
               initialSurvey={surveyConfig}
             />
-
-
-
-            {configApplied && !configSyncedWithServer && (
-              <div className="sync-status">
-                Syncing configuration...
-              </div>
-            )}
           </div>
         )}
       </div>

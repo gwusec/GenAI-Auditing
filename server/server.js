@@ -2,252 +2,262 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const fs = require('fs');
-const { createProxyMiddleware } = require('http-proxy-middleware');
 const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const isDevelopment = process.env.NODE_ENV !== 'production';
+app.set('trust proxy', 1);
+const BODY_SIZE_LIMIT = process.env.BODY_SIZE_LIMIT || '1mb';
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 120000);
+const CHAT_RATE_LIMIT_WINDOW_MS = Number(process.env.CHAT_RATE_LIMIT_WINDOW_MS || 60000);
+const CHAT_RATE_LIMIT_MAX = Number(process.env.CHAT_RATE_LIMIT_MAX || 20);
+const OLLAMA_TEST_TIMEOUT_MS = Number(process.env.OLLAMA_TEST_TIMEOUT_MS || 5000);
+const ALLOW_PRIVATE_OLLAMA_URLS = (process.env.ALLOW_PRIVATE_OLLAMA_URLS || '').toLowerCase() === 'true';
 
-// Simple in-memory session store to keep track of user configurations
-const sessionStore = {
-  sessions: {},
-  
-  // Store a user's configuration
-  setUserConfig(userId, config) {
-    console.log(`SETTING USER CONFIG for ${userId}:`, config);
-    this.sessions[userId] = {
-      ...config,
-      lastUpdated: new Date()
-    };
-    return true;
-  },
-  
-  // Get a user's configuration
-  getUserConfig(userId) {
-    const config = this.sessions[userId];
-    if (config) {
-      console.log(`RETRIEVED USER CONFIG for ${userId}:`, config);
-    } else {
-      console.log(`NO CONFIG FOUND for ${userId}`);
+function parseAllowedOrigins(value) {
+  if (!value) {
+    return isDevelopment ? ['*'] : [];
+  }
+  return value
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
     }
-    return config;
-  },
-  
-  // Clean up old sessions (can be called periodically)
-  cleanup() {
-    const now = new Date();
-    const expireTime = 24 * 60 * 60 * 1000; // 24 hours
-    
-    Object.keys(this.sessions).forEach(userId => {
-      const session = this.sessions[userId];
-      if (now - session.lastUpdated > expireTime) {
-        delete this.sessions[userId];
-      }
-    });
+    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('CORS origin not allowed'));
   }
 };
 
-/**
- * Smart connection logic for Ollama - tries multiple URLs to find a working connection
- */
-async function findWorkingOllamaUrl(configUrl, model = 'llama3.1') {
-  const urlsToTry = [
-    configUrl, // User's configured URL
-    'http://localhost:11434', // Standard local
-    'http://host.docker.internal:11434', // Docker Desktop (Mac/Windows)
-    'http://172.17.0.1:11434', // Docker default bridge (Linux)
-    'http://192.168.65.2:11434', // Docker Desktop alternative
-  ].filter((url, index, self) => 
-    // Remove duplicates and empty URLs
-    url && url.trim() && self.indexOf(url) === index
-  );
-
-  console.log('🔍 Trying Ollama URLs:', urlsToTry);
-
-  for (const url of urlsToTry) {
-    try {
-      console.log(`   Attempting: ${url}`);
-      
-      // Test connection with a simple request
-      const response = await axios.get(`${url}/api/tags`, {
-        timeout: 3000,
-        validateStatus: (status) => status === 200
-      });
-      
-      if (response.data && response.data.models) {
-        // Check if the required model is available
-        const modelNames = response.data.models.map(model => model.name);
-        const hasRequiredModel = modelNames.some(name => 
-          name === model || 
-          name === `${model}:latest` ||
-          name === `${model}:8b` ||
-          name.startsWith(`${model}:`)
-        );
-        
-        if (hasRequiredModel) {
-          console.log(`✅ Found working Ollama with ${model} at: ${url}`);
-          return url;
-        } else {
-          console.log(`⚠️  Ollama at ${url} doesn't have model ${model}`);
-        }
-      }
-    } catch (error) {
-      console.log(`   ❌ Failed: ${error.message}`);
-    }
+function redactSecret(secret = '') {
+  if (!secret || typeof secret !== 'string') {
+    return undefined;
   }
-  
-  console.log('❌ No working Ollama URL found');
-  return null;
+  if (secret.length <= 8) {
+    return '***';
+  }
+  return `${secret.slice(0, 3)}***${secret.slice(-3)}`;
 }
 
-// Enable CORS
-app.use(cors());
+function normalizeUrl(url) {
+  return (url || '').trim().replace(/\/$/, '');
+}
 
-// Parse JSON request bodies
-app.use(express.json());
+function safeHostname(rawUrl) {
+  try {
+    return new URL(rawUrl).hostname;
+  } catch (error) {
+    return 'invalid-url';
+  }
+}
 
-// Enhanced request logging middleware
-app.use((req, res, next) => {
-  const startTime = Date.now();
-  const originalSend = res.send;
-  
-  // Pretty formatting for the method + URL in logs
-  const methodColor = '\x1b[36m'; // Cyan
-  const resetColor = '\x1b[0m';
-  console.log(`${methodColor}${req.method} ${req.url}${resetColor}`);
-  
-  // Add header logging for important requests
-  if (req.url === '/chat') {
-    console.log('REQUEST HEADERS:', {
-      'x-api-provider': req.headers['x-api-provider'],
-      'x-api-model': req.headers['x-api-model'],
-      'x-api-base-url': req.headers['x-api-base-url'],
-      // Only show the last 4 chars of API key for security
-      'x-api-key': req.headers['x-api-key'] ? 
-        '***' + req.headers['x-api-key'].slice(-4) : undefined,
-      'x-ollama-url': req.headers['x-ollama-url'],
-      'x-ollama-model': req.headers['x-ollama-model']
+function isPrivateIPv4(hostname) {
+  if (/^127\./.test(hostname)) return true;
+  if (/^10\./.test(hostname)) return true;
+  if (/^192\.168\./.test(hostname)) return true;
+  const match172 = hostname.match(/^172\.(\d{1,3})\./);
+  if (match172) {
+    const secondOctet = Number(match172[1]);
+    return secondOctet >= 16 && secondOctet <= 31;
+  }
+  return false;
+}
+
+function isPrivateHost(hostname) {
+  const host = (hostname || '').toLowerCase();
+  if (!host) return true;
+  if (host === 'localhost' || host === '::1' || host === '[::1]') return true;
+  if (host.endsWith('.local')) return true;
+  if (host.startsWith('169.254.')) return true;
+  if (host.startsWith('fc') || host.startsWith('fd')) return true;
+  return isPrivateIPv4(host);
+}
+
+function validateOllamaUrl(rawUrl) {
+  const normalized = normalizeUrl(rawUrl);
+  if (!normalized) {
+    return { valid: false, error: 'Ollama URL is required' };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch (error) {
+    return { valid: false, error: 'Ollama URL is invalid' };
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { valid: false, error: 'Ollama URL must use http or https' };
+  }
+
+  if (!isDevelopment && !ALLOW_PRIVATE_OLLAMA_URLS && isPrivateHost(parsed.hostname)) {
+    return {
+      valid: false,
+      error: 'Private/local Ollama URLs are blocked by server policy'
+    };
+  }
+
+  return { valid: true, normalized };
+}
+
+function validateMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return false;
+  }
+  return messages.every((msg) => msg && typeof msg.content === 'string' && typeof msg.role === 'string');
+}
+
+const chatRateBuckets = new Map();
+setInterval(() => {
+  const cutoff = Date.now() - CHAT_RATE_LIMIT_WINDOW_MS;
+  for (const [key, entry] of chatRateBuckets.entries()) {
+    if (entry.windowStart < cutoff) {
+      chatRateBuckets.delete(key);
+    }
+  }
+}, Math.max(30000, CHAT_RATE_LIMIT_WINDOW_MS)).unref();
+
+function chatRateLimit(req, res, next) {
+  const key = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+  const now = Date.now();
+  const entry = chatRateBuckets.get(key);
+
+  if (!entry || now - entry.windowStart >= CHAT_RATE_LIMIT_WINDOW_MS) {
+    chatRateBuckets.set(key, { count: 1, windowStart: now });
+    return next();
+  }
+
+  entry.count += 1;
+  if (entry.count > CHAT_RATE_LIMIT_MAX) {
+    return res.status(429).json({
+      statusCode: 429,
+      error: 'Too many chat requests, please try again shortly.'
     });
   }
-  
-  // Add response logging
-  res.send = function(body) {
+
+  return next();
+}
+
+app.use(cors(corsOptions));
+app.use(express.json({ limit: BODY_SIZE_LIMIT }));
+
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  res.setTimeout(REQUEST_TIMEOUT_MS, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ statusCode: 408, error: 'Request timed out' });
+    }
+  });
+
+  console.log(`${req.method} ${req.url}`);
+
+  if (req.url === '/chat' && req.body?.relay) {
+    const relay = req.body.relay;
+    console.log('CHAT RELAY META:', {
+      backend: relay.backend,
+      provider: relay.provider,
+      model: relay.model,
+      baseUrl: relay.baseUrl,
+      apiKey: redactSecret(relay.apiKey),
+      ollamaUrl: relay.ollamaUrl,
+      ollamaModel: relay.ollamaModel
+    });
+  }
+
+  res.on('finish', () => {
     const duration = Date.now() - startTime;
-    console.log(`Response sent in ${duration}ms - Status: ${res.statusCode}`);
-    return originalSend.call(this, body);
-  };
-  
+    console.log(`${req.method} ${req.url} -> ${res.statusCode} (${duration}ms)`);
+  });
+
   next();
 });
 
-// Endpoint to save user configuration
 app.post('/api/set-config', (req, res) => {
-  const { userId, backend, config } = req.body;
-  
-  if (!userId || !backend || !config) {
-    return res.status(400).json({ 
-      error: 'Missing required parameters' 
-    });
-  }
-  
-  console.log(`RECEIVED CONFIG UPDATE for user ${userId}`);
-  console.log(`BACKEND: ${backend}`);
-  console.log('CONFIG:', config);
-  
-  // Store the configuration
-  sessionStore.setUserConfig(userId, { backend, config });
-  
-  res.json({ success: true });
+  res.json({
+    success: true,
+    deprecated: true,
+    message: 'Request-scoped routing is active. /api/set-config is no longer used by the relay.'
+  });
 });
 
 // IMPORTANT: This is the main chat endpoint that TRAILS-Chatbot uses
-app.post('/chat', async (req, res) => {
+app.post('/chat', chatRateLimit, async (req, res) => {
   try {
-    // Extract the relevant information from the request
-    const { pid: userId, messages } = req.body;
-    console.log(`CHAT REQUEST - User ID: ${userId}, Messages: ${messages?.length || 0}`);
-    
-    // Get the user's configuration from the session store
-    const userConfig = sessionStore.getUserConfig(userId);
-    
-    // Check if we have API configuration in the headers (legacy support)
-    const apiProvider = req.headers['x-api-provider'];
-    const apiKey = req.headers['x-api-key'];
-    const apiModel = req.headers['x-api-model'];
-    const apiBaseUrl = req.headers['x-api-base-url'];
-    
-    // Use the session store config if available, otherwise fall back to headers
-    if (userConfig && userConfig.backend === 'api') {
-      console.log(`USING STORED CONFIG: Backend ${userConfig.backend}, Provider ${userConfig.config.provider}`);
-      
-      // Get the API config from the session store
-      const apiConfig = userConfig.config;
-      
-      return handleApiProviderRequest(req, res, 
-        apiConfig.provider, 
-        apiConfig.apiKey, 
-        apiConfig.model, 
-        apiConfig.baseUrl
-      );
-    } else if (apiProvider && apiKey) {
-      console.log(`USING HEADER CONFIG: Provider ${apiProvider}`);
-      return handleApiProviderRequest(req, res, apiProvider, apiKey, apiModel, apiBaseUrl);
+    const { messages, relay } = req.body;
+    if (!validateMessages(messages)) {
+      return res.status(400).json({ statusCode: 400, error: 'Invalid messages payload' });
     }
-    
-// Otherwise, handle Ollama request with smart connection logic
-let ollamaUrl = 'http://localhost:11434';
-let ollamaModel = 'llama3.1';
 
-if (userConfig && userConfig.backend === 'ollama') {
-  ollamaUrl = userConfig.config.url || ollamaUrl;
-  ollamaModel = userConfig.config.model || ollamaModel;
-  console.log(`USING STORED OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
-} else {
-  // For backward compatibility, get from headers if available
-  ollamaUrl = req.headers['x-ollama-url'] || ollamaUrl;
-  ollamaModel = req.headers['x-ollama-model'] || ollamaModel;
-  console.log(`USING DEFAULT/HEADER OLLAMA CONFIG: Model ${ollamaModel} @ ${ollamaUrl}`);
-}
-
-// 🚀 NEW: Use smart connection logic to find working URL
-console.log(`🔍 Using smart connection logic for Ollama...`);
-const workingUrl = await findWorkingOllamaUrl(ollamaUrl, ollamaModel);
-
-if (!workingUrl) {
-  console.error('❌ Could not find any working Ollama installation');
-  return res.status(500).json({
-    statusCode: 500,
-    error: 'Could not connect to Ollama. Please make sure Ollama is running and the model is installed.',
-    body: {
-      message: {
-        role: 'assistant',
-        content: `I couldn't connect to Ollama. Please ensure:\n\n1. Ollama is running (ollama serve)\n2. The model is installed (ollama pull ${ollamaModel})\n3. Ollama is accessible from Docker\n\nTried these URLs: ${[ollamaUrl, 'http://host.docker.internal:11434', 'http://172.17.0.1:11434'].join(', ')}`
-      },
-      finish_reason: 'error'
+    if (!relay || !relay.backend) {
+      return res.status(400).json({ statusCode: 400, error: 'Missing relay configuration' });
     }
-  });
-}
 
-// Update the URL to the working one (and optionally save it back to config)
-ollamaUrl = workingUrl;
-console.log(`✅ Using working Ollama URL: ${ollamaUrl}`);
+    if (relay.backend === 'api') {
+      const provider = relay.provider;
+      const apiKey = relay.apiKey;
+      const model = relay.model;
+      const baseUrl = relay.baseUrl;
 
-// Update user config with working URL if it's different
-if (userConfig && userConfig.config.url !== workingUrl) {
-  console.log(`💾 Auto-updating user config with working URL: ${workingUrl}`);
-  sessionStore.setUserConfig(userId, {
-    ...userConfig,
-    config: {
-      ...userConfig.config,
-      url: workingUrl
+      if (!provider || !apiKey || !model || !baseUrl) {
+        return res.status(400).json({
+          statusCode: 400,
+          error: 'API relay requires provider, apiKey, model, and baseUrl'
+        });
+      }
+
+      return handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl);
     }
-  });
-}
 
-console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
-    
-    // Format messages for Ollama API
+    if (relay.backend !== 'ollama') {
+      return res.status(400).json({ statusCode: 400, error: `Unsupported backend: ${relay.backend}` });
+    }
+
+    const ollamaUrlValidation = validateOllamaUrl(relay.ollamaUrl);
+    if (!ollamaUrlValidation.valid) {
+      return res.status(400).json({ statusCode: 400, error: ollamaUrlValidation.error });
+    }
+
+    const ollamaUrl = ollamaUrlValidation.normalized;
+    const ollamaModel = relay.ollamaModel || 'llama3.1';
+
+    let tagsResponse;
+    try {
+      tagsResponse = await axios.get(`${ollamaUrl}/api/tags`, { timeout: OLLAMA_TEST_TIMEOUT_MS });
+    } catch (error) {
+      return res.status(502).json({
+        statusCode: 502,
+        error: `Unable to reach Ollama endpoint: ${error.message}`
+      });
+    }
+
+    const availableModels = Array.isArray(tagsResponse.data?.models)
+      ? tagsResponse.data.models.map((model) => model.name)
+      : [];
+
+    const hasRequestedModel = availableModels.some((name) =>
+      name === ollamaModel ||
+      name === `${ollamaModel}:latest` ||
+      name === `${ollamaModel}:8b` ||
+      name.startsWith(`${ollamaModel}:`)
+    );
+
+    if (!hasRequestedModel) {
+      return res.status(400).json({
+        statusCode: 400,
+        error: `Model ${ollamaModel} not found on the provided Ollama endpoint`
+      });
+    }
+
     const ollamaMessages = messages.map(msg => ({
       role: msg.role,
       content: msg.content
@@ -263,7 +273,6 @@ console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
     
     try {
       console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
-      // Call Ollama API
       const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
         model: ollamaModel,
         messages: ollamaMessages,
@@ -273,7 +282,7 @@ console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
           num_predict: 2000
         }
       }, {
-        timeout: 120000
+        timeout: REQUEST_TIMEOUT_MS
       });
       
       console.log('RECEIVED RESPONSE FROM OLLAMA');
@@ -294,7 +303,7 @@ console.log(`ROUTING TO OLLAMA - URL: ${ollamaUrl}, Model: ${ollamaModel}`);
       res.json(responseData);
     } catch (error) {
       console.error('Error calling Ollama API:', error.message);
-      console.error('Error details:', error.response?.data || 'No response data');
+      console.error('Error details:', error.response?.status || 'No status');
       
       // Send error response
       res.status(500).json({
@@ -408,12 +417,25 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         throw new Error(`Unsupported provider: ${provider}`);
     }
     
-    console.log(`SENDING REQUEST TO ${provider.toUpperCase()} API at ${apiEndpoint}`);
+    console.log('API REQUEST START', {
+      provider,
+      hostname: safeHostname(apiEndpoint),
+      model,
+      stage: 'started'
+    });
     
     // Make the API request
-    const apiResponse = await axios.post(apiEndpoint, requestBody, { headers });
+    const apiResponse = await axios.post(apiEndpoint, requestBody, {
+      headers,
+      timeout: REQUEST_TIMEOUT_MS
+    });
     
-    console.log(`RECEIVED RESPONSE FROM ${provider.toUpperCase()} API`);
+    console.log('API REQUEST RESULT', {
+      provider,
+      hostname: safeHostname(apiEndpoint),
+      model,
+      stage: 'succeeded'
+    });
     
     // Extract and format the response based on provider
     let assistantResponse;
@@ -450,7 +472,12 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
     res.json(responseData);
   } catch (error) {
     console.error(`Error processing ${provider} API request:`, error.message);
-    console.error(error.response?.data || 'No response data');
+    console.error('API REQUEST RESULT', {
+      provider,
+      model,
+      stage: 'failed'
+    });
+    console.error(error.response?.status || 'No status');
     
     res.status(500).json({
       statusCode: 500,
@@ -543,10 +570,18 @@ app.post('/api/test-api-key', async (req, res) => {
         return res.status(400).json({ error: 'Unsupported provider' });
     }
     
-    console.log(`SENDING TEST REQUEST TO ${testEndpoint}`);
+    console.log('API KEY TEST REQUEST START', {
+      provider,
+      hostname: safeHostname(testEndpoint),
+      model,
+      stage: 'started'
+    });
     
     // Make test request
-    const response = await axios.get(testEndpoint, { headers });
+    const response = await axios.get(testEndpoint, {
+      headers,
+      timeout: REQUEST_TIMEOUT_MS
+    });
     
     if (response.status === 200) {
       console.log(`API KEY TEST SUCCESSFUL FOR ${provider.toUpperCase()}`);
@@ -574,43 +609,37 @@ app.get('/api/webllm/models', (req, res) => {
   });
 });
 
-// Create a proxy for the Ollama API for direct model queries
-app.use('/api/ollama', createProxyMiddleware({
-  target: 'http://localhost:11434',
-  changeOrigin: true,
-  pathRewrite: {
-    '^/api/ollama': ''
-  },
-  onProxyReq: (proxyReq, req, res) => {
-    // If a custom Ollama URL was provided in headers, use that instead
-    const customOllamaUrl = req.headers['x-ollama-url'];
-    if (customOllamaUrl) {
-      // We'd need to cancel this proxy and create a new request
-      // This is complex with http-proxy-middleware, so we'll handle
-      // the case in the route handler if needed
-    }
-    console.log(`Proxying Ollama API request: ${req.method} ${req.path}`);
+app.get('/api/ollama/api/tags', async (req, res) => {
+  const providedUrl = req.headers['x-ollama-url'];
+  const validation = validateOllamaUrl(providedUrl);
+  if (!validation.valid) {
+    return res.status(400).json({ error: validation.error });
   }
-}));
+
+  try {
+    const response = await axios.get(`${validation.normalized}/api/tags`, {
+      timeout: OLLAMA_TEST_TIMEOUT_MS
+    });
+    return res.status(200).json(response.data);
+  } catch (error) {
+    return res.status(502).json({ error: `Failed to reach Ollama endpoint: ${error.message}` });
+  }
+});
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0' });
+  res.status(200).json({
+    status: 'ok',
+    version: '1.0.0',
+    uptimeSeconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString()
+  });
 });
-
-// Clean up old sessions periodically
-setInterval(() => {
-  try {
-    sessionStore.cleanup();
-  } catch (error) {
-    console.error('Error cleaning up session store:', error);
-  }
-}, 3600000); // Once per hour
 
 // In development mode, don't try to serve the static build files
 if (!isDevelopment) {
   // Check if the build directory exists
-  const buildPath = path.join(__dirname, 'build');
+  const buildPath = path.join(__dirname, '..', 'build');
   if (fs.existsSync(buildPath)) {
     // Serve static files from the React app
     app.use(express.static(buildPath));
@@ -638,10 +667,10 @@ if (!isDevelopment) {
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`API available at http://localhost:${PORT}`);
+  console.log(`API available at :${PORT}`);
   if (isDevelopment) {
     console.log(`React app running at http://localhost:3001`);
   } else {
-    console.log(`App available at http://localhost:${PORT}`);
+    console.log(`App available on configured host at :${PORT}`);
   }
 });
