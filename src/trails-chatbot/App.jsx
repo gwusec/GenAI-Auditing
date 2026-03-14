@@ -106,9 +106,8 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
   // Initialize the singleton config and additional settings
   useEffect(() => {
     AppConfig.initialize({ llmProxyServerUrl, isViewOnly, config, userId });
-    if (llmProxyServerUrl) {
-      apiClient.getInstance(llmProxyServerUrl.toString().trim());
-    }
+    const baseUrl = typeof llmProxyServerUrl === 'string' ? llmProxyServerUrl.trim() : '';
+    apiClient.getInstance(baseUrl);
   }, [llmProxyServerUrl, isViewOnly, config, userId]);
 
   const startNextConversation = async () => {
