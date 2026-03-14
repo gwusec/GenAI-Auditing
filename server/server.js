@@ -536,7 +536,10 @@ function formatMessagesForProvider(messages, provider) {
 
 // API endpoint to test API keys
 app.post('/api/test-api-key', async (req, res) => {
-  const { provider, apiKey, model, baseUrl } = req.body;
+  const provider = (req.body.provider || '').toLowerCase().trim();
+  const apiKey = (req.body.apiKey || '').trim();
+  const model = (req.body.model || '').trim();
+  const baseUrl = (req.body.baseUrl || '').trim();
   
   if (!provider || !apiKey) {
     return res.status(400).json({ error: 'Provider and API key are required' });
@@ -602,7 +605,21 @@ app.post('/api/test-api-key', async (req, res) => {
     }
   } catch (error) {
     console.error(`Error testing ${provider} API key:`, error.message);
-    res.status(500).json({ error: error.response?.data?.error || error.message });
+
+    const upstreamStatus = error.response?.status;
+    const upstreamError = error.response?.data?.error;
+    const upstreamMessage =
+      typeof upstreamError === 'string'
+        ? upstreamError
+        : upstreamError?.message || error.message;
+
+    if (upstreamStatus) {
+      return res.status(upstreamStatus).json({
+        error: `Provider request failed (${upstreamStatus}): ${upstreamMessage}`
+      });
+    }
+
+    return res.status(500).json({ error: `Provider request failed: ${upstreamMessage}` });
   }
 });
 

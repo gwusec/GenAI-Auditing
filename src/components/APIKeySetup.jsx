@@ -77,6 +77,15 @@ function APIKeySetup({ config, setConfig }) {
     setTestStatus(null);
 
     const normalizedBaseUrl = (config.baseUrl || API_BASE_URLS.openai).trim();
+    const normalizedApiKey = (config.apiKey || '').trim();
+    const normalizedProvider = (config.provider || 'openai').trim().toLowerCase();
+    const normalizedModel = (config.model || PROVIDER_MODELS.openai[0].id).trim();
+
+    if (!normalizedApiKey) {
+      setTestStatus({ success: false, message: 'Error: API key is required' });
+      setIsTestingKey(false);
+      return;
+    }
 
     try {
       // Validate early to show a friendly client-side message.
@@ -87,8 +96,8 @@ function APIKeySetup({ config, setConfig }) {
       return;
     }
     
-    console.log(`API_SETUP: Testing API key for ${config.provider}`);
-    console.log(`API_SETUP: Using model "${config.model}" and baseUrl "${normalizedBaseUrl}"`);
+    console.log(`API_SETUP: Testing API key for ${normalizedProvider}`);
+    console.log(`API_SETUP: Using model "${normalizedModel}" and baseUrl "${normalizedBaseUrl}"`);
     
     try {
       const response = await fetch('/api/test-api-key', {
@@ -97,9 +106,9 @@ function APIKeySetup({ config, setConfig }) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          provider: config.provider,
-          apiKey: config.apiKey,
-          model: config.model,
+          provider: normalizedProvider,
+          apiKey: normalizedApiKey,
+          model: normalizedModel,
           baseUrl: normalizedBaseUrl
         })
       });
