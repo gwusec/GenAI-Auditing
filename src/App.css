@@ -15,8 +15,7 @@ header {
   justify-content: space-between;
   align-items: center;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 1000; /* Increased z-index */
   min-height: 60px; /* Fixed header height */
 }
@@ -204,7 +203,7 @@ header h1 {
     gap: 10px;
     text-align: center;
     padding: 10px;
-    position: sticky; /* Keep sticky on mobile */
+    position: relative;
     min-height: auto;
   }
   

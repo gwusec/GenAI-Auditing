@@ -58,7 +58,9 @@ const AuditForm = ({
         getAvailableStates(effectiveSurveyQuestions)[0] || STATE.COMPLETE
     );
     const [tutorialCompleted, setTutorialCompleted] = useState(false);
-    const [isCheckedNoProblematicOutputFound, setNoProblematicOutputFound] = useState(false);
+    const [noProblematicFound, setNoProblematicFound] = useState({});
+    const [currentHighlightIndex, setCurrentHighlightIndex] = useState(0);
+    const [viewedHighlightIndices, setViewedHighlightIndices] = useState(new Set([0]));
     const [errors, setErrors] = useState({});
 
     useEffect(() => {
@@ -143,10 +145,15 @@ const AuditForm = ({
     };
 
     const handleHighlight = (highlight) => {
-        setAuditData(prev => ({
-            ...prev,
-            highlights: [...prev.highlights, highlight],
-        }));
+        setAuditData(prev => {
+            const highlightQuestions = effectiveSurveyQuestions.questions.filter(q => q.type === 'textHighlight');
+            const currentQ = highlightQuestions[currentHighlightIndex];
+            if (!currentQ) return prev;
+            return {
+                ...prev,
+                highlights: [...prev.highlights, { ...highlight, questionId: currentQ.id }],
+            };
+        });
     };
 
     const handleRemoveHighlight = (index) => {
@@ -194,9 +201,14 @@ const AuditForm = ({
                 if (!auditData.textResponses[question.id] || auditData.textResponses[question.id].trim() === '') {
                     newErrors[question.id] = 'This field is required.';
                 }
-            } else if (question.type === 'textHighlight' && question.settings.required && question.settings.minHighlights > 0) {
-                if (auditData.highlights.length < question.settings.minHighlights) {
-                    newErrors[question.id] = `At least ${question.settings.minHighlights} highlights are required.`;
+            } else if (question.type === 'textHighlight' && question.settings.required) {
+                // Checks that either text was highlighted for this question or the checkbox was checked..
+                const qHighlights = auditData.highlights.filter(h => h.questionId === question.id || !h.questionId);
+                const minExpected = question.settings.minHighlights > 0 ? question.settings.minHighlights : 1;
+                if (qHighlights.length < minExpected && !noProblematicFound[question.id]) {
+                    newErrors[question.id] = question.settings.minHighlights > 0
+                        ? `At least ${question.settings.minHighlights} highlights are required (or check the box below).`
+                        : `Please highlight problematic passages or check the box below.`;
                 }
             }
         });
@@ -258,7 +270,17 @@ const AuditForm = ({
                                 removeHighlight={handleRemoveHighlight}
                                 enableHighlighting={conversationState === STATE.AUDIT_HIGHLIGHT}
                                 disableTextSelection={conversationState === STATE.AUDIT_TEXTRESPONSE}
-                                highlights={auditData.highlights}
+                                highlights={
+                                    conversationState === STATE.AUDIT_HIGHLIGHT
+                                        ? auditData.highlights.filter(h => {
+                                            const hQuestions = effectiveSurveyQuestions.questions.filter(q => q.type === 'textHighlight');
+                                            const currQ = hQuestions[currentHighlightIndex];
+                                            return currQ && (h.questionId === currQ.id || !h.questionId);
+                                        })
+                                        : conversationState === STATE.AUDIT_TEXTRESPONSE
+                                            ? auditData.highlights
+                                            : []
+                                }
                                 isAudit={true}
                                 auditFinished={isSubmitted}
                             />
@@ -413,43 +435,98 @@ const AuditForm = ({
                             </>
                         )}
                         {conversationState === STATE.AUDIT_HIGHLIGHT && (
-                            <>
-                                {effectiveSurveyQuestions.questions
-                                    .filter(q => q.type === 'textHighlight')
-                                    .map((question, qIndex) => (
-                                        <Box key={question.id}>
-                                            <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section">
-                                                <Typography variant="h6" gutterBottom align="center">
-                                                    {question.content || 'Highlighting passages'}
-                                                </Typography>
-                                                <Typography variant="body1" paragraph>
-                                                    {question.content}
-                                                </Typography>
+                            <Box sx={{ position: 'relative', width: '100%', display: 'flex', flexDirection: 'column' }}>
+                                {(() => {
+                                    const highlightQuestions = effectiveSurveyQuestions.questions.filter(q => q.type === 'textHighlight');
+                                    const question = highlightQuestions[currentHighlightIndex];
+
+                                    if (!question) return null;
+
+                                    const handlePrev = () => {
+                                        if (currentHighlightIndex > 0) {
+                                            const newIndex = currentHighlightIndex - 1;
+                                            setCurrentHighlightIndex(newIndex);
+                                            setViewedHighlightIndices(prev => new Set(prev).add(newIndex));
+                                        }
+                                    };
+
+                                    const handleNext = () => {
+                                        if (currentHighlightIndex < highlightQuestions.length - 1) {
+                                            const newIndex = currentHighlightIndex + 1;
+                                            setCurrentHighlightIndex(newIndex);
+                                            setViewedHighlightIndices(prev => new Set(prev).add(newIndex));
+                                        }
+                                    };
+
+                                    const qHighlights = auditData.highlights.filter(h => h.questionId === question.id || !h.questionId);
+
+                                    const isGlobalContinueEnabled = () => {
+                                        if (viewedHighlightIndices.size < highlightQuestions.length) return false;
+
+                                        return highlightQuestions.every(q => {
+                                            if (!q.settings.required) return true;
+                                            const qsHighlights = auditData.highlights.filter(h => h.questionId === q.id || !h.questionId);
+                                            const minExpected = q.settings.minHighlights > 0 ? q.settings.minHighlights : 1;
+                                            if (qsHighlights.length >= minExpected) return true;
+                                            if (noProblematicFound[q.id]) return true;
+                                            return false;
+                                        });
+                                    };
+
+                                    return (
+                                        <Box key={question.id} sx={{ mb: 8 }}>
+                                            <Paper elevation={3} sx={{ p: 3, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }} className="highlight-section">
+                                                <Button
+                                                    onClick={handlePrev}
+                                                    disabled={currentHighlightIndex === 0}
+                                                    variant="outlined"
+                                                >
+                                                    {"< Prev"}
+                                                </Button>
+                                                <Box sx={{ flex: 1, textAlign: 'center', px: 2 }}>
+                                                    <Typography variant="h6" gutterBottom>
+                                                        {question.content || 'Highlighting passages'}
+                                                        {question.settings.required && <span style={{ color: '#d32f2f', marginLeft: '4px' }}>*</span>}
+                                                    </Typography>
+                                                    <Typography variant="body1">
+                                                        Question {currentHighlightIndex + 1} of {highlightQuestions.length}
+                                                    </Typography>
+                                                </Box>
+                                                <Button
+                                                    onClick={handleNext}
+                                                    disabled={currentHighlightIndex === highlightQuestions.length - 1}
+                                                    variant="outlined"
+                                                >
+                                                    {"Next >"}
+                                                </Button>
                                             </Paper>
                                             <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section" tutorial-step="marked-passages">
                                                 <Typography variant="body1">
-                                                    Your marked passages will appear here:
+                                                    Your marked passages for this question will appear here:
                                                 </Typography>
                                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center', minHeight: '200px' }}>
-                                                    {auditData.highlights.map((highlight, index) => (
-                                                        <Chip
-                                                            key={index}
-                                                            label={highlight.text}
-                                                            onDelete={() => handleRemoveHighlight(index)}
-                                                            color="primary"
-                                                            size="small"
-                                                        />
-                                                    ))}
+                                                    {qHighlights.map((highlight, index) => {
+                                                        const globalIndex = auditData.highlights.findIndex(h => h === highlight);
+                                                        return (
+                                                            <Chip
+                                                                key={index}
+                                                                label={highlight.text}
+                                                                onDelete={() => handleRemoveHighlight(globalIndex)}
+                                                                color="primary"
+                                                                size="small"
+                                                            />
+                                                        );
+                                                    })}
                                                 </Box>
                                             </Paper>
                                             <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section" tutorial-step="no-marked-passages">
                                                 <Typography variant="body1">
-                                                    In case you didn't find any part of the output to be problematic, you can proceed to the next page.
+                                                    In case you didn't find any part of the output to be problematic, you can proceed.
                                                 </Typography>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                                     <Checkbox
-                                                        checked={isCheckedNoProblematicOutputFound}
-                                                        onChange={(e) => setNoProblematicOutputFound(e.target.checked)}
+                                                        checked={!!noProblematicFound[question.id]}
+                                                        onChange={(e) => setNoProblematicFound(prev => ({ ...prev, [question.id]: e.target.checked }))}
                                                         color="primary"
                                                         size="small"
                                                     />
@@ -462,26 +539,36 @@ const AuditForm = ({
                                                         {errors[question.id]}
                                                     </Alert>
                                                 )}
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
                                                     <Button startIcon={<InfoIcon />} onClick={handleReplayTutorial}>
                                                         Replay Tutorial
                                                     </Button>
-                                                    <Button
-                                                        variant="contained"
-                                                        color="primary"
-                                                        onClick={() => handleStateChange(getNextState())}
-                                                        disabled={
-                                                            !isCheckedNoProblematicOutputFound &&
-                                                            auditData.highlights.length < question.settings.minHighlights
-                                                        }
-                                                    >
-                                                        Next
-                                                    </Button>
                                                 </Box>
                                             </Paper>
+                                            <Box sx={{
+                                                position: 'absolute',
+                                                bottom: 0,
+                                                right: 0,
+                                                zIndex: 10,
+                                                padding: 2,
+                                                borderTop: '1px solid #ddd',
+                                                backgroundColor: 'white',
+                                                borderRadius: '8px',
+                                                boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
+                                            }}>
+                                                <Button
+                                                    variant="contained"
+                                                    color="primary"
+                                                    onClick={() => handleStateChange(getNextState())}
+                                                    disabled={!isGlobalContinueEnabled()}
+                                                >
+                                                    Continue
+                                                </Button>
+                                            </Box>
                                         </Box>
-                                    ))}
-                            </>
+                                    );
+                                })()}
+                            </Box>
                         )}
                         {conversationState === STATE.AUDIT_TEXTRESPONSE && (
                             <>

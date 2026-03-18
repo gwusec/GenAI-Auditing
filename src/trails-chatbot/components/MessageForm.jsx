@@ -8,7 +8,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef(null);
   const [isTextareaActive, setIsTextareaActive] = useState(false);
-  const [toastPosition, setToastPosition] = useState({ top: 0, left: 0 });
   const theme = useTheme();
 
   const handleSubmit = useCallback((e) => {
@@ -37,39 +36,29 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  useEffect(() => {
-    if (isTextareaActive && textareaRef.current) {
-      const { top, left } = textareaRef.current.getBoundingClientRect();
-      setToastPosition({
-        top: top + window.scrollY,
-        left: left + window.scrollX - 200,
-      });
-    }
-  }, [isTextareaActive]);
-
   return (
     <>
       <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
-        <div className={styles.container}>
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsTextareaActive(true)}
-            onBlur={() => setIsTextareaActive(false)}
-            placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
-            className={styles.textarea}
-          />
+        <div className={styles.container} style={{ position: 'relative' }}>
           {isTextareaActive && (
-            <div>
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                paddingBottom: '8px',
+                zIndex: 10,
+              }}
+            >
               <div
                 className={styles.toast}
                 style={{
                   backgroundColor: theme.palette.info.main,
-                  position: 'absolute',
-                  top: `${toastPosition.top - 25}px`,
-                  left: `${toastPosition.left}px`,
+                  width: 'auto',
+                  maxWidth: '300px'
                 }}
               >
                 <Typography variant="inherit">
@@ -80,9 +69,8 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
                 className={styles.toast}
                 style={{
                   backgroundColor: theme.palette.info.main,
-                  position: 'absolute',
-                  top: `${toastPosition.top + 60}px`,
-                  left: `${toastPosition.left}px`,
+                  width: 'auto',
+                  maxWidth: '300px'
                 }}
               >
                 <Typography variant="inherit">
@@ -91,6 +79,16 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
               </div>
             </div>
           )}
+          <textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setIsTextareaActive(true)}
+            onBlur={() => setIsTextareaActive(false)}
+            placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
+            className={styles.textarea}
+          />
         </div>
         <IconButton
           type="submit"

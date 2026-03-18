@@ -93,7 +93,7 @@ const ChatHistory = ({
   };
 
   const handleTextSelection = (messageId, author, content) => {
-    
+
     if (!enableHighlighting || author !== "bot" || !addHighlight) return;
     const selection = window.getSelection();
 
@@ -101,21 +101,34 @@ const ChatHistory = ({
       let selectedText = selection.toString().trim();
 
       let startIndex = -1;
+      const strippedContent = content
+        .replace(/<trails-audit-[^>]*>/g, "")
+        .replace(/<\/trails-audit-[^>]*>/g, "");
+
       let selectionDirection = selection.anchorOffset > selection.focusOffset ? "backward" : "forward";
-      if (selectionDirection === "forward") {
-        startIndex = content
-          .replace(/<trails-audit-mark>/g, "") // Replace all opening tags
-          .replace(/<\/trails-audit-mark>/g, "") // Replace all closing tags
-          .indexOf(selection.anchorNode.textContent) + selection.anchorOffset;
-      } else if (selectionDirection === "backward") {
-        startIndex = content
-          .replace(/<trails-audit-mark>/g, "") // Replace all opening tags
-          .replace(/<\/trails-audit-mark>/g, "") // Replace all closing tags
-          .indexOf(selection.focusNode.textContent) + selection.focusOffset;
+
+      // Selection starts and ends in the same node
+      if (selection.anchorNode === selection.focusNode) {
+        if (selectionDirection === "forward") {
+          startIndex = strippedContent.indexOf(selection.anchorNode.textContent);
+          if (startIndex !== -1) startIndex += selection.anchorOffset;
+        } else if (selectionDirection === "backward") {
+          startIndex = strippedContent.indexOf(selection.focusNode.textContent);
+          if (startIndex !== -1) startIndex += selection.focusOffset;
+        }
+      } else {
+        // Different nodes
+        startIndex = strippedContent.indexOf(selection.anchorNode.textContent);
+        if (startIndex !== -1) startIndex += selection.anchorOffset;
+      }
+
+      // Fallback if the textNode didn't map to raw markdown
+      if (startIndex === -1 && selectedText.length > 0) {
+        startIndex = strippedContent.indexOf(selectedText);
       }
 
       console.log("startIndex:", startIndex);
-      
+
       if (startIndex !== -1) {
         // Check if the selection overlaps with any existing highlight
         const overlappingHighlight = highlights.find(
@@ -125,8 +138,8 @@ const ChatHistory = ({
               // is startIndex inside the highlight?
               (startIndex >= h.startIndex &&
                 startIndex < h.startIndex + h.text.length) ||
-                // is startIndex + selectedText.length inside the highlight?
-                (startIndex + selectedText.length >= h.startIndex &&
+              // is startIndex + selectedText.length inside the highlight?
+              (startIndex + selectedText.length >= h.startIndex &&
                 startIndex + selectedText.length < h.startIndex + h.text.length) ||
               // is the highlight inside startIndex and startIndex + selectedText.length?
               (startIndex < h.startIndex &&
@@ -142,8 +155,8 @@ const ChatHistory = ({
             startIndex,
           });
         }
+        selection.removeAllRanges();
       }
-      selection.removeAllRanges();
     }
   };
 
