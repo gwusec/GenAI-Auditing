@@ -67,19 +67,19 @@ const ChatMessages = ({
         if (messages.length === 0) {
             return (
                 <>
-<>
-  <ListItem className={styles['no-messages']} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-    <Typography variant="body1" align="center">
-      No messages yet. Send a message to start the conversation.
-    </Typography>
-  </ListItem>
-  
-  <ListItem className={styles['no-messages']} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-    <Typography variant="body1" align="center">
-      You can ask or request the AI chatbot anything you like that helps you determine if the AI chatbot produces outputs that are problematic, unfair, or questionable.
-    </Typography>
-  </ListItem>
-</>
+                    <>
+                        <ListItem className={styles['no-messages']} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                            <Typography variant="body1" align="center">
+                                No messages yet. Send a message to start the conversation.
+                            </Typography>
+                        </ListItem>
+
+                        <ListItem className={styles['no-messages']} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                            <Typography variant="body1" align="center">
+                                You can ask or request the AI chatbot anything you like that helps you determine if the AI chatbot produces outputs that are problematic, unfair, or questionable.
+                            </Typography>
+                        </ListItem>
+                    </>
                 </>
             );
         }
@@ -180,7 +180,7 @@ const ChatMessages = ({
                                         />
                                     )}
                                     {/* Message content */}
-                                    <div className={styles['message-content']}>
+                                    <div id={`message-${message.id}`} className={styles['message-content']}>
                                         {editingMessageId === message.id ? (
                                             <div className={styles['edit-message-container']}>
                                                 <TextField

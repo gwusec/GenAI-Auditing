@@ -572,6 +572,40 @@ const AuditForm = ({
                         )}
                         {conversationState === STATE.AUDIT_TEXTRESPONSE && (
                             <>
+                                <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
+                                    <Typography variant="h6" gutterBottom align="center" sx={{ mb: 2, fontWeight: 'bold' }}>
+                                        Your Highlighted Passages
+                                    </Typography>
+                                    {effectiveSurveyQuestions.questions
+                                        .filter(q => q.type === 'textHighlight')
+                                        .map((question, qIndex) => {
+                                            const qHighlights = auditData.highlights?.filter(h => h.questionId === question.id || !h.questionId) || [];
+                                            return (
+                                                <Box key={question.id} sx={{ mb: 2 }}>
+                                                    <Typography variant="subtitle1" fontWeight="bold">
+                                                        {qIndex + 1}. {question.content || 'Highlighting passages'}
+                                                    </Typography>
+                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+                                                        {qHighlights.length > 0 ? (
+                                                            qHighlights.map((h, i) => (
+                                                                <Chip key={i} label={h.text} color="primary" variant="outlined" />
+                                                            ))
+                                                        ) : (
+                                                            <Typography variant="body2" color="textSecondary">
+                                                                No problematic text selected
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                            );
+                                        })}
+                                    {effectiveSurveyQuestions.questions.filter(q => q.type === 'textHighlight').length === 0 && (
+                                        <Typography variant="body2" color="textSecondary" align="center">
+                                            No text highlight questions were asked.
+                                        </Typography>
+                                    )}
+                                </Paper>
+
                                 {effectiveSurveyQuestions.questions
                                     .filter(q => q.type === 'freeResponse')
                                     .map((question, qIndex) => (
@@ -579,20 +613,9 @@ const AuditForm = ({
                                             <Typography variant="h6" gutterBottom align="center">
                                                 {question.content || 'Free Response Question'}
                                             </Typography>
-                                            <Typography variant="body1">
+                                            <Typography variant="body1" sx={{ mb: 2 }}>
                                                 Please provide your feedback below.
                                             </Typography>
-                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center' }}>
-                                                {auditData.highlights.map((highlight, index) => (
-                                                    <Chip
-                                                        key={index}
-                                                        label={highlight.text}
-                                                        color="primary"
-                                                        sx={{ m: 0.5 }}
-                                                        size="small"
-                                                    />
-                                                ))}
-                                            </Box>
                                             <TextField
                                                 label={question.content}
                                                 multiline

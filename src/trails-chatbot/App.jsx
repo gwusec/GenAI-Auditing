@@ -11,6 +11,7 @@ import ErrorDialog from "./components/ErrorDialog";
 import AppConfig from "./tools/AppConfig";
 import Debugger from './components/Debugger';
 import ChatTimerSystem from './tools/ChatTimerSystem';
+import studyConfig from './config.json';
 
 import {
   Dialog,
@@ -59,14 +60,27 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 
   /** ########## Timer ########### */
 
-  const timerSystem = useMemo(() => new ChatTimerSystem(config), [config]);
+  const enhancedConfig = useMemo(() => {
+    return {
+      ...config,
+      timerMaxOverallChatTimeSeconds: studyConfig.totalTime ?? config.timerMaxOverallChatTimeSeconds,
+      timerChatsMaxSeconds: Array(studyConfig.numPhases || 1).fill(studyConfig.phaseTime ?? 420),
+    };
+  }, [config]);
+
+  const timerSystem = useMemo(() => {
+    return studyConfig.disableTimer ? null : new ChatTimerSystem(enhancedConfig);
+  }, [enhancedConfig]);
+
   const [timerState, setTimerState] = useState({
     percentageChatTimeRemaining: 100,
-    overallTimeRemaining: timerSystem.state.overallTimeRemaining,
-    currentChatTimeRemaining: timerSystem.state.currentChatTimeRemaining
+    overallTimeRemaining: timerSystem?.state?.overallTimeRemaining ?? 0,
+    currentChatTimeRemaining: timerSystem?.state?.currentChatTimeRemaining ?? 0
   });
 
   useEffect(() => {
+    if (!timerSystem) return;
+
     const handleTick = ({ percentageChatTimeRemaining, overallTimeRemaining, currentChatTimeRemaining }) => {
       setTimerState({ percentageChatTimeRemaining, overallTimeRemaining, currentChatTimeRemaining });
     };
@@ -98,7 +112,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
       timerSystem.off('onExpired', handlePhaseExpired);
       timerSystem.off('onOverallExpired', handleOverallExpired);
     };
-  }, []);
+  }, [timerSystem]);
 
 
 
@@ -121,11 +135,13 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
       updateAppStateBasedOnConversation(newConversation.state);
 
       // Start the timer
-      if (!timerSystem.state.hasStarted) {
-        timerSystem.cleanup();
-        timerSystem.start();
+      if (timerSystem) {
+        if (!timerSystem.state.hasStarted) {
+          timerSystem.cleanup();
+          timerSystem.start();
+        }
+        timerSystem.startNewChat();
       }
-      timerSystem.startNewChat();
     } catch (error) {
       console.error("Error starting new conversation:", error);
       setError("Failed to start a new conversation. Please try again.");
@@ -188,37 +204,44 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
   }, []);
 
   useEffect(() => {
-    if (conversations.length === 1 &&
-      conversations[0].state === STATE.COMPLETE) {
-      setShowAfterChatOneDialog(true)
-    } else if (conversations.length == 2 &&
-      conversations[0].state === STATE.COMPLETE &&
-      conversations[1].state === STATE.COMPLETE &&
-      timerSystem.canStartNewChat()) {
-      setShowAfterChatTwoDialogWithTime(true);
-    } else if (conversations.length == 2 &&
-      conversations[0].state === STATE.COMPLETE &&
-      conversations[1].state === STATE.COMPLETE &&
-      !timerSystem.canStartNewChat()) {
-      setShowAfterChatTwoDialogNoTime(true);
+    if (conversations.length === 0) return;
+
+    // Check if ALL conversations are complete
+    const allComplete = conversations.every(c => c.state === STATE.COMPLETE);
+    if (!allComplete) return;
+
+    const numPhases = studyConfig.numPhases || 2;
+    const allowChatAfterPhasesComplete = studyConfig.allowChatAfterPhasesComplete ?? false;
+
+    const currentPhases = conversations.length;
+    const shouldShowExport = currentPhases >= numPhases;
+    let shouldShowNewChat = false;
+
+    if (allowChatAfterPhasesComplete) {
+      shouldShowNewChat = true;
+    } else {
+      shouldShowNewChat = currentPhases < numPhases;
+    }
+
+    // Map the conceptual booleans to the legacy dialog state variables 
+    // that SummaryPage relies on:
+    if (shouldShowNewChat && !shouldShowExport) {
+      setShowAfterChatOneDialog(true);
       setShowAfterChatTwoDialogWithTime(false);
-      setShowAfterChatOneDialog(false);
-    } else if (conversations.length > 2 &&
-      conversations[0].state === STATE.COMPLETE &&
-      conversations[1].state === STATE.COMPLETE &&
-      conversations[conversations.length - 1].state === STATE.COMPLETE &&
-      timerSystem.canStartNewChat()) {
       setShowAfterChatTwoDialogNoTime(false);
+    } else if (shouldShowNewChat && shouldShowExport) {
+      setShowAfterChatOneDialog(false);
       setShowAfterChatTwoDialogWithTime(true);
+      setShowAfterChatTwoDialogNoTime(false);
+    } else if (!shouldShowNewChat && shouldShowExport) {
       setShowAfterChatOneDialog(false);
-    } else if (conversations.length > 2 &&
-      conversations[0].state === STATE.COMPLETE &&
-      conversations[1].state === STATE.COMPLETE &&
-      conversations[conversations.length - 1].state === STATE.COMPLETE &&
-      !timerSystem.canStartNewChat()) {
-      setShowAfterChatTwoDialogNoTime(true);
       setShowAfterChatTwoDialogWithTime(false);
+      setShowAfterChatTwoDialogNoTime(true);
+    } else {
+      // Fallback catch-all
       setShowAfterChatOneDialog(false);
+      setShowAfterChatTwoDialogWithTime(false);
+      setShowAfterChatTwoDialogNoTime(false);
     }
   }, [conversations]);
 
@@ -267,7 +290,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
   // Callback for tutorial completion. To do: check if timer excludes tutorial time
   const handleTutorialComplete = useCallback(() => {
     if (currentAppState === AppState.CHAT) {
-      if (timerSystem.state.isPaused) {
+      if (timerSystem && timerSystem.state.isPaused) {
         console.log("Resuming timer during tutorial completion...");
         timerSystem.resume();
       }
@@ -278,7 +301,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
   useEffect(() => {
     if (currentAppState === AppState.AUDIT || currentAppState === AppState.COMPLETE || showTimerChatTimeUpDialog || showOverallTimeUpDialog || showAPIErrorDialog) {
       console.log("Pausing timer during state transition...");
-      if (!timerSystem.state.isPaused) {
+      if (timerSystem && !timerSystem.state.isPaused) {
         timerSystem.pause();
       }
     } else {
@@ -304,7 +327,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
       console.log("Ending chat for conversation:", activeConversation.id);
       const endChatEvent = new ChatEvent(CHAT_EVENT_TYPE.END_CHAT, null);
       await conversationHandler.addChatEvent(activeConversation.id, endChatEvent);
-      timerSystem.stopPhaseTimer();
+      if (timerSystem) timerSystem.stopPhaseTimer();
       const updatedConversation = await conversationHandler.getConversationById(activeConversation.id);
       console.log("Updated conversation state:", updatedConversation.state);
       // Check if state is ANY, not just LIKERT
@@ -637,12 +660,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
               setLoading={setIsLoading}
               onTutorialComplete={handleTutorialComplete}
               onTutorialStart={() => {
-                if (!timerSystem.state.isPaused) { // Only pause if not already paused
+                if (timerSystem && !timerSystem.state.isPaused) { // Only pause if not already paused
                   timerSystem.pause();
                 }
               }}
               onTutorialEnd={() => {
-                if (timerSystem.state.isPaused) { // Only resume if currently paused
+                if (timerSystem && timerSystem.state.isPaused) { // Only resume if currently paused
                   console.log("Resuming timer system tutorial...");
                   timerSystem.resume();
                 }

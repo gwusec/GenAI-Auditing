@@ -13,6 +13,7 @@ import './App.css';
 
 // AppState Enum to manage flow
 const AppState = {
+  BACKEND_SETUP: 'BACKEND_SETUP',
   SURVEY_DESIGN: 'SURVEY_DESIGN',
   CHAT: 'CHAT',
   SURVEY_COMPLETE: 'SURVEY_COMPLETE'
@@ -20,7 +21,7 @@ const AppState = {
 
 function App() {
   // App Flow State
-  const [appState, setAppState] = useState(AppState.SURVEY_DESIGN);
+  const [appState, setAppState] = useState(AppState.BACKEND_SETUP);
   const [surveyConfig, setSurveyConfig] = useState(null);
 
   // LLM backend configuration
@@ -141,7 +142,7 @@ function App() {
     };
     localStorage.setItem('llmConfig', JSON.stringify(config));
     setConfigApplied(true);
-    setShowConfig(false);
+    setAppState(AppState.SURVEY_DESIGN); // Proceed to Survey Design
   };
 
 
@@ -211,10 +212,10 @@ function App() {
         <h1>Chatbot</h1>
         {appState === AppState.SURVEY_DESIGN && (
           <button
-            onClick={() => setShowConfig(!showConfig)}
+            onClick={() => setAppState(AppState.BACKEND_SETUP)}
             className="config-toggle"
           >
-            {showConfig ? 'Hide' : 'Show'} Backend Settings
+            Back to Backend Settings
           </button>
         )}
         {appState === AppState.CHAT && (
@@ -237,8 +238,8 @@ function App() {
         )}
       </header>
 
-      {/* Configuration Panel - Only visible in Survey Design mode if toggled */}
-      {appState === AppState.SURVEY_DESIGN && showConfig && (
+      {/* Configuration Panel - Only visible in Backend Setup mode */}
+      {appState === AppState.BACKEND_SETUP && (
         <div className="config-panel">
           <h3>Backend Settings</h3>
 

@@ -38,15 +38,16 @@ const renderQuestionResponse = (question, audit, index) => {
                 </Box>
             );
 
-        case 'textHighlight':
+        case 'textHighlight': {
+            const qHighlights = audit.highlights?.filter(h => h.questionId === id || !h.questionId) || [];
             return (
                 <Box key={id} sx={{ mb: 3 }}>
                     <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                         {index + 1}. {content || 'Highlighting Passages'}
                     </Typography>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                        {audit.highlights?.length > 0 ? (
-                            audit.highlights.map((h, i) => (
+                        {qHighlights.length > 0 ? (
+                            qHighlights.map((h, i) => (
                                 <Chip key={i} label={h.text} color="primary" variant="outlined" />
                             ))
                         ) : (
@@ -55,6 +56,7 @@ const renderQuestionResponse = (question, audit, index) => {
                     </Box>
                 </Box>
             );
+        }
 
         case 'freeResponse':
             return (

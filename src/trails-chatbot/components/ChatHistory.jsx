@@ -93,65 +93,121 @@ const ChatHistory = ({
   };
 
   const handleTextSelection = (messageId, author, content) => {
-
     if (!enableHighlighting || author !== "bot" || !addHighlight) return;
     const selection = window.getSelection();
 
     if (!selection.isCollapsed) {
       let selectedText = selection.toString().trim();
+      if (!selectedText) return;
 
-      let startIndex = -1;
       const strippedContent = content
         .replace(/<trails-audit-[^>]*>/g, "")
         .replace(/<\/trails-audit-[^>]*>/g, "");
 
-      let selectionDirection = selection.anchorOffset > selection.focusOffset ? "backward" : "forward";
+      let startIndex = -1;
+      let matchLength = selectedText.length;
 
-      // Selection starts and ends in the same node
-      if (selection.anchorNode === selection.focusNode) {
-        if (selectionDirection === "forward") {
-          startIndex = strippedContent.indexOf(selection.anchorNode.textContent);
-          if (startIndex !== -1) startIndex += selection.anchorOffset;
-        } else if (selectionDirection === "backward") {
-          startIndex = strippedContent.indexOf(selection.focusNode.textContent);
-          if (startIndex !== -1) startIndex += selection.focusOffset;
+      // Calculate DOM character offset
+      const container = document.getElementById(`message-${messageId}`);
+      let domSelectionStart = 0;
+      if (container && selection.rangeCount > 0) {
+        try {
+          const range = selection.getRangeAt(0);
+          const preCaretRange = range.cloneRange();
+          preCaretRange.selectNodeContents(container);
+          preCaretRange.setEnd(range.startContainer, range.startOffset);
+          domSelectionStart = preCaretRange.toString().length;
+        } catch (e) {
+          console.warn("Could not calculate DOM offset", e);
         }
-      } else {
-        // Different nodes
-        startIndex = strippedContent.indexOf(selection.anchorNode.textContent);
-        if (startIndex !== -1) startIndex += selection.anchorOffset;
       }
 
-      // Fallback if the textNode didn't map to raw markdown
-      if (startIndex === -1 && selectedText.length > 0) {
-        startIndex = strippedContent.indexOf(selectedText);
+      // Try exact match on the full string
+      const exactMatches = [];
+      let exactIdx = strippedContent.indexOf(selectedText);
+      while (exactIdx !== -1) {
+        exactMatches.push({ index: exactIdx, length: selectedText.length });
+        exactIdx = strippedContent.indexOf(selectedText, exactIdx + 1);
+      }
+
+      let bestMatch = null;
+      let minDiff = Infinity;
+
+      // Get exact matches
+      exactMatches.forEach(match => {
+        const diff = Math.abs(match.index - domSelectionStart);
+        if (diff < minDiff) {
+          minDiff = diff;
+          bestMatch = match;
+        }
+      });
+
+      // If that fails, do a Regex match that ignores markdown formatting between words
+      if (!bestMatch) {
+        const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const words = selectedText.split(/\s+/).filter(w => w.length > 0);
+        if (words.length > 0) {
+          const regexStr = words.map(escapeRegExp).join('[\\s\\*\\_\\~\\`\\#\\>\\[\\]\\(\\)]+');
+          try {
+            const regex = new RegExp(regexStr, 'gi');
+            let match;
+            while ((match = regex.exec(strippedContent)) !== null) {
+              const diff = Math.abs(match.index - domSelectionStart);
+              if (diff < minDiff) {
+                minDiff = diff;
+                bestMatch = { index: match.index, length: match[0].length };
+              }
+            }
+          } catch (e) {
+            console.error("Regex map failed:", e);
+          }
+        }
+      }
+
+      if (bestMatch) {
+        startIndex = bestMatch.index;
+        matchLength = bestMatch.length;
+      }
+
+      // If all else fails, fallback to naive DOM node matching
+      if (startIndex === -1 && selection.anchorNode) {
+        let selectionDirection = selection.anchorOffset > selection.focusOffset ? "backward" : "forward";
+        let tempIdx = -1;
+        if (selection.anchorNode === selection.focusNode) {
+          if (selectionDirection === "forward") {
+            tempIdx = strippedContent.indexOf(selection.anchorNode.textContent);
+            if (tempIdx !== -1) startIndex = tempIdx + selection.anchorOffset;
+          } else {
+            tempIdx = strippedContent.indexOf(selection.focusNode.textContent);
+            if (tempIdx !== -1) startIndex = tempIdx + selection.focusOffset;
+          }
+        } else {
+          tempIdx = strippedContent.indexOf(selection.anchorNode.textContent);
+          if (tempIdx !== -1) startIndex = tempIdx + selection.anchorOffset;
+        }
       }
 
       console.log("startIndex:", startIndex);
 
       if (startIndex !== -1) {
+        const exactMarkdownText = strippedContent.substring(startIndex, startIndex + matchLength);
+
         // Check if the selection overlaps with any existing highlight
         const overlappingHighlight = highlights.find(
           (h) =>
             h.messageId === messageId &&
             (
-              // is startIndex inside the highlight?
-              (startIndex >= h.startIndex &&
-                startIndex < h.startIndex + h.text.length) ||
-              // is startIndex + selectedText.length inside the highlight?
-              (startIndex + selectedText.length >= h.startIndex &&
-                startIndex + selectedText.length < h.startIndex + h.text.length) ||
-              // is the highlight inside startIndex and startIndex + selectedText.length?
-              (startIndex < h.startIndex &&
-                startIndex + selectedText.length >= h.startIndex + h.text.length) ||
-              (h.startIndex < startIndex + selectedText.length &&
-                h.startIndex + h.text.length > startIndex))
+              (startIndex >= h.startIndex && startIndex < h.startIndex + h.text.length) ||
+              (startIndex + exactMarkdownText.length >= h.startIndex && startIndex + exactMarkdownText.length < h.startIndex + h.text.length) ||
+              (startIndex < h.startIndex && startIndex + exactMarkdownText.length >= h.startIndex + h.text.length) ||
+              (h.startIndex < startIndex + exactMarkdownText.length && h.startIndex + h.text.length > startIndex)
+            )
         );
 
         if (!overlappingHighlight) {
           addHighlight({
             messageId,
-            text: selectedText,
+            text: exactMarkdownText,
             startIndex,
           });
         }
