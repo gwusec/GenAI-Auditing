@@ -651,6 +651,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
             flexDirection: "column",
             flexGrow: 1,
             overflow: "hidden",
+            minHeight: 0,
           }}
         >
           {activeConversation && currentAppState === AppState.CHAT && (

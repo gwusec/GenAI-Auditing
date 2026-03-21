@@ -23,8 +23,13 @@ import {
     Chip,
     Paper,
     Alert,
+    IconButton,
 } from '@mui/material';
 import InfoIcon from '@mui/icons-material/Info';
+import CancelIcon from '@mui/icons-material/Cancel';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 const fairnessPropertiesRandomOrder = [...fairnessProperties].sort(() => 0.5 - Math.random());
 
@@ -504,17 +509,24 @@ const AuditForm = ({
                                                 <Typography variant="body1">
                                                     Your marked passages for this question will appear here:
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center', minHeight: '200px' }}>
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center', minHeight: '200px', alignContent: 'flex-start', alignItems: 'flex-start' }}>
                                                     {qHighlights.map((highlight, index) => {
                                                         const globalIndex = auditData.highlights.findIndex(h => h === highlight);
                                                         return (
-                                                            <Chip
+                                                            <Paper
                                                                 key={index}
-                                                                label={highlight.text}
-                                                                onDelete={() => handleRemoveHighlight(globalIndex)}
-                                                                color="primary"
-                                                                size="small"
-                                                            />
+                                                                elevation={0}
+                                                                sx={{ p: 1, display: 'flex', alignItems: 'flex-start', gap: 1, border: '1px solid #1976d2', borderRadius: '16px', backgroundColor: '#e3f2fd', maxWidth: '100%' }}
+                                                            >
+                                                                <Box sx={{ flex: 1, '& p': { m: 0 }, '& ul, & ol': { m: 0, pl: 2 } }}>
+                                                                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                                                        {highlight.text.replace(/\n(?=[*+-]\s|\d+\.\s)/g, '\n\n')}
+                                                                    </ReactMarkdown>
+                                                                </Box>
+                                                                <IconButton size="small" onClick={() => handleRemoveHighlight(globalIndex)} sx={{ color: '#1976d2', padding: '2px', mt: '-2px' }}>
+                                                                    <CancelIcon fontSize="small" />
+                                                                </IconButton>
+                                                            </Paper>
                                                         );
                                                     })}
                                                 </Box>
@@ -588,7 +600,13 @@ const AuditForm = ({
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
                                                         {qHighlights.length > 0 ? (
                                                             qHighlights.map((h, i) => (
-                                                                <Chip key={i} label={h.text} color="primary" variant="outlined" />
+                                                                <Paper key={i} elevation={0} sx={{ p: 1, border: '1px solid #1976d2', borderRadius: '16px', maxWidth: '100%' }}>
+                                                                    <Box sx={{ '& p': { m: 0 }, '& ul, & ol': { m: 0, pl: 2 } }}>
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>
+                                                                            {h.text.replace(/\n(?=[*+-]\s|\d+\.\s)/g, '\n\n')}
+                                                                        </ReactMarkdown>
+                                                                    </Box>
+                                                                </Paper>
                                                             ))
                                                         ) : (
                                                             <Typography variant="body2" color="textSecondary">

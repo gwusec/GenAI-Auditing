@@ -108,11 +108,10 @@ const SummaryPage = ({ conversation, initialSurvey, startNextConversation, showN
 
     return (
         <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            flexGrow: 1,
+            height: '100%',
             overflowY: 'auto',
-            p: 2
+            p: 2,
+            pb: 10
         }}>
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mb: 3, gap: 2, flexWrap: 'wrap' }}>
                 <Typography variant="h5" align="center" sx={{ fontWeight: 'bold', margin: 0 }}>
@@ -146,11 +145,11 @@ const SummaryPage = ({ conversation, initialSurvey, startNextConversation, showN
                 </Paper>
             )}
 
-            <Paper elevation={3} sx={{ p: 0, borderRadius: 2, overflow: 'hidden', mb: 4 }}>
+            <Paper elevation={3} sx={{ p: 0, borderRadius: 2, overflow: 'hidden', mb: 4, display: 'flex', flexDirection: 'column' }}>
                 <Typography variant="h6" gutterBottom align="center" className={styles['header']} sx={{ m: 0 }}>
                     Conversation Transcript
                 </Typography>
-                <Box sx={{ maxHeight: '600px', overflowY: 'auto' }}>
+                <Box sx={{ maxHeight: '600px', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                     <ChatHistory
                         conversationId={conversation.id}
                         enableHighlighting={false}

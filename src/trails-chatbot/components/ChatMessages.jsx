@@ -18,11 +18,59 @@ import {
     Save as SaveIcon,
     Cancel as CancelIcon,
 } from "@mui/icons-material";
+import ErrorIcon from '@mui/icons-material/Error';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import LoadingDots from './LoadingDots';
 import styles from './ChatMessages.module.css';
+
+const markdownComponents = {
+    p: ({ node, ...props }) => (
+        <p {...props} className={styles['markdown-paragraph']} />
+    ),
+    a: ({ node, children, ...props }) => (
+        <a {...props} className={styles['markdown-link']}>
+            {children}
+        </a>
+    ),
+    code: ({ node, inline, className, children, ...props }) => {
+        let rawText = '';
+        
+        // Simpler reliable flatten since we know react-markdown only passes raw strings into code:
+        if (Array.isArray(children)) {
+            rawText = children.map(c => typeof c === 'string' ? c : (c?.props?.children || '')).join('');
+        } else if (typeof children === 'string') {
+            rawText = children;
+        } else {
+            rawText = String(children);
+        }
+
+        const parts = rawText.split(/(<trails-audit-mark>|<\/trails-audit-mark>)/g);
+        let isHighlighted = false;
+        
+        const rendered = parts.map((part, i) => {
+            if (part === '<trails-audit-mark>') { isHighlighted = true; return null; }
+            if (part === '</trails-audit-mark>') { isHighlighted = false; return null; }
+            return isHighlighted && part.length > 0 ? <mark key={i} className={styles['markdown-mark']}>{part}</mark> : part;
+        });
+
+        return inline ? (
+            <code {...props} className={styles['inline-code']}>
+                {rendered}
+            </code>
+        ) : (
+            <pre {...props} className={styles['block-code']}>
+                <code>{rendered}</code>
+            </pre>
+        );
+    },
+    'trails-audit-mark': ({ node, children, ...props }) => (
+        <mark {...props} className={styles['markdown-mark']}>
+            {children}
+        </mark>
+    ),
+};
 
 const ChatMessages = ({
     messages,
@@ -208,38 +256,15 @@ const ChatMessages = ({
                                                 </IconButton>
                                             </div>
                                         ) : (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                rehypePlugins={[rehypeRaw]}
-                                                components={{
-                                                    p: ({ node, ...props }) => (
-                                                        <p {...props} className={styles['markdown-paragraph']} />
-                                                    ),
-                                                    a: ({ node, children, ...props }) => (
-                                                        <a {...props} className={styles['markdown-link']}>
-                                                            {children}
-                                                        </a>
-                                                    ),
-                                                    code: ({ node, inline, className, children, ...props }) =>
-                                                        inline ? (
-                                                            <code {...props} className={styles['inline-code']}>
-                                                                {children}
-                                                            </code>
-                                                        ) : (
-                                                            <pre {...props} className={styles['block-code']}>
-                                                                <code>{children}</code>
-                                                            </pre>
-                                                        ),
-                                                    // Custom component for trails-audit-mark
-                                                    'trails-audit-mark': ({ node, children, ...props }) => (
-                                                        <mark {...props} className={styles['markdown-mark']}>
-                                                            {children}
-                                                        </mark>
-                                                    ),
-                                                }}
-                                            >
-                                                {message.content.toString()}
-                                            </ReactMarkdown>
+                                            <div className="markdown-body">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                    rehypePlugins={[rehypeRaw]}
+                                                    components={markdownComponents}
+                                                >
+                                                    {message.content.toString()}
+                                                </ReactMarkdown>
+                                            </div>
                                         )}
                                         {/* Timestamp */}
                                         <Typography variant="caption" className={styles['timestamp']}>

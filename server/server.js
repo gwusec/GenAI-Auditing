@@ -269,7 +269,7 @@ app.post('/chat', chatRateLimit, async (req, res) => {
       role: msg.role,
       content: msg.content
     }));
-    
+
     // Make sure we have a system message
     if (!ollamaMessages.some(msg => msg.role === 'system')) {
       ollamaMessages.unshift({
@@ -277,7 +277,7 @@ app.post('/chat', chatRateLimit, async (req, res) => {
         content: 'You are a helpful assistant.'
       });
     }
-    
+
     try {
       console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
       const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
@@ -291,9 +291,9 @@ app.post('/chat', chatRateLimit, async (req, res) => {
       }, {
         timeout: REQUEST_TIMEOUT_MS
       });
-      
+
       console.log('RECEIVED RESPONSE FROM OLLAMA');
-      
+
       // Format response to match what the TRAILS chatbot expects
       const responseData = {
         statusCode: 200,
@@ -305,13 +305,16 @@ app.post('/chat', chatRateLimit, async (req, res) => {
           finish_reason: 'stop'
         }
       };
-      
+
       console.log('RETURNING RESPONSE TO CLIENT');
       res.json(responseData);
     } catch (error) {
       console.error('Error calling Ollama API:', error.message);
       console.error('Error details:', error.response?.status || 'No status');
-      
+
+      // Prevent crash if headers already sent (e.g., by timeout)
+      if (res.headerSent) return;
+
       // Send error response
       res.status(500).json({
         statusCode: 500,
@@ -327,7 +330,10 @@ app.post('/chat', chatRateLimit, async (req, res) => {
     }
   } catch (error) {
     console.error('Error processing chat request:', error.message);
-    
+
+    // Prevent crash if headers already sent (e.g., by timeout)
+    if (res.headerSent) return;
+
     // Send error response
     res.status(500).json({
       statusCode: 500,
@@ -339,18 +345,18 @@ app.post('/chat', chatRateLimit, async (req, res) => {
 // Handler for API provider requests
 async function handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl) {
   const { messages } = req.body;
-  
+
   try {
     console.log(`PROCESSING ${provider.toUpperCase()} API REQUEST - Model: ${model}`);
-    
+
     // Format messages according to provider requirements
     const formattedMessages = formatMessagesForProvider(messages, provider);
-    
+
     // Prepare headers for the API request
     const headers = {
       'Content-Type': 'application/json',
     };
-    
+
     // Set provider-specific headers
     switch (provider) {
       case 'openai':
@@ -369,11 +375,11 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
-    
+
     // Prepare the request body based on the provider
     let requestBody;
     let apiEndpoint;
-    
+
     switch (provider) {
       case 'openai':
         apiEndpoint = `${baseUrl}/chat/completions`;
@@ -423,27 +429,27 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
-    
+
     console.log('API REQUEST START', {
       provider,
       hostname: safeHostname(apiEndpoint),
       model,
       stage: 'started'
     });
-    
+
     // Make the API request
     const apiResponse = await axios.post(apiEndpoint, requestBody, {
       headers,
       timeout: REQUEST_TIMEOUT_MS
     });
-    
+
     console.log('API REQUEST RESULT', {
       provider,
       hostname: safeHostname(apiEndpoint),
       model,
       stage: 'succeeded'
     });
-    
+
     // Extract and format the response based on provider
     let assistantResponse;
     switch (provider) {
@@ -462,7 +468,7 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
       default:
         throw new Error(`Unsupported provider: ${provider}`);
     }
-    
+
     // Format response for the TRAILS chatbot
     const responseData = {
       statusCode: 200,
@@ -474,7 +480,7 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         finish_reason: 'stop'
       }
     };
-    
+
     console.log('RETURNING API RESPONSE TO CLIENT');
     res.json(responseData);
   } catch (error) {
@@ -485,7 +491,7 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
       stage: 'failed'
     });
     console.error(error.response?.status || 'No status');
-    
+
     res.status(500).json({
       statusCode: 500,
       error: `API error: ${error.message}`,
@@ -504,36 +510,36 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
 function formatMessagesForProvider(messages, provider) {
   // Clone messages to avoid modifying the original
   const formattedMessages = JSON.parse(JSON.stringify(messages));
-  
+
   // Make sure we have a system message
   const hasSystemMessage = formattedMessages.some(msg => msg.role === 'system');
-  
+
   if (!hasSystemMessage) {
     formattedMessages.unshift({
       role: 'system',
       content: 'You are a helpful assistant.'
     });
   }
-  
+
   console.log(`FORMATTING MESSAGES FOR ${provider.toUpperCase()}`);
-  
+
   // Provider-specific formatting
   switch (provider) {
     case 'anthropic':
       // Claude requires 'user' and 'assistant' roles, 'system' remains the same
       return formattedMessages;
-      
+
     case 'gemini':
       // Gemini uses 'user' and 'model' roles
       return formattedMessages.map(msg => ({
         role: msg.role === 'assistant' ? 'model' : msg.role,
         content: msg.content
       }));
-      
+
     case 'cohere':
       // Cohere has a different structure we'll handle in the API call
       return formattedMessages;
-      
+
     case 'openai':
     default:
       // OpenAI format is our default
@@ -548,7 +554,7 @@ app.post('/api/test-api-key', async (req, res) => {
   const apiKey = (payload.apiKey || '').trim();
   const model = (payload.model || '').trim();
   const baseUrl = (payload.baseUrl || '').trim();
-  
+
   if (!provider || !apiKey) {
     return res.status(400).json({ error: 'Provider and API key are required' });
   }
@@ -562,14 +568,14 @@ app.post('/api/test-api-key', async (req, res) => {
   } catch (error) {
     return res.status(400).json({ error: 'Invalid baseUrl format' });
   }
-  
+
   console.log(`TESTING API KEY FOR ${provider.toUpperCase()} - Model: ${model}`);
-  
+
   try {
     // Create test request based on provider
     let testEndpoint;
     const headers = { 'Content-Type': 'application/json' };
-    
+
     switch (provider) {
       case 'openai':
         testEndpoint = `${baseUrl}/models`;
@@ -590,20 +596,20 @@ app.post('/api/test-api-key', async (req, res) => {
       default:
         return res.status(400).json({ error: 'Unsupported provider' });
     }
-    
+
     console.log('API KEY TEST REQUEST START', {
       provider,
       hostname: safeHostname(testEndpoint),
       model,
       stage: 'started'
     });
-    
+
     // Make test request
     const response = await axios.get(testEndpoint, {
       headers,
       timeout: REQUEST_TIMEOUT_MS
     });
-    
+
     if (response.status === 200) {
       console.log(`API KEY TEST SUCCESSFUL FOR ${provider.toUpperCase()}`);
       res.json({ success: true });
@@ -678,21 +684,21 @@ if (!isDevelopment) {
   if (fs.existsSync(buildPath)) {
     // Serve static files from the React app
     app.use(express.static(buildPath));
-    
+
     // For any other GET request, send the React app
     app.get('*', (req, res) => {
       res.sendFile(path.join(buildPath, 'index.html'));
     });
   } else {
     console.warn('Warning: Build directory does not exist. Run npm run build first.');
-    
+
     app.get('*', (req, res) => {
       res.send('Server is running but the React app has not been built yet. Run npm run build first.');
     });
   }
 } else {
   console.log('Running in development mode. Static files will be served by the React dev server.');
-  
+
   // In development, any unknown routes should 404
   app.get('*', (req, res) => {
     res.status(404).send('Not found: This route is not handled by the API server in development mode.');
