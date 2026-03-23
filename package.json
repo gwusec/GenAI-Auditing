@@ -1,64 +1,42 @@
 {
-  "name": "trails-chatbot-wrapper",
-  "version": "1.0.0",
+  "name": "trails-ui-chatbot",
+  "version": "1.0.2",
   "private": true,
+  "files": [
+    "src/**/*",
+    "assets/tutorial-marking.mov"
+  ],
+  "main": "./src/lib.js",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
-    "@mlc-ai/web-llm": "^0.2.18",
     "@mui/icons-material": "^6.3.1",
     "@mui/material": "^6.3.1",
     "axios": "^1.7.9",
-    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dexie": "^4.0.10",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.2.3",
     "events": "^3.3.0",
-    "express": "^4.18.2",
-    "http-proxy-middleware": "^2.0.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.3",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
-    "uuid": "^11.0.4",
-    "web-vitals": "^3.5.0"
+    "uuid": "^11.0.4"
   },
-  "devDependencies": {
-    "@babel/core": "^7.22.5",
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@babel/plugin-transform-private-property-in-object": "^7.25.9",
-    "@babel/plugin-transform-runtime": "^7.22.5",
-    "@babel/preset-env": "^7.22.5",
-    "@babel/preset-react": "^7.22.5",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "assert": "^2.1.0",
-    "babel-loader": "^9.1.2",
-    "buffer": "^6.0.3",
-    "concurrently": "^9.1.2",
-    "cross-env": "^10.1.0",
-    "crypto-browserify": "^3.12.1",
-    "nodemon": "^3.0.1",
-    "os-browserify": "^0.3.0",
-    "path-browserify": "^1.0.1",
-    "process": "^0.11.10",
-    "react-app-rewired": "^2.2.1",
-    "react-scripts": "^5.0.1",
-    "stream-browserify": "^3.0.0",
-    "url": "^0.11.4",
-    "util": "^0.12.5",
-    "vm-browserify": "^1.1.2"
+  "exports": {
+    ".": {
+      "node": "./src/lib.js",
+      "default": "./src/lib.js"
+    }
   },
   "scripts": {
-    "client": "cross-env PORT=3001 react-app-rewired start",
-    "build": "react-app-rewired build",
-    "test": "react-app-rewired test",
+    "start": "dotenvx run -f .env -- react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "server": "nodemon server/server.js",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
-    "start": "node server/server.js",
-    "prod": "npm run start"
+    "start-mock-server": "node -r dotenv/config ./testing/mockServer.js",
+    "start-with-mock": "concurrently \"npm run start-mock-server\" \"npm run start\""
   },
   "eslintConfig": {
     "extends": [
@@ -78,5 +56,11 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:3000"
+  "devDependencies": {
+    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "@babel/plugin-transform-private-property-in-object": "^7.25.9",
+    "@dotenvx/dotenvx": "^1.32.1",
+    "concurrently": "^9.1.2",
+    "react-scripts": "^5.0.1"
+  }
 }

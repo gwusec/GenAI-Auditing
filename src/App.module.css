@@ -1,0 +1,128 @@
+/* App.module.css */
+
+.App {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.annotate-button {
+  background-color: #f39c12;
+}
+
+.annotate-button:hover {
+  background-color: #e67e22;
+}
+
+.assessment-chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #ecf0f1;
+  border-right: 1px solid #ddd;
+}
+
+.assessment-container {
+  display: flex;
+  height: 100%;
+}
+
+.assessment-form {
+  flex: 1;
+  padding: 20px;
+  background-color: #f7f7f7;
+  border-left: 1px solid #ddd;
+}
+
+.chat-box {
+  flex-grow: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background-color: #ecf0f1;
+}
+
+.chat-container {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f7f7f7;
+  padding: 5px;
+}
+
+.chat-header {
+  background-color: #3498db;
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+  font-size: 0.8em;
+}
+
+.end-chat-button {
+  padding: 30px;
+  margin-top: 20px;
+  background-color: #f39c12 !important;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.guide-text {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #ecf0f1;
+  text-align: center;
+}
+
+.instructions-container li {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.instructions-container li::before {
+  content: '•';
+  color: #3498db;
+  font-weight: bold;
+  display: inline-block;
+  width: 1em;
+  margin-left: -1em;
+}
+
+.instructions-container ul {
+  list-style-type: none;
+  padding-left: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 20px;
+}
+
+.message {
+  margin-bottom: 10px;
+  padding: 10px;
+  border-radius: 4px;
+  background-color: #bdc3c7;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #f9f9f9;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.sidebar-guide-text {
+  margin-top: auto;
+  font-size: 1em;
+  color: #555;
+  text-align: center;
+}
+
+.thank-you-message {
+  font-size: 24px;
+  color: #4caf50;
+  text-align: center;
+  margin-top: 50px;
+}
