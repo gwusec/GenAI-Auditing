@@ -2,7 +2,7 @@
 # TRAILS Chatbot Auditing Tool
 
 This is the chatbot auditing interface using the Material-UI for the frontend interface.
-The chatbot auditing tool communicates with the [TRAILS-ui-llm-proxy](https://github.com:gwusec/TRAILS-ui-llm-proxy.git). 
+Live Demo: https://chatbot-audit.onrender.com/
 
 ## Setup
 
