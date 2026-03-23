@@ -1,0 +1,11 @@
+# docker-compose.yml
+services:
+  chatbot:
+    image: chatbot:osf
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped

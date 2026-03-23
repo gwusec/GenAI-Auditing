@@ -1,0 +1,115 @@
+.webllm-setup {
+    background-color: #f9f9f9;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .webllm-setup h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1.1rem;
+  }
+  
+  .info-box {
+    background-color: #e8f4fd;
+    border-left: 4px solid #3498db;
+    padding: 12px 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+  
+  .info-box p {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 0.9rem;
+  }
+  
+  .checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .checkbox-container input[type="checkbox"] {
+    width: auto;
+    margin-right: 8px;
+  }
+  
+  .model-preload {
+    margin: 25px 0;
+  }
+  
+  .preload-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+    width: 100%;
+  }
+  
+  .preload-button:hover:not(:disabled) {
+    background-color: #2980b9;
+  }
+  
+  .preload-button:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+  }
+  
+  .preload-button.loaded {
+    background-color: #27ae60;
+  }
+  
+  .progress-container {
+    margin-top: 10px;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+    height: 20px;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .progress-bar {
+    height: 100%;
+    background-color: #3498db;
+    transition: width 0.2s ease;
+  }
+  
+  .progress-text {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #2c3e50;
+    font-size: 0.8rem;
+    font-weight: bold;
+  }
+  
+  .browser-compatibility {
+    background-color: #fef9e7;
+    border-left: 4px solid #f1c40f;
+    padding: 15px;
+    border-radius: 4px;
+  }
+  
+  .browser-compatibility h5 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #7d6608;
+  }
+  
+  .browser-compatibility p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #7d6608;
+  }

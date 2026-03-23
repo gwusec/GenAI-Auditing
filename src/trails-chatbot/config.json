@@ -1,0 +1,7 @@
+{
+    "numPhases": 1,
+    "allowChatAfterPhasesComplete": true,
+    "disableTimer": false,
+    "phaseTime": 420,
+    "totalTime": 1800
+}
