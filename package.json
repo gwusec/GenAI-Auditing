@@ -2,6 +2,7 @@
   "name": "trails-ui-chatbot",
   "version": "1.0.2",
   "private": true,
+  "license": "Apache-2.0",
   "files": [
     "src/**/*",
     "assets/tutorial-marking.mov"
