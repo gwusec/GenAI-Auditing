@@ -4,30 +4,22 @@ import apiClient from './tools/APIClient';
 import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
 import conversationHandler from './tools/ConversationHandler';
 import ChatBox from './components/ChatBox';
-import AuditForm from './components/AuditForm';
-import ConversationHistory from './components/ConversationHistory';
-import ErrorDialog from './components/ErrorDialog';
 import AppConfig from './tools/AppConfig';
-import ChatDialog from './components/ChatDialog';
-import Debugger from './components/Debugger';
 import ChatTimerSystem from './tools/ChatTimerSystem';
-import SurveyMaker from './components/SurveyMaker';
 import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    CssBaseline,
     Box,
     Button,
     Typography,
     Tabs,
     Tab,
-    Alert,
     Tooltip,
     LinearProgress,
 } from '@mui/material';
 import styles from './App.module.css';
+import Survey from "./pages/Survey";
+import Chat from "./pages/Chat";
+import Audit from "./pages/Audit";
+import Complete from "./pages/Complete";
 
 const AppState = {
     SURVEY: 'survey',
@@ -49,9 +41,6 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     const [showAfterChatTwoDialogNoTime, setShowAfterChatTwoDialogNoTime] = useState(false);
     const [showAfterChatTwoDialogWithTime, setShowAfterChatTwoDialogWithTime] = useState(false);
     const [showTimerChatTimeUpDialog, setShowTimerChatTimeUpDialog] = useState(false);
-
-    const steps = ["Survey Creation", "Conversation", "Reporting"];
-    const activeStep = currentAppState === AppState.SURVEY ? 0 : currentAppState === AppState.CHAT ? 1 : 2;
 
     const timerSystem = useMemo(() => new ChatTimerSystem(config), [config]);
     const [timerState, setTimerState] = useState({
@@ -345,71 +334,34 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 
     return (
         <Box sx={{ display: 'flex', height: '100vh' }}>
-            {debugMode && currentAppState === AppState.SURVEY && <Debugger />}
-            <CssBaseline />
-            {error && (
-                <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
-                    {error}
-                </Alert>
-            )}
-
-            <ErrorDialog
-                open={showAPIErrorDialog}
-                onClose={handleCloseErrorDialog}
-                title="Your chat is too long!"
-                message="You cannot continue your chat with the AI chatbot, because your conversation is getting too long. Please end the current conversation by clicking 'End Conversation & Start Reporting'."
-            />
-
-            {currentAppState === AppState.SURVEY && !isViewOnly && (
-                <SurveyMaker onSurveySave={handleSurveySave} />
+            {currentAppState === AppState.SURVEY && (
+                <Survey
+                    debugMode={debugMode}
+                    isViewOnly={isViewOnly}
+                    handleSurveySave={handleSurveySave}
+                    error={error}
+                    setError={setError}
+                    showAPIErrorDialog={showAPIErrorDialog}
+                    handleCloseErrorDialog={handleCloseErrorDialog}
+                />
             )}
 
             {(currentAppState !== AppState.SURVEY || isViewOnly) && (
                 <>
                     {!isViewOnly && currentAppState === AppState.CHAT && showTimerChatTimeUpDialog && (
-                        <Dialog
-                            open={true}
-                            disableEscapeKeyDown
-                            onClose={(event, reason) => {
-                                if (reason !== 'backdropClick') {
-                                    handleCloseTimerChatTimeUpDialog(event);
-                                }
-                            }}
-                            aria-labelledby="timer-chat-time-up-dialog"
-                            maxWidth="sm"
-                            fullWidth
-                        >
-                            <DialogTitle id="timer-chat-time-up-dialog-title">
-                                You have reached the time limit in this conversation
-                            </DialogTitle>
-                            <DialogContent>
-                                <Typography variant="body1" color="textSecondary">
-                                    Please end the current chat by clicking 'End Conversation & Start Reporting'.
-                                </Typography>
-                            </DialogContent>
-                            <DialogActions>
-                                <Button
-                                    tutorial-step="end-chat-start-reporting-button"
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={handleCloseTimerChatTimeUpDialog}
-                                    disabled={isLoading || currentAppState !== AppState.CHAT}
-                                    sx={{
-                                        mt: 2,
-                                        padding: '20px',
-                                        marginTop: '15vh',
-                                        display: 'flex',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                        borderRadius: '4px',
-                                        height: '10vh',
-                                        marginBottom: '1vh',
-                                    }}
-                                >
-                                    End Conversation & Start Reporting
-                                </Button>
-                            </DialogActions>
-                        </Dialog>
+                        <Chat
+                            {...{
+                                isViewOnly,
+                                activeConversation,
+                                setActiveConversation,
+                                setIsLoading,
+                                timerSystem,
+                                setCurrentAppState,
+                                setError,
+                                isLoading,
+                                currentAppState,
+                                handleCloseTimerChatTimeUpDialog
+                            }} />
                     )}
 
                     {shouldShowSidebar() && (
@@ -534,6 +486,8 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                 overflow: 'hidden',
                             }}
                         >
+                            {/* there may be some issues with bringing this part over. i'll observe any issues later.
+                             Something like routing may solve this issue. */}
                             {activeConversation && currentAppState === AppState.CHAT && (
                                 <ChatBox
                                     conversation={activeConversation}
@@ -553,43 +507,29 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                     }}
                                 />
                             )}
-                            {activeConversation && currentAppState === AppState.AUDIT && (
-                                <AuditForm
-                                    conversationId={activeConversation.id}
-                                    onAuditComplete={handleAuditComplete}
-                                    setLoading={setIsLoading}
-                                    onTutorialComplete={handleTutorialComplete}
-                                    surveyQuestions={surveyQuestions}
-                                />
+                            {currentAppState === AppState.AUDIT && (
+                                <Audit {...{
+                                        activeConversation,
+                                        handleAuditComplete,
+                                        setIsLoading,
+                                        handleTutorialComplete,
+                                        surveyQuestions
+                                    }}/>
                             )}
-                            {activeConversation && currentAppState === AppState.COMPLETE && (
+                            {currentAppState === AppState.COMPLETE && (
                                 <>
-                                    {!isViewOnly && (
-                                        <>
-                                            <ChatDialog
-                                                open={showAfterChatOneDialog}
-                                                onClose={handleCloseChatOneDialog}
-                                                showNewChat={true}
-                                                showExportManager={false}
-                                            />
-                                            <ChatDialog
-                                                open={showAfterChatTwoDialogNoTime}
-                                                onClose={handleCloseChatTwoDialogNoTime}
-                                                showNewChat={false}
-                                                showExportManager={true}
-                                            />
-                                            <ChatDialog
-                                                open={showAfterChatTwoDialogWithTime}
-                                                onClose={handleCloseChatTwoDialogWithTime}
-                                                showNewChat={true}
-                                                showExportManager={true}
-                                            />
-                                        </>
-                                    )}
-                                    <ConversationHistory
-                                        conversation={activeConversation}
-                                        surveyQuestions={surveyQuestions}
-                                    />
+                                    <Complete
+                                        {...{
+                                            isViewOnly,
+                                            showAfterChatOneDialog,
+                                            handleCloseChatOneDialog,
+                                            showAfterChatTwoDialogNoTime,
+                                            handleCloseChatTwoDialogNoTime,
+                                            showAfterChatTwoDialogWithTime,
+                                            handleCloseChatTwoDialogWithTime,
+                                            activeConversation,
+                                            surveyQuestions
+                                        }}/>
                                 </>
                             )}
                         </Box>
@@ -601,3 +541,4 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 }
 
 export default App;
+export {AppState};
