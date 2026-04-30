@@ -1,12 +1,12 @@
 // src/components/AuditForm.jsx
 import React, { useState, useEffect, useCallback } from 'react';
-import { AuditResponse, STATE } from '../tools/models';
-import conversationHandler from '../tools/ConversationHandler';
-import ChatHistory from './ChatHistory';
-import { fairnessProperties } from '../tools/principles';
-import AuditPage0Tutorial from './tutorials/AuditPage0Tutorial';
-import AuditPage1Tutorial from './tutorials/AuditPage1Tutorial';
-import AuditPage2Tutorial from './tutorials/AuditPage2Tutorial';
+import { AuditResponse, STATE } from '../../tools/models';
+import conversationHandler from '../../tools/ConversationHandler';
+import ChatHistory from '../ChatHistory/ChatHistory';
+import { fairnessProperties } from '../../tools/principles';
+import AuditPage0Tutorial from '../tutorials/AuditPage0Tutorial';
+import AuditPage1Tutorial from '../tutorials/AuditPage1Tutorial';
+import AuditPage2Tutorial from '../tutorials/AuditPage2Tutorial';
 import styles from './AuditForm.module.css';
 import {
     Typography,

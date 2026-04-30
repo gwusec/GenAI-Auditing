@@ -1,20 +1,17 @@
 import ChatDialog from "../components/ChatDialog";
-import ConversationHistory from "../components/ConversationHistory";
-import React from "react";
+import ConversationHistory from "../components/ConversationHistory/ConversationHistory";
 
-function Complete(
-    {
-        isViewOnly,
-        showAfterChatOneDialog,
-        handleCloseChatOneDialog,
-        showAfterChatTwoDialogNoTime,
-        handleCloseChatTwoDialogNoTime,
-        showAfterChatTwoDialogWithTime,
-        handleCloseChatTwoDialogWithTime,
-        activeConversation,
-        surveyQuestions
-    }
-) {
+function CompleteLayout({
+    isViewOnly,
+    showAfterChatOneDialog,
+    handleCloseChatOneDialog,
+    showAfterChatTwoDialogNoTime,
+    handleCloseChatTwoDialogNoTime,
+    showAfterChatTwoDialogWithTime,
+    handleCloseChatTwoDialogWithTime,
+    activeConversation,
+    surveyQuestions
+}) {
     return (
         <>
             {!isViewOnly && activeConversation && (
@@ -47,4 +44,4 @@ function Complete(
     )
 }
 
-export default Complete;
+export default CompleteLayout;

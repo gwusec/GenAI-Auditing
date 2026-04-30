@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient from './tools/APIClient';
 import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
 import conversationHandler from './tools/ConversationHandler';
-import ChatBox from './components/ChatBox';
+import ChatBox from './components/ChatBox/ChatBox';
 import AppConfig from './tools/AppConfig';
 import ChatTimerSystem from './tools/ChatTimerSystem';
 import {
@@ -16,10 +16,10 @@ import {
     LinearProgress,
 } from '@mui/material';
 import styles from './App.module.css';
-import Survey from "./pages/Survey";
-import Chat from "./pages/Chat";
-import Audit from "./pages/Audit";
-import Complete from "./pages/Complete";
+import SurveyPage from "./pages/SurveyPage";
+import ChatPage from "./pages/ChatPage";
+import AuditPage from "./pages/AuditPage";
+import CompletePage from "./pages/CompletePage";
 
 const AppState = {
     SURVEY: 'survey',
@@ -327,18 +327,14 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
         handleEndChat();
     };
 
-    const handleSurveySave = (survey) => {
-        setSurveyQuestions(survey);
-        setCurrentAppState(AppState.CHAT);
-    };
-
     return (
         <Box sx={{ display: 'flex', height: '100vh' }}>
             {currentAppState === AppState.SURVEY && (
-                <Survey
+                <SurveyPage
                     debugMode={debugMode}
                     isViewOnly={isViewOnly}
-                    handleSurveySave={handleSurveySave}
+                    setCurrentAppState={setCurrentAppState}
+                    setSurveyQuestions={setSurveyQuestions}
                     error={error}
                     setError={setError}
                     showAPIErrorDialog={showAPIErrorDialog}
@@ -349,17 +345,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
             {(currentAppState !== AppState.SURVEY || isViewOnly) && (
                 <>
                     {!isViewOnly && currentAppState === AppState.CHAT && showTimerChatTimeUpDialog && (
-                        <Chat
+                        <ChatPage
                             {...{
                                 isViewOnly,
-                                activeConversation,
-                                setActiveConversation,
-                                setIsLoading,
-                                timerSystem,
-                                setCurrentAppState,
-                                setError,
                                 isLoading,
                                 currentAppState,
+                                showTimerChatTimeUpDialog,
                                 handleCloseTimerChatTimeUpDialog
                             }} />
                     )}
@@ -508,7 +499,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                 />
                             )}
                             {currentAppState === AppState.AUDIT && (
-                                <Audit {...{
+                                <AuditPage {...{
                                         activeConversation,
                                         handleAuditComplete,
                                         setIsLoading,
@@ -518,7 +509,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                             )}
                             {currentAppState === AppState.COMPLETE && (
                                 <>
-                                    <Complete
+                                    <CompletePage
                                         {...{
                                             isViewOnly,
                                             showAfterChatOneDialog,

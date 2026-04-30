@@ -1,13 +1,13 @@
 // src/components/ChatBox.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import conversationHandler from '../tools/ConversationHandler';
-import { Message, ChatEvent, CHAT_EVENT_TYPE } from '../tools/models';
-import MessageForm from './MessageForm';
-import { fairnessProperties } from '../tools/principles';
-import ChatBoxTutorial from './tutorials/ChatBoxTutorial';
+import conversationHandler from '../../tools/ConversationHandler';
+import { Message, ChatEvent, CHAT_EVENT_TYPE } from '../../tools/models';
+import MessageForm from '../MessageForm/MessageForm';
+import { fairnessProperties } from '../../tools/principles';
+import ChatBoxTutorial from '../tutorials/ChatBoxTutorial';
 import styles from './ChatBox.module.css';
-import ChatMessages from './ChatMessages';
+import ChatMessages from '../ChatMessages/ChatMessages';
 import {
     Typography,
     Box,
