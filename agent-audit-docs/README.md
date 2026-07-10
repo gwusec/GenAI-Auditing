@@ -14,6 +14,9 @@ This folder holds the initial design documentation. It is a scoping and position
 | [`02-borrow-vs-build.md`](02-borrow-vs-build.md) | What we reuse vs build from scratch, with a verified open-source license table and the reuse strategy. |
 | [`03-architecture.md`](03-architecture.md) | The trace-as-stimulus design, the event-log extension, the AI-judge and benchmark boundaries, and the data model. |
 | [`04-compliance.md`](04-compliance.md) | Where this fits the EU AI Act's human-oversight and audit-trail duties, and our data-controller stance. |
+| [`05-roadmap.md`](05-roadmap.md) | Phased build order (ingestion → replay → export → judge → gating) and contribution notes. |
+| [`architecture-diagram.svg`](architecture-diagram.svg) | One-page pipeline diagram: trace source → freeze → human review → export. |
+| [`lovable-prototype-prompt.md`](lovable-prototype-prompt.md) | Copy-paste prompt to one-shot a demo prototype in Lovable (to show an advisor). |
 
 ## Interactive mockups
 

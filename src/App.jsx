@@ -371,7 +371,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                 ))}
                             </Tabs>
                             {!isViewOnly && (
-                                <Box sx={{ mt: 12, backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, padding: '12px' }}>
+                                <Box sx={{ mt: 'auto', backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 3, padding: '14px' }}>
                                     {timerSystem !== null && (
                                         <Box tutorial-step="timer-time-limit">
                                             {timerSystem.state.currentChatIndex <= 1 ? (
@@ -387,7 +387,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                                         <LinearProgress
                                                             variant="determinate"
                                                             value={timerState.percentageChatTimeRemaining}
-                                                            sx={{ width: '100%', height: 15 }}
+                                                            sx={{ width: '100%', height: 8, borderRadius: 4 }}
                                                         />
                                                     </Tooltip>
                                                 </>
@@ -404,7 +404,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                                         <LinearProgress
                                                             variant="determinate"
                                                             value={timerState.percentageChatTimeRemaining}
-                                                            sx={{ width: '100%', height: 15 }}
+                                                            sx={{ width: '100%', height: 8, borderRadius: 4 }}
                                                         />
                                                     </Tooltip>
                                                 </>
@@ -415,21 +415,21 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                         tutorial-step="end-chat-start-reporting-button"
                                         variant="contained"
                                         color="primary"
+                                        fullWidth
                                         onClick={handleEndChat}
                                         disabled={isLoading || currentAppState !== AppState.CHAT}
                                         sx={{
                                             mt: 2,
-                                            padding: '20px',
-                                            marginTop: '20px',
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            borderRadius: '4px',
-                                            height: '10vh',
-                                            marginBottom: '1vh',
+                                            mb: 0.5,
+                                            py: 1.25,
+                                            borderRadius: '10px',
+                                            textTransform: 'none',
+                                            fontWeight: 600,
+                                            lineHeight: 1.3,
+                                            boxShadow: 'none',
                                         }}
                                     >
-                                        End Conversation & Start Reporting
+                                        End Conversation &amp; Start Reporting
                                     </Button>
                                     <Typography variant="body2" className={styles['sidebar-guide-text']}>
                                         On average, people need 7 prompts in a conversation to review and make an assessment.

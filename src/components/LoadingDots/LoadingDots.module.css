@@ -1,39 +1,27 @@
-/* HTML: <div class="loader"></div> */
-.loader {
-  width: 4px;
-  color: var(--mui-palette-text-primary, #000);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  box-shadow: 
-    19px -19px 0 0px, 38px -19px 0 0px, 57px -19px 0 0px,
-    19px 0     0 5px, 38px 0     0 5px, 57px 0     0 5px,
-    19px 19px  0 0px, 38px 19px  0 0px, 57px 19px  0 0px;
-  transform: translateX(-38px);
-  animation: l26 2s infinite linear;
+/* Slim three-dot typing indicator (prototype style). */
+.typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 2px;
 }
-@keyframes l26 {
-  12.5% {box-shadow: 
-    19px -19px 0 0px, 38px -19px 0 0px, 57px -19px 0 5px,
-    19px 0     0 5px, 38px 0     0 0px, 57px 0     0 5px,
-    19px 19px  0 0px, 38px 19px  0 0px, 57px 19px  0 0px}
-  25%   {box-shadow: 
-    19px -19px 0 5px, 38px -19px 0 0px, 57px -19px 0 5px,
-    19px 0     0 0px, 38px 0     0 0px, 57px 0     0 0px,
-    19px 19px  0 0px, 38px 19px  0 5px, 57px 19px  0 0px}
-  50%   {box-shadow: 
-    19px -19px 0 5px, 38px -19px 0 5px, 57px -19px 0 0px,
-    19px 0     0 0px, 38px 0     0 0px, 57px 0     0 0px,
-    19px 19px  0 0px, 38px 19px  0 0px, 57px 19px  0 5px}
-  62.5% {box-shadow: 
-    19px -19px 0 0px, 38px -19px 0 0px, 57px -19px 0 0px,
-    19px 0     0 5px, 38px 0     0 0px, 57px 0     0 0px,
-    19px 19px  0 0px, 38px 19px  0 5px, 57px 19px  0 5px}
-  75%   {box-shadow: 
-    19px -19px 0 0px, 38px -19px 0 5px, 57px -19px 0 0px,
-    19px 0     0 0px, 38px 0     0 0px, 57px 0     0 5px,
-    19px 19px  0 0px, 38px 19px  0 0px, 57px 19px  0 5px}
-  87.5% {box-shadow: 
-    19px -19px 0 0px, 38px -19px 0 5px, 57px -19px 0 0px,
-    19px 0     0 0px, 38px 0     0 5px, 57px 0     0 0px,
-    19px 19px  0 5px, 38px 19px  0 0px, 57px 19px  0 0px}
+
+.typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--mui-palette-primary-light, #2dd4bf);
+  animation: dot-bob 1.2s infinite ease-in-out;
+}
+
+.typing span:nth-child(2) { animation-delay: 0.18s; }
+.typing span:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes dot-bob {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%           { transform: translateY(-6px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing span { animation: none; opacity: 0.6; }
 }
