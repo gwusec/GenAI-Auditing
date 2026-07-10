@@ -302,8 +302,19 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                     )}
 
                     {shouldShowSidebar() && (
-                        <Box className={styles['sidebar']} sx={{ width: '300px', flexShrink: 0 }}>
-                            <Typography variant="h6" gutterBottom align="center">
+                        <Box
+                            className={styles['sidebar']}
+                            sx={{
+                                width: '300px',
+                                flexShrink: 0,
+                                background: (t) => (t.palette.mode === 'dark'
+                                    ? 'linear-gradient(180deg, #131c30 0%, #0c1322 100%)'
+                                    : 'linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%)'),
+                                borderRight: '1px solid',
+                                borderColor: 'divider',
+                            }}
+                        >
+                            <Typography variant="h6" gutterBottom align="center" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>
                                 AI Chatbot
                             </Typography>
                             <Tabs
@@ -311,13 +322,23 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                 variant="scrollable"
                                 value={activeConversationIndex}
                                 onChange={handleTabChange}
-                                sx={{ borderRight: 1, borderColor: 'divider', minHeight: '200px' }}
+                                sx={{ minHeight: '200px', '& .MuiTabs-indicator': { display: 'none' } }}
                             >
                                 <Tab
                                     label="Your recent conversations"
                                     value="recent-header"
                                     disabled
-                                    sx={{ fontWeight: 'bold' }}
+                                    sx={{
+                                        fontWeight: 700,
+                                        fontSize: '0.7rem',
+                                        letterSpacing: '0.12em',
+                                        textTransform: 'uppercase',
+                                        color: 'text.disabled',
+                                        minHeight: 'auto',
+                                        alignItems: 'flex-start',
+                                        px: '14px',
+                                        '&.Mui-disabled': { opacity: 1 },
+                                    }}
                                 />
                                 {conversations.map((conversation, index) => (
                                     <Tab
@@ -325,17 +346,26 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                         label={`Conversation ${index + 1}`}
                                         value={index}
                                         sx={{
-                                            padding: '8px 16px',
+                                            padding: '10px 14px',
                                             borderRadius: '10px',
-                                            marginBottom: '8px',
+                                            marginBottom: '6px',
                                             minHeight: 'auto',
+                                            alignItems: 'flex-start',
                                             textTransform: 'none',
+                                            transition: 'background-color .18s ease, transform .18s ease, color .18s ease',
                                             backgroundColor: activeConversationIndex === index
-                                                ? (t) => (t.palette.mode === 'dark' ? 'rgba(99,102,241,0.22)' : 'rgba(99,102,241,0.12)')
-                                                : 'action.hover',
+                                                ? (t) => (t.palette.mode === 'dark' ? 'rgba(20,184,166,0.18)' : 'rgba(13,148,136,0.12)')
+                                                : 'transparent',
                                             color: activeConversationIndex === index ? 'primary.main' : 'text.secondary',
                                             fontWeight: activeConversationIndex === index ? 700 : 500,
-                                            '&:hover': { backgroundColor: 'action.selected' },
+                                            boxShadow: activeConversationIndex === index
+                                                ? (t) => `inset 3px 0 0 ${t.palette.primary.main}`
+                                                : 'none',
+                                            '&:hover': {
+                                                backgroundColor: (t) => (t.palette.mode === 'dark' ? 'rgba(148,163,184,0.10)' : 'rgba(15,23,42,0.04)'),
+                                                color: 'text.primary',
+                                                transform: 'translateX(2px)',
+                                            },
                                         }}
                                     />
                                 ))}
