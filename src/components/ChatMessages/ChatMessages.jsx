@@ -130,6 +130,18 @@ const ChatMessages = ({
         return () => conversationHandler.unregisterOnStreamingUpdated(cb);
     }, []);
 
+    // Entrance animation should fire only for a genuinely new message (a live send),
+    // never for the whole history on load / tab switch, and never for the bot's
+    // committed reply (which the streaming bubble already animated in). We seed a
+    // "seen" set on mount, then animate only when exactly one new id appears.
+    const seenIdsRef = useRef(null);
+    const freshIds = messages.filter((m) => seenIdsRef.current && !seenIdsRef.current.has(m.id));
+    const animateId = freshIds.length === 1 ? freshIds[0].id : null;
+    useEffect(() => {
+        if (seenIdsRef.current === null) seenIdsRef.current = new Set(messages.map((m) => m.id));
+        else messages.forEach((m) => seenIdsRef.current.add(m.id));
+    }, [messages]);
+
     useEffect(() => {
         const conv = conversationHandler.getActiveConversation();
         setReactions(conv && conv.getReactions ? conv.getReactions() : []);
@@ -207,7 +219,7 @@ const ChatMessages = ({
                     return (
                         <ListItem
                             key={message.id}
-                            className={styles['message-row']}
+                            className={(message.id === animateId && message.author === 'user') ? styles['message-row'] : undefined}
                             onMouseUp={() =>
                                 handleTextSelection &&
                                 handleTextSelection(message.id, message.author, message.content)

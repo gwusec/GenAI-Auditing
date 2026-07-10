@@ -13,14 +13,11 @@ import {
     Box,
     Button,
     Container,
-    Paper,
-    IconButton,
     Chip,
+    Tooltip,
 } from "@mui/material";
 import {
     Info as InfoIcon,
-    ExpandMore,
-    ExpandLess
 } from "@mui/icons-material";
 
 const fairnessPropertiesRandomOrder = [...fairnessProperties].sort(() => 0.5 - Math.random());
@@ -33,8 +30,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
     const [editedContent, setEditedContent] = useState('');
     const [showTutorial, setShowTutorial] = useState(false);
     const [tutorialCompleted, setTutorialCompleted] = useState(false);
-    const [isMinimized, setIsMinimized] = useState(false);
-    const isMinimizeEnabled = messages && messages.length > 0;
+    const [showAllPrinciples, setShowAllPrinciples] = useState(false);
 
     // Initial setup
     useEffect(() => {
@@ -96,8 +92,6 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                 content: content,
             });
             await conversationHandler.addChatEvent(conversation.id, new ChatEvent(CHAT_EVENT_TYPE.NEW_USER_MESSAGE, userMessage));
-        
-            setIsMinimized(true);
         } catch (error) {
             console.error('Error in chat sequence:', error);
             setError('Failed to send message. (1) Please try again, or (2) reload the page. If error persists, please contact researchers.');
@@ -155,10 +149,6 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
         }
     };
     
-    const handleMinimizeToggle = () => {
-        setIsMinimized(prev => !prev);
-    };
-    
     const handleTutorialCompleteInternal = useCallback(() => {
         setShowTutorial(false);
         localStorage.setItem("chatTutorialShown", "true");
@@ -208,58 +198,54 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                     <Container maxWidth="md">
                         {isActive && conversation.id && (
                             <Box className={styles['chat-footer']}>
-                                {/* Fairness principles section */}
-                                <Paper variant="outlined" className={styles['fairness-properties']} elevation={0} tutorial-step="fairness-properties">
-                                    <div className={styles['fairness-header']}>
-                                        {/* Minimize toggle */}
-                                        {isMinimizeEnabled && (
-                                            <IconButton
-                                                onClick={handleMinimizeToggle}
-                                                className={styles['minimize-button']}
-                                                aria-label={
-                                                    isMinimized ? 'Expand principles list' : 'Minimize principles list'
-                                                }
-                                                title={
-                                                    isMinimized ? 'Expand principles list' : 'Minimize principles list'
-                                                }
-                                            >
-                                                {isMinimized ? <ExpandLess /> : <ExpandMore />}
-                                            </IconButton>
-                                        )}
-                                        {/* Header text */}
-                                        <Typography
-                                            variant="subtitle2"
-                                            className={styles['fairness-header-text']}
-                                        >
-                                            Please verify that the AI chatbot upholds these principles:
-                                        </Typography>
-                                    </div>
-                                    {/* Fairness principles list */}
-                                    {!isMinimized && (
-                                        <ul className={styles['principles-list']}>
-                                            {fairnessPropertiesRandomOrder.map((property, index) => (
-                                                <li key={index}>{property}</li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                    {/* Minimized view with chips */}
-                                    {isMinimized && (
-                                        <div className={styles['principles-chips']}>
-                                            {fairnessPropertiesRandomOrder.map((property, index) => {
-                                                const [title] = property.split(':');
-                                                return (
-                                                    <Chip 
-                                                        key={index} 
-                                                        label={title} 
-                                                        variant="outlined" 
-                                                        size="small" 
-                                                        className={styles['principle-chip']} 
+                                {/* Fairness principles — a quiet, compact chip row (hover a chip
+                                    for the full description; "+N more" reveals the rest). */}
+                                <Box tutorial-step="fairness-properties" sx={{ mb: 1.25 }}>
+                                    <Typography
+                                        variant="caption"
+                                        sx={{ display: 'block', color: 'text.secondary', fontWeight: 600, mb: 1, px: 0.5 }}
+                                    >
+                                        Please verify the AI chatbot upholds these principles
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                                        {(showAllPrinciples ? fairnessPropertiesRandomOrder : fairnessPropertiesRandomOrder.slice(0, 4)).map((property, index) => {
+                                            const [title] = property.split(':');
+                                            return (
+                                                <Tooltip key={index} title={property} arrow placement="top">
+                                                    <Chip
+                                                        label={title}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{
+                                                            borderRadius: '999px',
+                                                            color: 'text.secondary',
+                                                            borderColor: 'divider',
+                                                            fontWeight: 500,
+                                                            transition: 'border-color .15s ease, color .15s ease',
+                                                            '&:hover': { borderColor: 'primary.main', color: 'text.primary' },
+                                                        }}
                                                     />
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </Paper>
+                                                </Tooltip>
+                                            );
+                                        })}
+                                        {!showAllPrinciples && fairnessPropertiesRandomOrder.length > 4 && (
+                                            <Chip
+                                                label={`+${fairnessPropertiesRandomOrder.length - 4} more`}
+                                                size="small"
+                                                onClick={() => setShowAllPrinciples(true)}
+                                                sx={{ borderRadius: '999px', bgcolor: 'action.hover', fontWeight: 500 }}
+                                            />
+                                        )}
+                                        {showAllPrinciples && (
+                                            <Chip
+                                                label="Show less"
+                                                size="small"
+                                                onClick={() => setShowAllPrinciples(false)}
+                                                sx={{ borderRadius: '999px', bgcolor: 'action.hover', fontWeight: 500 }}
+                                            />
+                                        )}
+                                    </Box>
+                                </Box>
                                 {/* Message input form */}
                                 <Box className={styles['input-area']} tutorial-step="message-form">
                                     <MessageForm 

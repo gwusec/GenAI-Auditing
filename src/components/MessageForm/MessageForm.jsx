@@ -1,5 +1,5 @@
 // TRAILS-Chatbot/src/components/MessageForm.jsx  
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Box, IconButton, Typography } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import styles from "./MessageForm.module.css";
@@ -8,7 +8,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef(null);
   const [isTextareaActive, setIsTextareaActive] = useState(false);
-  const [toastPosition, setToastPosition] = useState({ top: 0, left: 0 });
 
   const handleSubmit = useCallback((e) => {
     if (textareaRef.current) {
@@ -36,19 +35,23 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
     e.target.style.height = `${e.target.scrollHeight}px`;
   };
 
-  useEffect(() => {
-    if (isTextareaActive && textareaRef.current) {
-      const { top, left } = textareaRef.current.getBoundingClientRect();
-      setToastPosition({
-        top: top + window.scrollY,
-        left: left + window.scrollX - 200,
-      });
-    }
-  }, [isTextareaActive]);
-
   return (
     <>
-      <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
+      <Box sx={{ position: 'relative' }}>
+        {/* Safety notices — anchored just above the input (float upward on focus,
+            so they never overlap the sidebar and cause no layout shift). */}
+        {isTextareaActive && (
+          <Box
+            sx={{
+              position: 'absolute', bottom: 'calc(100% + 8px)', left: 4, right: 4,
+              display: 'flex', flexWrap: 'wrap', gap: 1, zIndex: 5, pointerEvents: 'none',
+            }}
+          >
+            <span className={styles.notice}>Do not include personal information</span>
+            <span className={styles.notice}>Your conversation is stored and used for research</span>
+          </Box>
+        )}
+        <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
         <div className={styles.container}>
           <textarea
             ref={textareaRef}
@@ -60,34 +63,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
             placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
             className={styles.textarea}
           />
-          {isTextareaActive && (
-            <div>
-              <div
-                className={styles.toast}
-                style={{
-                  position: 'absolute',
-                  top: `${toastPosition.top - 25}px`,
-                  left: `${toastPosition.left}px`,
-                }}
-              >
-                <Typography variant="inherit">
-                  <b>Do not include personal information.</b>
-                </Typography>
-              </div>
-              <div
-                className={styles.toast}
-                style={{
-                  position: 'absolute',
-                  top: `${toastPosition.top + 60}px`,
-                  left: `${toastPosition.left}px`,
-                }}
-              >
-                <Typography variant="inherit">
-                  <b>Your conversation will be stored and used for research purposes.</b>
-                </Typography>
-              </div>
-            </div>
-          )}
         </div>
         <IconButton
           type="submit"
@@ -106,6 +81,7 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
         >
           <SendIcon fontSize="small" />
         </IconButton>
+        </Box>
       </Box>
       <Typography variant="caption" className={styles["disclaimer-text"]}>
         Note: The AI chatbot may say sensitive things based on your interactions with it.
