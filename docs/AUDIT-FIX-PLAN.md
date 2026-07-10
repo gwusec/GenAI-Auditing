@@ -20,6 +20,21 @@ The stale `.git/index.lock` was cleared and **the entire working tree is now com
 
 ---
 
+## Update — 2026-07-10 working session (UI + hardening + Supabase live verification)
+
+Continued on `audit-fixes`. Unit suite now **220 passing**, `vite build` clean, `node --check` OK. New commits, all live-verified in the Docker build against Ollama:
+
+- **Live Docker QA (§8) — done.** Walked the full flow: post-audit summary renders (no white-screen), consent gate renders + records, P3 framing reaches the model (PirateBot), server-side keys (OpenAI shows the env panel, no key field), dashboard + tidy CSV/JSON export. Found + fixed one bug during QA: questionnaire answers weren't exported (`AuditFlow` stores them on `audit.questionnaire`; `toTidyRows` only read the legacy buckets) — now flattened, with a test.
+- **Streaming chat (SSE).** Relay streams tokens for Ollama + OpenAI-compatible (`stream:true` → `data:{delta}`), other providers fall back to JSON. `APIClient.sendChatMessageStream` (fetch + `parseSSEEvents`, unit-tested) with transparent JSON fallback; `ConversationHandler` streams into a transient buffer and commits one `NEW_BOT_MESSAGE` (event log stays clean).
+- **Visual pass.** Teal accent (replaced indigo) in `theme.js`, bridged into SurveyJS via `--sjs-*` CSS vars so the questionnaire matches in both modes; chat redesign (avatars, slim bubbles, user-right/bot-left, 3-dot typing indicator, message entrance on new user msg only, principles-as-chips, safety notices below the composer, sidebar gradient + fixed End-Conversation button); fixed footer clipping (main-content `flex:1`/`min-height:0`).
+- **Relay hardening.** Per-auditor request ceiling (MOD-7, `createRateCeiling` + `/chat` middleware, `MAX_CHAT_REQUESTS_PER_SESSION`); fail-closed CORS (§5) — same-origin allowed when `ALLOWED_ORIGINS` unset, cross-origin blocked.
+- **Supabase 0003 — VERIFIED LIVE.** Applied `0001`→`0004` against a real Supabase project and drove the browser: study create → open/close, crypto access code, questionnaire config, auditor session, conversation + chat events + reaction, provenance — all write/read under RLS. **Cross-investigator isolation confirmed** (a second investigator sees none of the first's studies/data). Docker Supabase wiring added (`REACT_APP_*` build args from `.env`); Vitest env made hermetic so the "unconfigured guardrail" tests ignore a dev `.env`.
+- **Append-only persistence (§4.6) — done + verified.** `0004_append_chat_event.sql` (SECURITY DEFINER, membership-checked) appends one event atomically; store seam `appendChatEvent` (IndexedDB local + Supabase RPC); `ConversationHandler` appends instead of rewriting. Verified live: an **anonymous auditor** joined by code and chatted, events appended via the RPC with no errors.
+
+**Still open / deferred:** rotate the committed self-host `JWT_SECRET`/anon key (§4.5, manual); anonymous-auditor **resume after a hard refresh** doesn't restore the active study (data persists in Supabase; the app just doesn't re-enter the study — minor UX gap); public-deploy checklist (set `ALLOWED_ORIGINS`, review rate limits). Supabase requires two dashboard toggles for the auditor flow: **disable email confirmation** and **enable anonymous sign-ins**.
+
+---
+
 ## 0. Read this first — state of the branch
 
 Three things you must know before you start:
