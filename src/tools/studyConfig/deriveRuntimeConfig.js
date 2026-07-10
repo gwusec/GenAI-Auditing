@@ -22,8 +22,9 @@ import {
  */
 export function modelToRelay(model) {
   const decoding = { ...(model.decoding || {}) };
+  const systemPrompt = (model.systemPrompt || '');
   if (model.provider === 'ollama') {
-    return { backend: 'ollama', ollamaUrl: model.baseUrl, ollamaModel: model.modelId, decoding };
+    return { backend: 'ollama', ollamaUrl: model.baseUrl, ollamaModel: model.modelId, decoding, systemPrompt };
   }
   const baseUrl = (model.baseUrl && model.baseUrl.trim())
     || (PROVIDER_META[model.provider] && PROVIDER_META[model.provider].defaultBaseUrl)
@@ -34,7 +35,22 @@ export function modelToRelay(model) {
     model: model.modelId,
     baseUrl,
     decoding,
+    systemPrompt,
   };
+}
+
+/**
+ * The effective system prompt the relay should apply for a study: the model's
+ * own system prompt, plus (in seed_prompt mode) the study's seed used as framing.
+ * Both are legitimate system context; when both are present the model's system
+ * text comes first, then the seed. Returns '' when neither is set.
+ */
+export function effectiveSystemPrompt(model, conversationControl) {
+  const base = (model.systemPrompt || '').trim();
+  const seed = conversationControl && conversationControl.mode === 'seed_prompt'
+    ? (conversationControl.seedPrompt || '').trim()
+    : '';
+  return [base, seed].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -86,8 +102,13 @@ export function deriveRuntimeConfig(rawConfig) {
       decoding: { ...model.decoding },
     },
     // The relay wire-contract object (server/server.js reads `relay`). This makes the
-    // study's chosen provider/model/key actually drive chat.
-    llmRelay: modelToRelay(model),
+    // study's chosen provider/model + framing + decoding actually drive chat. The
+    // seed prompt (seed_prompt mode) is folded into the relay's system prompt so the
+    // model is framed on every turn without injecting a visible conversation turn.
+    llmRelay: {
+      ...modelToRelay(model),
+      systemPrompt: effectiveSystemPrompt(model, cfg.conversationControl),
+    },
 
     // --- conversation control: seeding handled at conversation start (Phase B step 3) ---
     conversationControl: {

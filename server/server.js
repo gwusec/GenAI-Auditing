@@ -52,6 +52,10 @@ function missingKeyMessage(rawProvider) {
     `Set ${envVar} in the relay environment (see .env.example) and restart.`;
 }
 
+// Pure relay helpers (decoding resolution + system-message injection) live in a
+// dependency-free module so they can be unit-tested without the relay's deps.
+const { resolveDecoding, ensureSystemMessage } = require('./relayHelpers');
+
 function parseAllowedOrigins(value) {
   if (!value) {
     return isDevelopment ? ['*'] : [];
@@ -353,18 +357,12 @@ app.post('/chat', chatRateLimit, async (req, res) => {
       });
     }
 
-    const ollamaMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
-    // Make sure we have a system message
-    if (!ollamaMessages.some(msg => msg.role === 'system')) {
-      ollamaMessages.unshift({
-        role: 'system',
-        content: 'You are a helpful assistant.'
-      });
-    }
+    // Apply the study's system/seed prompt (relay.systemPrompt) and decoding.
+    const ollamaMessages = ensureSystemMessage(
+      messages.map(msg => ({ role: msg.role, content: msg.content })),
+      relay.systemPrompt
+    );
+    const ollamaDecoding = resolveDecoding(relay);
 
     try {
       console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
@@ -373,8 +371,9 @@ app.post('/chat', chatRateLimit, async (req, res) => {
         messages: ollamaMessages,
         stream: false,
         options: {
-          temperature: 0.7,
-          num_predict: 2000
+          temperature: ollamaDecoding.temperature,
+          num_predict: ollamaDecoding.maxTokens,
+          ...(ollamaDecoding.topP !== undefined ? { top_p: ollamaDecoding.topP } : {})
         }
       }, {
         timeout: REQUEST_TIMEOUT_MS
@@ -435,13 +434,16 @@ app.post('/chat', chatRateLimit, async (req, res) => {
 
 // Handler for API provider requests
 async function handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl) {
-  const { messages } = req.body;
+  const { messages, relay } = req.body;
+  const decoding = resolveDecoding(relay);
 
   try {
     console.log(`PROCESSING ${provider.toUpperCase()} API REQUEST - Model: ${model}`);
 
-    // Format messages according to provider requirements
-    const formattedMessages = formatMessagesForProvider(messages, provider);
+    // Apply the study's system/seed prompt before provider formatting, then let
+    // each provider body carry the study's decoding settings.
+    const messagesWithSystem = ensureSystemMessage(messages, relay && relay.systemPrompt);
+    const formattedMessages = formatMessagesForProvider(messagesWithSystem, provider);
 
     // Prepare headers for the API request
     const headers = {
@@ -488,8 +490,9 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         requestBody = {
           model: model,
           messages: formattedMessages,
-          temperature: 0.7,
-          max_tokens: 2000
+          temperature: decoding.temperature,
+          max_tokens: decoding.maxTokens,
+          ...(decoding.topP !== undefined ? { top_p: decoding.topP } : {})
         };
         break;
       case 'anthropic':
@@ -498,8 +501,9 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
           model: model,
           messages: nonSystemMessages,
           ...(systemText ? { system: systemText } : {}),
-          max_tokens: 2000,
-          temperature: 0.7
+          max_tokens: decoding.maxTokens,
+          temperature: decoding.temperature,
+          ...(decoding.topP !== undefined ? { top_p: decoding.topP } : {})
         };
         break;
       case 'cohere':
@@ -512,8 +516,9 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
             message: msg.content
           })),
           ...(systemText ? { preamble: systemText } : {}),
-          temperature: 0.7,
-          max_tokens: 2000
+          temperature: decoding.temperature,
+          max_tokens: decoding.maxTokens,
+          ...(decoding.topP !== undefined ? { p: decoding.topP } : {})
         };
         break;
       case 'gemini':
@@ -526,8 +531,9 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
             parts: [{ text: msg.content }]
           })),
           generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 2000
+            temperature: decoding.temperature,
+            maxOutputTokens: decoding.maxTokens,
+            ...(decoding.topP !== undefined ? { topP: decoding.topP } : {})
           }
         };
         break;
@@ -959,13 +965,26 @@ if (!isDevelopment) {
   });
 }
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`API available at :${PORT}`);
-  if (isDevelopment) {
-    console.log(`React app running at http://localhost:3001`);
-  } else {
-    console.log(`App available on configured host at :${PORT}`);
-  }
-});
+// Start the server — only when run directly (not when imported by a test).
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`API available at :${PORT}`);
+    if (isDevelopment) {
+      console.log(`React app running at http://localhost:3001`);
+    } else {
+      console.log(`App available on configured host at :${PORT}`);
+    }
+  });
+}
+
+// Exported for unit tests (the pure relay helpers) and for supertest-style
+// integration tests that import the Express app without binding a port.
+module.exports = {
+  app,
+  resolveDecoding,
+  ensureSystemMessage,
+  resolveApiKey,
+  validateApiBaseUrl,
+  formatMessagesForProvider,
+};

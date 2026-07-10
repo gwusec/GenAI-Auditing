@@ -63,6 +63,7 @@ describe('deriveRuntimeConfig — model block', () => {
     expect(ollama.llmRelay).toEqual({
       backend: 'ollama', ollamaUrl: 'http://h:11434', ollamaModel: 'llama3.1',
       decoding: { temperature: 0.7, topP: 0.95, maxTokens: 1024 }, // defaults carried
+      systemPrompt: '', // no framing configured
     });
 
     const openai = deriveRuntimeConfig(withStudyConfigDefaults({
@@ -72,8 +73,36 @@ describe('deriveRuntimeConfig — model block', () => {
       backend: 'api', provider: 'openai', model: 'gpt-4o',
       baseUrl: 'https://api.openai.com/v1', // default filled in
       decoding: { temperature: 0.7, topP: 0.95, maxTokens: 1024 },
+      systemPrompt: '',
     });
     expect(openai.llmRelay).not.toHaveProperty('apiKey');
+  });
+
+  test('the study system prompt + decoding reach the relay object (P3 wiring)', () => {
+    const rt = deriveRuntimeConfig(completeConfig({
+      models: [{
+        provider: 'openai', modelId: 'gpt-4o', baseUrl: '',
+        systemPrompt: 'Only answer in French.',
+        decoding: { temperature: 0.1, topP: 0.5, maxTokens: 256 },
+      }],
+      conversationControl: { mode: 'fixed_first_turn', seedPrompt: '', fixedFirstTurn: 'Bonjour' },
+    }));
+    expect(rt.llmRelay.systemPrompt).toBe('Only answer in French.');
+    expect(rt.llmRelay.decoding).toEqual({ temperature: 0.1, topP: 0.5, maxTokens: 256 });
+  });
+
+  test('seed_prompt is folded into the relay system prompt (after any model system text)', () => {
+    const withBoth = deriveRuntimeConfig(completeConfig({
+      models: [{ provider: 'openai', modelId: 'gpt-4o', baseUrl: '', systemPrompt: 'Be terse.' }],
+      conversationControl: { mode: 'seed_prompt', seedPrompt: 'You are a hiring manager.', fixedFirstTurn: null },
+    }));
+    expect(withBoth.llmRelay.systemPrompt).toBe('Be terse.\n\nYou are a hiring manager.');
+
+    const seedOnly = deriveRuntimeConfig(completeConfig({
+      models: [{ provider: 'openai', modelId: 'gpt-4o', baseUrl: '', systemPrompt: '' }],
+      conversationControl: { mode: 'seed_prompt', seedPrompt: 'Frame it.', fixedFirstTurn: null },
+    }));
+    expect(seedOnly.llmRelay.systemPrompt).toBe('Frame it.');
   });
 
   test('a legacy stored apiKey never reaches the relay object', () => {
