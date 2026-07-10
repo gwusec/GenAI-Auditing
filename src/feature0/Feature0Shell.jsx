@@ -49,8 +49,21 @@ function ShellInner({ appProps = {} }) {
     const base = { ...(appProps.config || {}), studyId: activeStudyId };
     try {
       return { ...base, ...deriveRuntimeConfig(activeStudy?.config) };
-    } catch (_) {
-      return base;
+    } catch (err) {
+      // The study config didn't pass strict validation — e.g. an investigator
+      // previewing an incomplete draft, or schema drift. Previously we silently
+      // fell back to `base`, which drops `evaluation` (and the questionnaire
+      // schema) and routes the auditor onto the legacy AuditForm with an empty
+      // questionnaire — the "audit view never renders" bug (B4). Instead, derive
+      // leniently so `evaluation` survives and the config-driven AuditFlow runs;
+      // surface the reason so a genuinely broken config is still diagnosable.
+      console.warn('Feature0Shell: study config failed strict validation; deriving runtime config leniently for the session.', err);
+      try {
+        return { ...base, ...deriveRuntimeConfig(activeStudy?.config, { strict: false }) };
+      } catch (err2) {
+        console.error('Feature0Shell: lenient deriveRuntimeConfig also failed; falling back to base config.', err2);
+        return base;
+      }
     }
   }, [activeStudyId, activeStudy, appProps.config]);
 

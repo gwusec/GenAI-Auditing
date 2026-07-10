@@ -24,6 +24,17 @@ const AppState = {
     COMPLETE: 'complete',
 };
 
+// A study with no configured timer yields NaN "time remaining" (empty duration
+// arrays → chatDurations[0] is undefined). Treat that as "no limit" rather than
+// showing the misleading "less than 1 minute" fallback (B3).
+const hasTimeLimit = (ms) => ms != null && !Number.isNaN(ms);
+const formatTimeRemaining = (ms) => {
+    const minutes = ms / 1000 / 60;
+    if (minutes > 1) return `${Math.ceil(minutes)} minutes`;
+    if (ms / 1000 === 0) return 'no time';
+    return 'less than 1 minute';
+};
+
 function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {}, userId, debugMode = false, presetSurveyQuestions = null, onConversationStart = null, onConversationComplete = null }) {
     // When a study is pre-configured (auditor taking an investigator's study),
     // skip the in-app SurveyMaker step and start directly in CHAT using the
@@ -336,28 +347,28 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                             {timerSystem.state.currentChatIndex <= 1 ? (
                                                 <>
                                                     <Typography variant="body1" className="mt-2">
-                                                        Time remaining: {timerState.currentChatTimeRemaining / 1000 / 60 > 1
-                                                            ? Math.ceil(timerState.currentChatTimeRemaining / 1000 / 60) + ' minutes'
-                                                            : timerState.currentChatTimeRemaining / 1000 === 0
-                                                                ? ' no time'
-                                                                : ' less than 1 minute'}
+                                                        {hasTimeLimit(timerState.currentChatTimeRemaining)
+                                                            ? `Time remaining: ${formatTimeRemaining(timerState.currentChatTimeRemaining)}`
+                                                            : 'No time limit'}
                                                     </Typography>
-                                                    <Tooltip title={`${Math.ceil(timerSystem.state.currentChatTimeRemaining / 1000 / 60)} minute(s) remaining`}>
-                                                        <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
-                                                    </Tooltip>
+                                                    {hasTimeLimit(timerState.currentChatTimeRemaining) && (
+                                                        <Tooltip title={`${Math.ceil(timerSystem.state.currentChatTimeRemaining / 1000 / 60)} minute(s) remaining`}>
+                                                            <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
+                                                        </Tooltip>
+                                                    )}
                                                 </>
                                             ) : (
                                                 <>
                                                     <Typography variant="body1" className="mt-2">
-                                                        Time remaining: {timerState.overallTimeRemaining / 1000 / 60 > 1
-                                                            ? Math.ceil(timerState.overallTimeRemaining / 1000 / 60) + ' minutes'
-                                                            : timerState.overallTimeRemaining / 1000 === 0
-                                                                ? ' no time'
-                                                                : ' less than 1 minute'}
+                                                        {hasTimeLimit(timerState.overallTimeRemaining)
+                                                            ? `Time remaining: ${formatTimeRemaining(timerState.overallTimeRemaining)}`
+                                                            : 'No time limit'}
                                                     </Typography>
-                                                    <Tooltip title={`${Math.ceil(timerSystem.state.overallTimeRemaining / 1000 / 60)} minute(s) remaining`}>
-                                                        <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
-                                                    </Tooltip>
+                                                    {hasTimeLimit(timerState.overallTimeRemaining) && (
+                                                        <Tooltip title={`${Math.ceil(timerSystem.state.overallTimeRemaining / 1000 / 60)} minute(s) remaining`}>
+                                                            <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
+                                                        </Tooltip>
+                                                    )}
                                                 </>
                                             )}
                                         </div>

@@ -104,9 +104,9 @@
 .notice {
   display: inline-flex;
   align-items: center;
-  background-color: var(--mui-palette-background-paper, #1e293b);
-  color: var(--mui-palette-text-secondary, #94a3b8);
-  border: 1px solid var(--mui-palette-divider, #1f2937);
+  background-color: hsl(var(--card));
+  color: hsl(var(--muted-foreground));
+  border: 1px solid hsl(var(--border));
   padding: 4px 10px;
   border-radius: 999px;
   box-shadow: 0 4px 14px rgba(2, 6, 23, 0.18);

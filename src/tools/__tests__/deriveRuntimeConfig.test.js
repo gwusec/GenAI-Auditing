@@ -194,6 +194,19 @@ describe('deriveRuntimeConfig — guards', () => {
       .toThrow(/Invalid StudyConfig/);
   });
 
+  test('strict:false tolerates an invalid config and still carries evaluation (B4 preview path)', () => {
+    // An investigator previewing an incomplete draft must still reach the
+    // config-driven AuditFlow, so a not-yet-valid config must NOT be rejected —
+    // and `evaluation` (+ any questionnaire schema) must survive.
+    const invalid = { models: [{ provider: 'vllm', modelId: 'org/m', baseUrl: '' }] };
+    expect(() => deriveRuntimeConfig(invalid, { strict: false })).not.toThrow();
+    const rt = deriveRuntimeConfig(invalid, { strict: false });
+    expect(rt.evaluation).toBeTruthy();
+    expect(rt.evaluation.questionnaire).toBeTruthy();
+    // strict still rejects the same config.
+    expect(() => deriveRuntimeConfig(invalid, { strict: true })).toThrow(/Invalid StudyConfig/);
+  });
+
   test('tolerates a partial config by filling defaults, then derives', () => {
     const rt = deriveRuntimeConfig({ models: [{ provider: 'openai', modelId: 'gpt-4o' }] });
     expect(rt.model.modelId).toBe('gpt-4o');

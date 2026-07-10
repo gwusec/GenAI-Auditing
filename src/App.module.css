@@ -108,8 +108,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--mui-palette-background-paper, #f9f9f9);
-  border-right: 1px solid var(--mui-palette-divider, #e2e8f0);
+  background-color: hsl(var(--card));
+  border-right: 1px solid hsl(var(--border));
   padding: 16px;
   box-sizing: border-box;
 }
@@ -117,7 +117,7 @@
 .sidebar-guide-text {
   margin-top: auto;
   font-size: 1em;
-  color: var(--mui-palette-text-secondary, #555);
+  color: hsl(var(--muted-foreground));
   text-align: center;
 }
 

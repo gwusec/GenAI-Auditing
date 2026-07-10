@@ -76,12 +76,20 @@ export function effectiveSystemPrompt(model, conversationControl) {
  *   - consent / launchCapture: carried through for the session
  *   - configVersion: provenance stamp (D9)
  *
+ * `strict` (default true) asserts the completed config is valid — the guarantee
+ * for a real auditor session. Pass `strict: false` for an investigator *previewing*
+ * their own possibly-incomplete draft: the config is still normalized with defaults
+ * (so `evaluation` + any questionnaire schema survive and the config-driven AuditFlow
+ * runs), it just isn't rejected for a not-yet-valid draft. The mapping body below only
+ * reads fields that `withStudyConfigDefaults` guarantees, so it never throws on its own.
+ *
  * @param {object} rawConfig a StudyConfig (possibly partial)
+ * @param {{strict?: boolean}} [options]
  * @returns {object} the runtime config
  */
-export function deriveRuntimeConfig(rawConfig) {
+export function deriveRuntimeConfig(rawConfig, { strict = true } = {}) {
   const cfg = withStudyConfigDefaults(rawConfig);
-  assertValidStudyConfig(cfg);
+  if (strict) assertValidStudyConfig(cfg);
 
   const { limits } = cfg;
   const n = limits.conversationsPerAuditor;
