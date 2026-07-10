@@ -209,7 +209,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                         {isActive && conversation.id && (
                             <Box className={styles['chat-footer']}>
                                 {/* Fairness principles section */}
-                                <Paper className={styles['fairness-properties']} elevation={3} tutorial-step="fairness-properties">
+                                <Paper variant="outlined" className={styles['fairness-properties']} elevation={0} tutorial-step="fairness-properties">
                                     <div className={styles['fairness-header']}>
                                         {/* Minimize toggle */}
                                         {isMinimizeEnabled && (

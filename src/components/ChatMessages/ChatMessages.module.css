@@ -37,7 +37,7 @@
 .message-author {
     margin-bottom: 4px;
     font-size: 0.85em;
-    color: #555;
+    color: var(--mui-palette-text-secondary, #555);
 }
 
 /* Container for the message bubble and author; rename as .chatMessages__bubbleContainer; Element: Container for the message bubble and related info. */
@@ -59,16 +59,12 @@
 
 /* User message bubble; rename as .chatMessages__userMessage; Element: Styles user message bubbles. */
 .user-message {
-    background-color: #e0f7fa; /* Light cyan */
-    border-radius: 12px 12px 0 12px; /* Rounded corners */
-    color: #000;
+    border-radius: 4px 14px 14px 14px;
 }
 
 /* Bot message bubble; rename as .chatMessages__botMessage; Element: Styles bot message bubbles.*/
 .bot-message {
-    background-color: #e8eaf6; /* Light indigo */
-    border-radius: 12px 12px 12px 50px; /* Rounded corners */
-    color: #000;
+    border-radius: 14px 4px 14px 14px;
 }
 
 /* Status chips; rename as .chatMessages__statusChip; Element: Styles status chips within messages. */
@@ -124,7 +120,8 @@
 /* Loading paper; rename as .chatMessages__loadingPaper; Element: Styles the Paper component wrapping the loading dots. */
 .loading-paper {
     padding: 40px;
-    background-color: #f5f5f5;
+    background-color: var(--mui-palette-background-paper, #f5f5f5);
+    border: 1px solid var(--mui-palette-divider, #e2e8f0);
 }
 
 /* Error alert; remame as .chatMessages__errorAlert; Element: Styles the error alert within chatMessages. */
@@ -149,19 +146,19 @@
 
 /* rename as .chatMessages__markdownLink; Element: Styles links rendered via Markdown. */
 .markdown-link {
-    color: #1976d2; /* Use primary main color */
+    color: var(--mui-palette-primary-main, #4f46e5);
 }
 
 /* rename as .chatMessages__inlineCode; Element: Styles inline code snippets. */
 .inline-code {
-    background-color: #f5f5f5;
+    background-color: var(--mui-palette-action-hover, #f5f5f5);
     padding: 2px 4px;
     border-radius: 4px;
 }
 
 /* rename as .chatMessages__blockCode; Element: Styles block code snippets. */
 .block-code {
-    background-color: #f5f5f5;
+    background-color: var(--mui-palette-action-hover, #f5f5f5);
     padding: 8px;
     border-radius: 4px;
     overflow: auto;

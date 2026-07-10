@@ -1,6 +1,6 @@
 // src/components/ChatMessages.jsx
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
     List,
@@ -12,17 +12,69 @@ import {
     Chip,
     TextField,
     Box,
+    Stack,
+    Button,
+    Tooltip,
 } from "@mui/material";
 import {
     Edit as EditIcon,
     Save as SaveIcon,
     Cancel as CancelIcon,
+    ThumbUpAlt as ThumbUpIcon,
+    ThumbDownAlt as ThumbDownIcon,
+    Star as StarIcon,
+    StarBorder as StarBorderIcon,
+    Flag as FlagIcon,
+    ChatBubbleOutline as CommentIcon,
 } from "@mui/icons-material";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import LoadingDots from '../LoadingDots/LoadingDots';
+import conversationHandler from '../../tools/ConversationHandler';
+import AppConfig from '../../tools/AppConfig';
+import { currentReactions } from '../../tools/audit/reactions';
 import styles from './ChatMessages.module.css';
+
+// Inline turn-level reaction controls under a chatbot message (AUD-5 / EVAL-1).
+function MessageReactions({ messageId, types, reactions, onReact }) {
+    const [commentOpen, setCommentOpen] = useState(false);
+    const [comment, setComment] = useState('');
+    const cur = (type) => reactions.find((r) => r.messageId === messageId && r.type === type);
+    const thumbs = (cur('thumbs') || {}).value;
+    const star = Boolean((cur('star') || {}).value);
+    const flag = Boolean((cur('flag') || {}).value);
+    const commentCount = reactions.filter((r) => r.messageId === messageId && r.type === 'comment' && r.comment).length;
+
+    return (
+        <Box onMouseUp={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center">
+                {types.includes('thumbs') && (
+                    <>
+                        <Tooltip title="Helpful"><IconButton size="small" color={thumbs === 'up' ? 'primary' : 'default'} onClick={() => onReact('thumbs', thumbs === 'up' ? null : 'up')}><ThumbUpIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Not helpful"><IconButton size="small" color={thumbs === 'down' ? 'error' : 'default'} onClick={() => onReact('thumbs', thumbs === 'down' ? null : 'down')}><ThumbDownIcon fontSize="small" /></IconButton></Tooltip>
+                    </>
+                )}
+                {types.includes('star') && (
+                    <Tooltip title="Star"><IconButton size="small" color={star ? 'warning' : 'default'} onClick={() => onReact('star', star ? null : true)}>{star ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}</IconButton></Tooltip>
+                )}
+                {types.includes('flag') && (
+                    <Tooltip title="Flag as problematic"><IconButton size="small" color={flag ? 'error' : 'default'} onClick={() => onReact('flag', flag ? null : true)}><FlagIcon fontSize="small" /></IconButton></Tooltip>
+                )}
+                {types.includes('comment') && (
+                    <Tooltip title="Add a comment"><IconButton size="small" color={commentCount ? 'primary' : 'default'} onClick={() => setCommentOpen((o) => !o)}><CommentIcon fontSize="small" /></IconButton></Tooltip>
+                )}
+                {commentCount > 0 && <Typography variant="caption" color="text.secondary">{commentCount} comment(s)</Typography>}
+            </Stack>
+            {commentOpen && (
+                <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
+                    <TextField size="small" placeholder="Add a comment…" value={comment} onChange={(e) => setComment(e.target.value)} fullWidth />
+                    <Button size="small" variant="contained" onClick={() => { if (comment.trim()) { onReact('comment', null, comment.trim()); setComment(''); setCommentOpen(false); } }}>Add</Button>
+                </Stack>
+            )}
+        </Box>
+    );
+}
 
 const ChatMessages = ({
     messages,
@@ -41,6 +93,31 @@ const ChatMessages = ({
     canEditLastMessage = () => false,
 }) => {
     const messagesEndRef = useRef(null);
+
+    // Turn-level reactions (config-gated). Uses the singletons so no prop-drilling
+    // through ChatPage/ChatLayout is needed.
+    const reactionCfg = (AppConfig.getAll().config && AppConfig.getAll().config.evaluation
+        && AppConfig.getAll().config.evaluation.turnReactions) || { enabled: false, types: [] };
+    const [reactions, setReactions] = useState([]);
+
+    useEffect(() => {
+        const conv = conversationHandler.getActiveConversation();
+        setReactions(conv && conv.getReactions ? conv.getReactions() : []);
+        const onUpd = (list) => setReactions(list || []);
+        conversationHandler.on('reactionsUpdated', onUpd);
+        return () => conversationHandler.removeListener('reactionsUpdated', onUpd);
+    }, [messages]);
+
+    const react = async (messageId, type, value, comment = null) => {
+        const conv = conversationHandler.getActiveConversation();
+        if (!conv) return;
+        try {
+            const updated = await conversationHandler.addReaction(conv.id, { messageId, type, value, comment });
+            setReactions(updated);
+        } catch (e) {
+            console.warn('Reaction failed:', e.message);
+        }
+    };
 
     useEffect(() => {
         console.log("Messages updated:", messages);
@@ -127,7 +204,7 @@ const ChatMessages = ({
                                     sx={{
                                         marginBottom: '4px',
                                         fontSize: '0.85em',
-                                        color: '#555',
+                                        color: 'text.secondary',
                                         textAlign: message.author === 'user' ? 'left' : 'right', // Align based on author
                                         display: 'block', // Ensures the alignment applies properly
                                     }}
@@ -138,16 +215,23 @@ const ChatMessages = ({
 
                                 {/* Message bubble */}
                                 <Paper
-                                    elevation={1}
+                                    elevation={0}
                                     sx={{
-                                        padding: '10px',
+                                        padding: '10px 14px',
                                         wordBreak: 'break-word',
                                         fontSize: '1em',
                                         lineHeight: '1.5',
                                         width: 'fit-content',
                                         maxWidth: '100%',
-                                        backgroundColor: message.author === 'user' ? '#e0f7fa' : '#e8eaf6',
-                                        borderRadius: message.author === 'user' ? '0px 12px 12px 12px' : '12px 0px 12px 12px',
+                                        border: '1px solid',
+                                        borderColor: message.author === 'user' ? 'transparent' : 'divider',
+                                        color: message.author === 'user'
+                                            ? (t) => (t.palette.mode === 'dark' ? '#e0e7ff' : '#312e81')
+                                            : 'text.primary',
+                                        backgroundColor: message.author === 'user'
+                                            ? (t) => (t.palette.mode === 'dark' ? 'rgba(99,102,241,0.22)' : 'rgba(99,102,241,0.12)')
+                                            : 'background.paper',
+                                        borderRadius: message.author === 'user' ? '4px 14px 14px 14px' : '14px 4px 14px 14px',
                                     }}
                                     className={`
                                         ${styles['message-paper']} 
@@ -159,11 +243,8 @@ const ChatMessages = ({
                                         <Chip
                                             label="Restarted Conversation"
                                             size="small"
-                                            sx={{
-                                                marginBottom: '8px',
-                                                backgroundColor: '#4caf50',
-                                                color: 'white',
-                                            }}
+                                            color="success"
+                                            sx={{ marginBottom: '8px' }}
                                             className={`${styles['status-chip']} ${styles['restart-chip']}`}
                                         />
                                     )}
@@ -171,11 +252,8 @@ const ChatMessages = ({
                                         <Chip
                                             label="Edited Message"
                                             size="small"
-                                            sx={{
-                                                marginBottom: '8px',
-                                                backgroundColor: '#ff9800',
-                                                color: 'white',
-                                            }}
+                                            color="warning"
+                                            sx={{ marginBottom: '8px' }}
                                             className={`${styles['status-chip']} ${styles['edit-chip']}`}
                                         />
                                     )}
@@ -247,6 +325,16 @@ const ChatMessages = ({
                                         </Typography>
                                     </div>
                                 </Paper>
+
+                                {/* Turn-level reactions on chatbot messages */}
+                                {reactionCfg.enabled && message.author !== 'user' && !editingMessageId && (
+                                    <MessageReactions
+                                        messageId={message.id}
+                                        types={reactionCfg.types || []}
+                                        reactions={currentReactions(reactions)}
+                                        onReact={(type, value, comment) => react(message.id, type, value, comment)}
+                                    />
+                                )}
                             </Box>
 
                             {/* Edit icon for user's most recent message */}

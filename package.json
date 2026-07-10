@@ -11,8 +11,10 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
+    "@fontsource/inter": "^5.1.0",
     "@mui/icons-material": "^6.3.1",
     "@mui/material": "^6.3.1",
+    "@supabase/supabase-js": "^2.45.0",
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
     "dexie": "^4.0.10",
@@ -23,6 +25,8 @@
     "react-markdown": "^9.0.3",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.0",
+    "survey-core": "^2.5.31",
+    "survey-react-ui": "^2.5.31",
     "uuid": "^11.0.4"
   },
   "exports": {
@@ -32,18 +36,14 @@
     }
   },
   "scripts": {
-    "start": "dotenvx run -f .env -- react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject",
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start-mock-server": "node -r dotenv/config ./testing/mockServer.js",
-    "start-with-mock": "concurrently \"npm run start-mock-server\" \"npm run start\""
-  },
-  "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "start-with-mock": "concurrently \"npm run start-mock-server\" \"npm run dev\""
   },
   "browserslist": {
     "production": [
@@ -58,10 +58,10 @@
     ]
   },
   "devDependencies": {
-    "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
-    "@babel/plugin-transform-private-property-in-object": "^7.25.9",
-    "@dotenvx/dotenvx": "^1.32.1",
+    "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "react-scripts": "^5.0.1"
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
   }
 }

@@ -1,55 +1,27 @@
 // TRAILS-Chatbot/src/tools/db.js
+//
+// BACKWARD-COMPAT SHIM (Phase 2B). The persistence logic now lives behind the
+// ConversationStore seam (./stores). This module preserves the historical
+// `db.*` API so existing imports (ConversationHandler, FinalAssessment) keep
+// working unchanged, while delegating to whichever store the factory selects
+// (IndexedDB by default; Supabase when configured).
+//
+// New code should prefer: import { getConversationStore } from './stores';
 
-import Dexie from 'dexie';
-import { Conversation} from './models';
+import { getConversationStore } from './stores';
 
-export const db = new Dexie('llmChatDatabase');
-
-db.version(1).stores({
-    conversations: 'id, userID, startTimestamp, endTimestamp, state, events, audit',
-});
-db.conversations.mapToClass(Conversation);
-
-db.initializeDatabase = async () => {
+// Resolve the store per-call (not captured once) so a runtime persistence
+// override (e.g. demo mode forcing local storage) takes effect.
+const db = {
+  initializeDatabase: async () => {},
+  createConversation: (userID) => getConversationStore().createConversation(userID),
+  getConversationById: (id) => getConversationStore().getConversationById(id),
+  getAllConversations: () => getConversationStore().getAllConversations(),
+  updateConversation: (id, updatedData) => getConversationStore().updateConversation(id, updatedData),
+  deleteConversation: (id) => getConversationStore().deleteConversation(id),
+  addConversation: (conversation) => getConversationStore().addConversation(conversation),
+  resetDatabase: () => getConversationStore().resetDatabase(),
 };
 
-// Create a new conversation
-db.createConversation = async (userID) => {
-    const conversation = new Conversation(userID);
-    await db.conversations.add(conversation);
-    return conversation;
-};
-
-// Read a conversation by ID
-db.getConversationById = async (id) => {
-    return await db.conversations.get(id);
-};
-
-// Read all conversations
-db.getAllConversations = async () => {
-    const conversations = await db.conversations.toArray();
-    return conversations.sort((a, b) => a.startTimestamp - b.startTimestamp);
-};
-
-// Update a conversation by ID
-db.updateConversation = async (id, updatedData) => {
-    await db.conversations.update(id, updatedData);
-    return await db.getConversationById(id);
-};
-
-// Delete a conversation by ID
-db.deleteConversation = async (id) => {
-    await db.conversations.delete(id);
-};
-
-// Add a new conversation to the database from a conversation object
-db.addConversation = async (conversation) => {
-    return await db.conversations.add(conversation);
-};
-
-// Clear the database
-db.resetDatabase = async () => {
-    await db.conversations.clear();
-};
-
+export { db };
 export default db;

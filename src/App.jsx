@@ -28,14 +28,18 @@ const AppState = {
     COMPLETE: 'complete',
 };
 
-function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {}, userId, debugMode = false }) {
-    const [currentAppState, setCurrentAppState] = useState(AppState.SURVEY);
+function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {}, userId, debugMode = false, presetSurveyQuestions = null }) {
+    // When a study is pre-configured (auditor taking an investigator's study),
+    // skip the in-app SurveyMaker step and start directly in CHAT using the
+    // provided questionnaire. With no preset (standalone/legacy), behavior is
+    // unchanged: start in SURVEY so the questionnaire is authored inline.
+    const [currentAppState, setCurrentAppState] = useState(presetSurveyQuestions ? AppState.CHAT : AppState.SURVEY);
     const [conversations, setConversations] = useState([]);
     const [activeConversationIndex, setActiveConversationIndex] = useState(0);
     const [activeConversation, setActiveConversation] = useState(null);
     const [error, setError] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [surveyQuestions, setSurveyQuestions] = useState(null);
+    const [surveyQuestions, setSurveyQuestions] = useState(presetSurveyQuestions || null);
     const [showAPIErrorDialog, setShowAPIErrorDialog] = useState(false);
     const [showTimerChatTimeUpDialog, setShowTimerChatTimeUpDialog] = useState(false);
 
@@ -79,7 +83,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
 
     const startNextConversation = async () => {
         try {
-            const newConversation = await conversationHandler.createNewConversation();
+            const newConversation = await conversationHandler.createNewConversation(config);
             setConversations(prev => [...prev, newConversation]);
             setActiveConversation(newConversation);
             setActiveConversationIndex(conversations.length);
@@ -305,18 +309,22 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                         value={index}
                                         sx={{
                                             padding: '8px 16px',
-                                            borderRadius: '16px',
+                                            borderRadius: '10px',
                                             marginBottom: '8px',
-                                            backgroundColor: activeConversationIndex === index ? '#e0f7fa' : '#f5f5f5',
-                                            color: activeConversationIndex === index ? '#00796b' : '#555',
-                                            fontWeight: activeConversationIndex === index ? 'bold' : 'normal',
-                                            '&:hover': { backgroundColor: '#b2ebf2' },
+                                            minHeight: 'auto',
+                                            textTransform: 'none',
+                                            backgroundColor: activeConversationIndex === index
+                                                ? (t) => (t.palette.mode === 'dark' ? 'rgba(99,102,241,0.22)' : 'rgba(99,102,241,0.12)')
+                                                : 'action.hover',
+                                            color: activeConversationIndex === index ? 'primary.main' : 'text.secondary',
+                                            fontWeight: activeConversationIndex === index ? 700 : 500,
+                                            '&:hover': { backgroundColor: 'action.selected' },
                                         }}
                                     />
                                 ))}
                             </Tabs>
                             {!isViewOnly && (
-                                <Box sx={{ mt: 12, backgroundColor: '#e0f7fa', padding: '10px' }}>
+                                <Box sx={{ mt: 12, backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2, padding: '12px' }}>
                                     {timerSystem !== null && (
                                         <Box tutorial-step="timer-time-limit">
                                             {timerSystem.state.currentChatIndex <= 1 ? (

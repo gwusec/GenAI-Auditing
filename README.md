@@ -55,7 +55,13 @@ The application should open in your web browser.
 
 ## Understanding the Data Flow
 
-The application's data flow involves the frontend sending user messages to the backend, which then interacts with the Ollama model to generate responses. These interactions are logged in a MongoDB database for session persistence and history retrieval.
+The frontend sends user messages to a backend (either an external TRAILS LLM proxy or the bundled relay in `server/`), which forwards them to the configured model (Ollama or a cloud provider) and returns the response.
+
+**Persistence (today):** conversations and audit data are stored **client-side in the browser using IndexedDB via [Dexie](https://dexie.org/)** (see `src/tools/db.js`). There is no server-side database in the current build — data lives in the participant's browser until exported. (An earlier version of this document referred to MongoDB; that is not accurate for this codebase.)
+
+> **Roadmap note:** server-side persistence is planned via Supabase/Postgres (with per-study data isolation), so research data can be collected across participants and viewed in an investigator dashboard. Until then, treat persistence as local-only. The product spec is [`docs/PRD.md`](docs/PRD.md) and the build roadmap is [`PLAN.md`](PLAN.md).
+
+Each conversation is modeled as an append-only log of events (`new_user_message`, `new_bot_message`, `edit_message`, `restart_chat`, `end_chat`); the UI view and the LLM context are *derived* from that log (see `src/tools/ConversationHandler.js`).
 
 ### Data Flow Diagram
 
@@ -63,11 +69,13 @@ The application's data flow involves the frontend sending user messages to the b
     sequenceDiagram
         participant User as User
         participant chatbot as TRAILS-chatbot
-        participant proxy as TRAILS-ui-llm-proxy
+        participant proxy as TRAILS LLM proxy / relay
+        participant store as IndexedDB (browser, local)
 
         User->>+chatbot: Enter message
         chatbot->>+proxy: POST message
         proxy-->>-chatbot: Return response
+        chatbot->>store: Persist conversation + audit (local)
         chatbot-->>-User: Display Conversation
 ```
 
@@ -85,13 +93,37 @@ The `trails-chatbot:audit-finished` custom event is dispatched by the `ExportMan
 
 **Cancelable:** `true`
 
-**Detail:** The event detail contains the exported conversation data, which is an object with the following structure:
+**Detail:** The event detail is the exported conversation data returned by `conversationHandler.getExistingConversations()` — an **array of conversation objects**. Each conversation has the following shape:
 
 ```json
-{
-  // conversation data properties
-}
+[
+  {
+    "id": "uuid",
+    "userID": "user123",
+    "startTimestamp": 1736728140426,
+    "endTimestamp": 1736728170553,
+    "state": "complete",
+    "chatEvents": [
+      {
+        "id": "uuid",
+        "type": "new_user_message | new_bot_message | edit_message | restart_chat | end_chat | api_error",
+        "timestamp": 1736728148828,
+        "data": { "id": "uuid", "author": "user | bot", "content": "...", "referencedMessageId": null, "isEdited": false }
+      }
+    ],
+    "audit": {
+      "id": "uuid",
+      "startTimestamp": 1736728140426,
+      "endTimestamp": 1736728170553,
+      "likertResponses": { "problematic": "(1)<br/>Strongly Disagree" },
+      "highlights": [ { "messageId": "uuid", "text": "problematic passage", "startIndex": 0 } ],
+      "textResponses": { "explainProblematic": "...", "biasesHarms": "..." }
+    }
+  }
+]
 ```
+
+> See `src/index.js` (`exportedData`) for a complete worked example of this structure.
 
 ## Deployment
 

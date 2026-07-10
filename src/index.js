@@ -1,7 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import '@fontsource/inter/400.css';
+import '@fontsource/inter/500.css';
+import '@fontsource/inter/600.css';
+import '@fontsource/inter/700.css';
 import './index.css';
 import App from './App';
+import Feature0Shell from './feature0/Feature0Shell';
+import { ThemeModeProvider } from './theme';
 
 
 const getCurrentUserId = () => {
@@ -169,22 +175,57 @@ const exportedData = [
   }
 ];
 
+// Relay base URL. When REACT_APP_LLM_PROXY_HOST_AND_PORT is set, use it (split
+// frontend/relay deployments). Otherwise default to the SAME ORIGIN serving this
+// app — the self-host/Docker case where server.js serves the build AND is the
+// relay. (A missing env var previously produced "http://undefined", breaking chat.)
+const relayBaseUrl =
+  (process.env.REACT_APP_LLM_PROXY_HOST_AND_PORT
+    ? `http://${process.env.REACT_APP_LLM_PROXY_HOST_AND_PORT}`
+    : (typeof window !== 'undefined' ? window.location.origin : ''));
+
+// Shared props for the audit app.
+const appProps = {
+  userId: getCurrentUserId(),
+  llmProxyServerUrl: relayBaseUrl,
+  // Debug tools (reset storage etc.) must not show to auditors. Opt in via
+  // REACT_APP_DEBUG=on for local development only.
+  debugMode: ['on', '1', 'true'].includes((process.env.REACT_APP_DEBUG || '').toLowerCase()),
+  isViewOnly: false,
+  viewOnlyData: exportedData,
+  config: {
+    timerMaxOverallChatTimeSeconds: [], // time in seconds
+    timerChatsMaxSeconds: [,],  // time in seconds; each entry is one chat that MUST be completed
+    timerAuditMaxSeconds: [],          // audit: first 1.5 min (90s), second 1 min (60s)
+    timerWarningChatTimeIsUpSeconds: [],    // show warning with 2 min left in a chat
+    timerMinChatTimeRemainingToStartNewChatSeconds: [], // need at least 3 min left to start a new chat
+
+    // Canonical backend contract: APIClient sends this `relay` object to the
+    // bundled relay (server/server.js), which routes to the chosen backend.
+    // Examples:
+    //   Ollama:  { backend: 'ollama', ollamaUrl: 'http://host.docker.internal:11434', ollamaModel: 'llama3.1' }
+    //   API:     { backend: 'api', provider: 'openai', apiKey: '...', model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1' }
+    // A settings UI to populate this interactively arrives in Phase 4.
+    llmRelay: {
+      backend: 'ollama',
+      ollamaUrl: 'http://host.docker.internal:11434',
+      ollamaModel: 'llama3.1'
+    }
+  }
+};
+
+// Feature 0 (accounts/roles/studies) is OPT-IN. When REACT_APP_FEATURE0 is
+// enabled, mount the shell (gate -> investigator dashboard / auditor session);
+// otherwise render the plain audit app exactly as before — behavior unchanged.
+const feature0Enabled = ['on', '1', 'true'].includes(
+  (process.env.REACT_APP_FEATURE0 || '').toLowerCase()
+);
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
-  // <React.StrictMode>
-    <App
-      userId={getCurrentUserId()}
-      llmProxyServerUrl={`http://${process.env.REACT_APP_LLM_PROXY_HOST_AND_PORT}`}
-      debugMode={true}
-      isViewOnly={false}
-      viewOnlyData={exportedData} 
-      config={{
-        timerMaxOverallChatTimeSeconds: [], // time in seconds
-        timerChatsMaxSeconds: [,],  // time in seconds; each entry is one chat that MUST be completed
-        timerAuditMaxSeconds: [],          // audit: first 1.5 min (90s), second 1 min (60s)
-        timerWarningChatTimeIsUpSeconds: [],    // show warning with 2 min left in a chat
-        timerMinChatTimeRemainingToStartNewChatSeconds: [] // need at least 3 min left to start a new chat
-      }}
-    />
-  // </React.StrictMode>
+  <ThemeModeProvider>
+    {feature0Enabled
+      ? <Feature0Shell appProps={appProps} />
+      : <App {...appProps} />}
+  </ThemeModeProvider>
 );

@@ -1,0 +1,38 @@
+name: CI
+
+# Phase 0 CI scaffold. Runs lint (if configured), tests, and a production build
+# on pushes and pull requests to the main branches.
+on:
+  push:
+    branches: [main, main-refactor]
+  pull_request:
+    branches: [main, main-refactor]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      # NOTE: package-lock.json is currently gitignored, so `npm ci` (which
+      # requires a committed lockfile) cannot run. Using `npm install` for now.
+      # Recommended Phase 1 follow-up: stop ignoring package-lock.json, commit it,
+      # and switch this back to `npm ci` for reproducible installs.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

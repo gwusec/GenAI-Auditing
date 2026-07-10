@@ -4,6 +4,8 @@ import apiClient from './APIClient';
 import { CHAT_EVENT_TYPE, STATE, ChatEvent, Message } from './models';
 import { EventEmitter } from 'events';
 import db from './db';
+import { applyConversationControl } from './studyConfig/conversationControl';
+import { makeReactionData } from './audit/reactions';
 
 class ConversationHandler extends EventEmitter {
     constructor() {
@@ -32,13 +34,42 @@ class ConversationHandler extends EventEmitter {
         return this.currentConversation;
     }
 
-    async createNewConversation() {
+    // Optionally apply the study's conversation-control mode (Phase B): seed the
+    // fixed first bot turn / record seed framing + stamp provenance. `runtimeConfig`
+    // is the output of deriveRuntimeConfig(); when absent (plain app / no study), a
+    // conversation is created exactly as before. Seeding failures never block creation.
+    async createNewConversation(runtimeConfig = null) {
         const conversation = await db.createConversation();
+        if (runtimeConfig && runtimeConfig.conversationControl) {
+            try {
+                applyConversationControl(conversation, runtimeConfig);
+                await db.updateConversation(conversation.id, conversation);
+            } catch (err) {
+                console.warn('Conversation-control seeding skipped:', err.message);
+            }
+        }
         return conversation;
     }
 
     async getConversationById(conversationId) {
         return db.getConversationById(conversationId);
+    }
+
+    // Phase C: append a turn-level reaction to a chatbot message (AUD-5 / EVAL-1).
+    // Stored as a NEW_REACTION event so it shares the immutable event log and
+    // survives resume. Returns the conversation's projected reactions.
+    async addReaction(conversationId, reactionInput) {
+        const conversation = await db.getConversationById(conversationId);
+        if (!conversation) throw new Error(`Conversation with ID ${conversationId} not found`);
+        const event = new ChatEvent(CHAT_EVENT_TYPE.NEW_REACTION, makeReactionData(reactionInput));
+        conversation.addChatEvent(event);
+        await db.updateConversation(conversationId, conversation);
+        // Keep the active conversation in sync so getReactions() stays fresh.
+        if (this.currentConversation && this.currentConversation.id === conversationId) {
+            this.currentConversation = conversation;
+        }
+        this.emit('reactionsUpdated', conversation.getReactions());
+        return conversation.getReactions();
     }
 
     async getExistingConversations() {

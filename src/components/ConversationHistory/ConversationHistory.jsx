@@ -33,7 +33,7 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                 auditFinished={true}
             />
             {audit && (
-                <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="free-response">
+                <Paper variant="outlined" sx={{ p: 3, mb: 2, borderRadius: 2 }} className="free-response">
                     <Typography variant="h6" gutterBottom align="center">
                         Your reported details
                     </Typography>
@@ -66,7 +66,7 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                             </Typography>
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
                                 {audit.highlights.map((highlight, index) => (
-                                    <Chip key={index} label={highlight.text} color="primary" size="small" />
+                                    <Chip key={index} label={highlight.quotedText || highlight.text} color="primary" size="small" />
                                 ))}
                             </Box>
                         </>
@@ -91,9 +91,28 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                             ))}
                         </>
                     )}
+                    {audit.questionnaire && Object.keys(audit.questionnaire).length > 0 && (
+                        <>
+                            <Typography variant="subtitle1" gutterBottom>
+                                Questionnaire Answers
+                            </Typography>
+                            {Object.entries(audit.questionnaire).map(([key, value]) => (
+                                <TextField
+                                    key={key}
+                                    label={key}
+                                    value={typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '')}
+                                    variant="outlined"
+                                    fullWidth
+                                    margin="normal"
+                                    readOnly={true}
+                                />
+                            ))}
+                        </>
+                    )}
                     {Object.keys(audit.likertResponses).length === 0 &&
                      audit.highlights.length === 0 &&
-                     Object.keys(audit.textResponses).length === 0 && (
+                     Object.keys(audit.textResponses).length === 0 &&
+                     (!audit.questionnaire || Object.keys(audit.questionnaire).length === 0) && (
                         <Typography variant="body1" align="center">
                             No audit responses provided.
                         </Typography>

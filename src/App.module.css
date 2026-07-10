@@ -108,7 +108,8 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #f9f9f9;
+  background-color: var(--mui-palette-background-paper, #f9f9f9);
+  border-right: 1px solid var(--mui-palette-divider, #e2e8f0);
   padding: 16px;
   box-sizing: border-box;
 }
@@ -116,7 +117,7 @@
 .sidebar-guide-text {
   margin-top: auto;
   font-size: 1em;
-  color: #555;
+  color: var(--mui-palette-text-secondary, #555);
   text-align: center;
 }
 
