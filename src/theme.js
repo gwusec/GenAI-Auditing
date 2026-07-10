@@ -54,6 +54,16 @@ export function makeTheme(mode) {
       MuiCssBaseline: {
         styleOverrides: {
           body: { transition: 'background-color 220ms ease' },
+          // Neutralize the browser's yellow/blue autofill background so saved
+          // username/password fields (login/register) match the theme surface
+          // instead of flashing an off-palette highlight.
+          'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active': {
+            WebkitBoxShadow: `0 0 0 100px ${paper} inset`,
+            WebkitTextFillColor: isLight ? '#0f172a' : '#e5e7eb',
+            caretColor: isLight ? '#0f172a' : '#e5e7eb',
+            borderRadius: 'inherit',
+            transition: 'background-color 9999s ease-in-out 0s',
+          },
         },
       },
       MuiButton: {

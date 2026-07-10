@@ -3,7 +3,7 @@
 // later). Also handles the public demo (local, ephemeral) and investigator
 // preview of their own study.
 
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { getAuthProvider } from '../tools/auth';
 import { getStudyService } from '../tools/studies';
 import { getSessionService, parseLaunchMetadata } from '../tools/sessions';
@@ -11,6 +11,20 @@ import { setPersistenceOverride } from '../tools/stores';
 import { deriveRuntimeConfig } from '../tools/studyConfig';
 
 const Feature0Context = createContext(null);
+
+// A small localStorage record so an anonymous auditor who refreshes returns to
+// their study instead of being dropped back to the access-code screen (the
+// Supabase anon session survives a reload; the app's active-study state doesn't).
+const RESUME_KEY = 'trails_auditor_resume';
+function readResume() {
+  try { return JSON.parse(localStorage.getItem(RESUME_KEY) || 'null'); } catch (_) { return null; }
+}
+function writeResume(rec) {
+  try { localStorage.setItem(RESUME_KEY, JSON.stringify(rec)); } catch (_) { /* ignore */ }
+}
+function clearResume() {
+  try { localStorage.removeItem(RESUME_KEY); } catch (_) { /* ignore */ }
+}
 
 // Built-in questionnaire for the public demo (and a sensible default). Uses the
 // { questions: [...] } shape that AuditForm/SurveyMaker expect.
@@ -58,11 +72,13 @@ export function Feature0Provider({
     const off = auth.onAuthChange((u) => setUser(u));
     return off;
   }, [auth]);
+  const resumedRef = useRef(false);
 
   const signIn = useCallback((creds) => auth.signIn(creds), [auth]);
   const signUp = useCallback((fields) => auth.signUp(fields), [auth]);
   const signOut = useCallback(async () => {
     await auth.signOut();
+    clearResume();
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
@@ -114,6 +130,31 @@ export function Feature0Provider({
     }
   }, [studies]);
 
+  // Resume an anonymous auditor's study after a page refresh. The Supabase anon
+  // session restores asynchronously (INITIAL_SESSION), so once `user` arrives and
+  // we're not already in a study, re-open the persisted study and rehydrate its
+  // session. Only anonymous auditors auto-resume — a signed-in investigator lands
+  // on their dashboard. Runs at most once per mount. (Defined AFTER loadStudy so
+  // its dependency reference isn't in the temporal dead zone.)
+  useEffect(() => {
+    if (resumedRef.current || !user || !user.isAnonymous || activeStudyId) return;
+    const rec = readResume();
+    if (!rec || !rec.studyId) return;
+    resumedRef.current = true;
+    (async () => {
+      const study = await loadStudy(rec.studyId, user.id);
+      if (!study) { clearResume(); return; }
+      setActiveStudyId(rec.studyId);
+      if (rec.consented) setConsentAgreed(true);
+      if (rec.sessionId) {
+        try {
+          const s = await sessions.getSession(rec.sessionId);
+          if (s) setSession(s);
+        } catch (_) { /* non-fatal — the audit still records conversations */ }
+      }
+    })();
+  }, [user, activeStudyId, loadStudy, sessions]);
+
   // Auditor flow: ensure an (anonymous) session, redeem the code, load the study,
   // then open an AuditorSession (with launch-metadata capture when the study opts in).
   const joinWithCode = useCallback(async (code) => {
@@ -123,7 +164,9 @@ export function Feature0Provider({
     const study = await loadStudy(studyId, current.id);
     setActiveStudyId(studyId);
     setConsentAgreed(false);
-    await startSession(study || { id: studyId }, current.id, { capture: true });
+    const s = await startSession(study || { id: studyId }, current.id, { capture: true });
+    // Remember the study (+ session) so a page refresh resumes it (see resume effect).
+    writeResume({ studyId, sessionId: s?.id ?? null, consented: false });
     return studyId;
   }, [auth, studies, loadStudy, startSession]);
 
@@ -139,6 +182,8 @@ export function Feature0Provider({
   // Record informed consent on the current session and unlock the audit.
   const recordConsent = useCallback(async (version) => {
     setConsentAgreed(true); // optimistic — consent is a UI gate, not a hard dependency on the store
+    const rec = readResume();
+    if (rec) writeResume({ ...rec, consented: true }); // don't re-prompt consent after a refresh
     if (session) {
       try { await sessions.recordConsent(session.id, { version: version ?? null }); }
       catch (err) { console.warn('Could not persist consent record:', err?.message || err); }
@@ -164,6 +209,7 @@ export function Feature0Provider({
   // Leave the audit session and return to the dashboard / gate.
   const exitStudy = useCallback(() => {
     if (demoMode) setPersistenceOverride(null); // restore the configured backend
+    clearResume(); // leaving the study on purpose -> don't auto-resume it
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
