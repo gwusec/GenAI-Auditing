@@ -1,5 +1,5 @@
 // StudyConfig — the versioned backbone object that fully determines the auditor
-// experience for a study (PRD §2.1, §7; Phase B scope docs/phase-b-study-config-scope.md).
+// experience for a study (see PLAN.md §3, requirements SC-1..SC-13).
 //
 // One object lives at `study.config`. This module owns its shape: the default,
 // a defaults-merger for partial input (UI/migration), and a validator that must

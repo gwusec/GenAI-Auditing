@@ -10,8 +10,7 @@ The app is a **Vite + React** single-page frontend served together with a small
 **Node/Express relay** (`server/`) that talks to the language models. Provider API keys
 live only in the relay environment — never in the browser or the study config.
 
-> Product spec: [`docs/PRD.md`](docs/PRD.md) · Build roadmap: [`PLAN.md`](PLAN.md) ·
-> Current fix/handoff plan: [`docs/AUDIT-FIX-PLAN.md`](docs/AUDIT-FIX-PLAN.md)
+> Project plan & status (single source of truth): [`PLAN.md`](PLAN.md)
 
 ## Quick start (Docker — recommended)
 
