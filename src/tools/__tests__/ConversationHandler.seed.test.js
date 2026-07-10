@@ -4,7 +4,7 @@
 vi.mock('../APIClient', () => ({ __esModule: true, default: {} }));
 vi.mock('../db', () => ({
   __esModule: true,
-  default: { createConversation: vi.fn(), updateConversation: vi.fn(), getConversationById: vi.fn() },
+  default: { createConversation: vi.fn(), updateConversation: vi.fn(), appendChatEvent: vi.fn(), getConversationById: vi.fn() },
 }));
 
 import conversationHandler from '../ConversationHandler';
@@ -22,6 +22,7 @@ const runtime = (control) =>
 beforeEach(() => {
   db.createConversation.mockReset();
   db.updateConversation.mockReset();
+  db.appendChatEvent.mockReset();
   db.getConversationById.mockReset();
   db.createConversation.mockImplementation(async () => new Conversation('u'));
 });
@@ -60,5 +61,11 @@ test('addReaction appends a NEW_REACTION event and persists', async () => {
   const reactions = await conversationHandler.addReaction(conv.id, { messageId: 'm1', type: 'thumbs', value: 'up' });
   expect(reactions).toHaveLength(1);
   expect(reactions[0]).toMatchObject({ messageId: 'm1', type: 'thumbs', value: 'up' });
-  expect(db.updateConversation).toHaveBeenCalledWith(conv.id, conv);
+  // Append-only (§4.6): the reaction event is appended atomically, not written
+  // via a whole-conversation rewrite.
+  const [cid, evt, state] = db.appendChatEvent.mock.calls[0];
+  expect(cid).toBe(conv.id);
+  expect(evt.type).toBe(CHAT_EVENT_TYPE.NEW_REACTION);
+  expect(state).toBeNull();
+  expect(db.updateConversation).not.toHaveBeenCalled();
 });

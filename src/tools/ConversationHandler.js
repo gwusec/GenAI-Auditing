@@ -93,7 +93,8 @@ class ConversationHandler extends EventEmitter {
         if (!conversation) throw new Error(`Conversation with ID ${conversationId} not found`);
         const event = new ChatEvent(CHAT_EVENT_TYPE.NEW_REACTION, makeReactionData(reactionInput));
         conversation.addChatEvent(event);
-        await db.updateConversation(conversationId, conversation);
+        // Append-only (§4.6): a reaction never changes state, so pass no state.
+        await db.appendChatEvent(conversationId, event, null);
         // Keep the active conversation in sync so getReactions() stays fresh.
         if (this.currentConversation && this.currentConversation.id === conversationId) {
             this.currentConversation = conversation;
@@ -141,9 +142,12 @@ class ConversationHandler extends EventEmitter {
             }
 
             conversation.addChatEvent(event);
-            await db.updateConversation(conversationId, conversation);
+            // Append-only (§4.6): append this single event atomically and carry
+            // any state transition (e.g. END_CHAT -> audit), rather than rewriting
+            // the whole chat_events array (which two tabs / a retry could clobber).
+            await db.appendChatEvent(conversationId, event, conversation.state);
 
-            switch (event.type) {   
+            switch (event.type) {
                 case CHAT_EVENT_TYPE.NEW_USER_MESSAGE:
                     // Build context and visible messages
                     this.buildVisibleMessages(conversation);

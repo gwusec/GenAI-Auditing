@@ -62,6 +62,17 @@ export default defineConfig(({ mode }) => {
       globals: true,
       environment: 'jsdom',
       include: ['src/**/*.{test,spec}.{js,jsx}', 'server/**/*.{test,spec}.{js,jsx}'],
+      // Keep the suite hermetic: run against the mock/IndexedDB backends regardless
+      // of a developer's .env (which may hold real Supabase creds for a live build),
+      // so the "unconfigured" guardrail tests stay meaningful.
+      env: {
+        REACT_APP_SUPABASE_URL: '',
+        REACT_APP_SUPABASE_ANON_KEY: '',
+        REACT_APP_PERSISTENCE: '',
+        REACT_APP_AUTH: '',
+        REACT_APP_STUDIES: '',
+        REACT_APP_SESSIONS: '',
+      },
     },
   };
 });

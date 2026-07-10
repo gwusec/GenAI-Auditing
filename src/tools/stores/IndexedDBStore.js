@@ -36,6 +36,19 @@ export class IndexedDBStore extends BaseConversationStore {
     return this.getConversationById(id);
   }
 
+  // Append a single chat event (+ optional state). Local storage is single-tab,
+  // so read-modify-write is race-free here; the atomic RPC only matters for the
+  // shared Supabase backend. Mirrors SupabaseStore.appendChatEvent so
+  // ConversationHandler can call it uniformly.
+  async appendChatEvent(id, event, state = null) {
+    const conv = await this.db.conversations.get(id);
+    if (!conv) return undefined;
+    conv.chatEvents = [...(conv.chatEvents || []), event];
+    if (state) conv.state = state;
+    await this.db.conversations.update(id, conv);
+    return conv;
+  }
+
   async deleteConversation(id) {
     await this.db.conversations.delete(id);
   }

@@ -18,6 +18,7 @@ const db = {
   getConversationById: (id) => getConversationStore().getConversationById(id),
   getAllConversations: () => getConversationStore().getAllConversations(),
   updateConversation: (id, updatedData) => getConversationStore().updateConversation(id, updatedData),
+  appendChatEvent: (id, event, state) => getConversationStore().appendChatEvent(id, event, state),
   deleteConversation: (id) => getConversationStore().deleteConversation(id),
   addConversation: (conversation) => getConversationStore().addConversation(conversation),
   resetDatabase: () => getConversationStore().resetDatabase(),

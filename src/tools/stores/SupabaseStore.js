@@ -103,6 +103,19 @@ export class SupabaseStore extends BaseConversationStore {
     return rowToConversation(data);
   }
 
+  // Atomically append ONE chat event (and optionally set state) via the
+  // append_chat_event RPC (0004). This replaces the old read-modify-write of the
+  // whole chat_events array, so two tabs / a retry can't clobber each other's
+  // events. The membership check lives in the SECURITY DEFINER function.
+  async appendChatEvent(id, event, state = null) {
+    const { error } = await this._c().rpc('append_chat_event', {
+      p_conversation_id: id,
+      p_event: event,
+      p_state: state ?? null,
+    });
+    if (error) throw error;
+  }
+
   async deleteConversation(id) {
     const { error } = await this._c().from('conversations').delete().eq('id', id);
     if (error) throw error;

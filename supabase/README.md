@@ -14,8 +14,12 @@ project** — the app still runs on local IndexedDB until you activate this.
 - `migrations/0003_lifecycle_sessions_provenance.sql` — the "Phase E deltas"
   below, as real SQL: status vocabulary `draft|open|closed`, the redeem RPC's
   study-open gate, `auditor_sessions`, conversation provenance columns,
-  write-side RLS membership checks, and the session helper RPCs. **Apply all
-  three, in order** — the app cannot open a study against 0001/0002 alone.
+  write-side RLS membership checks, and the session helper RPCs.
+- `migrations/0004_append_chat_event.sql` — the `append_chat_event` SECURITY
+  DEFINER RPC (membership-checked) that appends one chat event to
+  `conversations.chat_events` atomically, so two tabs / a retry can't clobber
+  each other's events (§4.6). **Apply all four, in order** — the app cannot open
+  a study against 0001/0002 alone.
 
 ## Data model in one breath
 A **study** is owned by an investigator and carries its config (model, evaluation

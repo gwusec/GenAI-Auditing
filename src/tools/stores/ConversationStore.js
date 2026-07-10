@@ -14,6 +14,7 @@
  * @property {(id: string) => Promise<object|undefined>} getConversationById
  * @property {() => Promise<object[]>} getAllConversations            // sorted by startTimestamp asc
  * @property {(id: string, data: object) => Promise<object>} updateConversation
+ * @property {(id: string, event: object, state?: string) => Promise<void>} appendChatEvent // atomically append one chat event (+ optional state)
  * @property {(id: string) => Promise<void>} deleteConversation
  * @property {(conversation: object) => Promise<any>} addConversation // import an existing object
  * @property {() => Promise<void>} resetDatabase
@@ -33,6 +34,7 @@ export class BaseConversationStore {
   async getConversationById() { return NOT_IMPLEMENTED('getConversationById'); }
   async getAllConversations() { return NOT_IMPLEMENTED('getAllConversations'); }
   async updateConversation() { return NOT_IMPLEMENTED('updateConversation'); }
+  async appendChatEvent() { return NOT_IMPLEMENTED('appendChatEvent'); }
   async deleteConversation() { return NOT_IMPLEMENTED('deleteConversation'); }
   async addConversation() { return NOT_IMPLEMENTED('addConversation'); }
   async resetDatabase() { return NOT_IMPLEMENTED('resetDatabase'); }
