@@ -57,9 +57,12 @@ export function makeTheme(mode) {
           // Neutralize the browser's yellow/blue autofill background so saved
           // username/password fields (login/register) match the theme surface
           // instead of flashing an off-palette highlight.
+          // `!important` is required to beat MUI's own higher-specificity input
+          // autofill rule (an emotion class selector), which otherwise paints a
+          // blue box-shadow over the field.
           'input:-webkit-autofill, input:-webkit-autofill:hover, input:-webkit-autofill:focus, input:-webkit-autofill:active': {
-            WebkitBoxShadow: `0 0 0 100px ${paper} inset`,
-            WebkitTextFillColor: isLight ? '#0f172a' : '#e5e7eb',
+            WebkitBoxShadow: `0 0 0 100px ${paper} inset !important`,
+            WebkitTextFillColor: `${isLight ? '#0f172a' : '#e5e7eb'} !important`,
             caretColor: isLight ? '#0f172a' : '#e5e7eb',
             borderRadius: 'inherit',
             transition: 'background-color 9999s ease-in-out 0s',
