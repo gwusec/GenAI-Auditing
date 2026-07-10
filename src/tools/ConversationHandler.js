@@ -40,6 +40,12 @@ class ConversationHandler extends EventEmitter {
         try {
             return await apiClient.sendChatMessageStream(this.contextMessages, {
                 onToken: (delta) => this._appendStreaming(delta),
+                // WebLLM surfaces in-browser model-load progress here (a status string
+                // to show in the transient bubble, or null to reset before tokens).
+                onStatus: (text) => {
+                    this.streamingContent = text == null ? '' : text;
+                    this.emit('streamingUpdated', this.streamingContent);
+                },
             });
         } finally {
             this._endStreaming();

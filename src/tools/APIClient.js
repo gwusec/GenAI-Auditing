@@ -22,6 +22,40 @@ export function parseSSEEvents(buffer) {
   return { events, rest };
 }
 
+// Run a completion entirely in the browser via WebLLM (WebGPU) — no relay call.
+// Loads the model on first use (progress surfaced through onStatus), then streams
+// tokens through onToken. Returns the same {status, data} shape as the relay paths.
+// Throws a descriptive Error when WebGPU is unavailable or the model can't load,
+// matching how the relay path throws on non-400 upstream failures.
+async function runWebLLM(llmMessages, relay, { onToken, onStatus } = {}) {
+  const { checkWebGPU, ensureModel, streamChat } = await import('./webllm/webllmEngine');
+  const gpu = await checkWebGPU();
+  if (!gpu.ok) throw new Error(gpu.reason);
+
+  const modelId = relay.webllmModel;
+  if (!modelId) throw new Error('No WebLLM model configured for this study.');
+
+  const messages = [];
+  if (relay.systemPrompt) messages.push({ role: 'system', content: relay.systemPrompt });
+  for (const m of llmMessages) messages.push(m);
+
+  if (onStatus) onStatus('⏳ Preparing the model in your browser… the first load can take a minute.');
+  const engine = await ensureModel(modelId, {
+    onProgress: ({ progress }) => {
+      if (!onStatus) return;
+      const pct = progress != null ? ` ${Math.round(progress * 100)}%` : '';
+      onStatus(`⏳ Preparing the model in your browser…${pct}`);
+    },
+  });
+  if (onStatus) onStatus(null); // clear the status so streamed tokens start clean
+
+  const full = await streamChat(engine, messages, relay.decoding || {}, { onToken });
+  return {
+    status: 'success',
+    data: { statusCode: 200, body: { message: { role: 'assistant', content: full }, finish_reason: 'stop' } },
+  };
+}
+
 const apiClient = (() => {
   let instance = null;
   let baseUrl = '';
@@ -74,6 +108,9 @@ const apiClient = (() => {
         if (!relay || !relay.backend) {
           throw new Error('LLM relay configuration is missing (expected config.llmRelay with a `backend`)');
         }
+        if (relay.backend === 'webllm') {
+          return await runWebLLM(llmMessages, relay, {});
+        }
         const response = await instance.post('/chat', {
           messages: llmMessages,
           pid: userId,
@@ -104,7 +141,7 @@ const apiClient = (() => {
     // responds with plain JSON instead (providers that don't stream, or an error),
     // it transparently falls back to the non-streaming behavior — so callers get a
     // consistent result regardless of whether streaming actually happened.
-    sendChatMessageStream: async (contextMessages, { onToken } = {}) => {
+    sendChatMessageStream: async (contextMessages, { onToken, onStatus } = {}) => {
       if (!instance) {
         throw new Error('API client not initialized. Call getInstance first.');
       }
@@ -118,6 +155,11 @@ const apiClient = (() => {
       if (!userId) throw new Error('User ID not found');
       if (!relay || !relay.backend) {
         throw new Error('LLM relay configuration is missing (expected config.llmRelay with a `backend`)');
+      }
+
+      // WebLLM runs in-browser — intercept before any network call to the relay.
+      if (relay.backend === 'webllm') {
+        return runWebLLM(llmMessages, relay, { onToken, onStatus });
       }
 
       const base = (baseUrl || instance.defaults.baseURL || '').replace(/\/+$/, '');

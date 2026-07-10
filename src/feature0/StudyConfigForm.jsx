@@ -15,8 +15,11 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import {
   withStudyConfigDefaults, validateStudyConfig, modelToRelay,
-  CONTROL_MODES, PROVIDERS, PROVIDER_META, REACTION_TYPES,
+  CONTROL_MODES, PROVIDER_META, REACTION_TYPES,
+  availableProviders, commercialConnectorsEnabled,
 } from '../tools/studyConfig';
+import OllamaConnectorPanel from './OllamaConnectorPanel';
+import WebLLMConnectorPanel from './WebLLMConnectorPanel';
 
 const MODE_LABELS = {
   seed_prompt: 'Start with a free conversation',
@@ -66,12 +69,26 @@ export default function StudyConfigForm({ config, onSave = () => {}, busy = fals
   const model = draft.models[0];
   const meta = PROVIDER_META[model.provider] || {};
 
+  // Which providers the "Where is the model hosted?" picker offers. The public
+  // build shows only local / in-browser providers (Ollama + WebLLM); a self-hosted
+  // deployment unlocks the commercial cloud providers. If the current config names
+  // a provider that isn't in the list (e.g. a study authored on a self-host build,
+  // opened here), keep it selectable so the <select> value still renders.
+  const showSelfHostNote = !commercialConnectorsEnabled();
+  const providerOptions = useMemo(() => {
+    const list = availableProviders();
+    return list.includes(model.provider) ? list : [model.provider, ...list];
+  }, [model.provider]);
+
   // --- Model list (populate the picker from the server) ---
   const [modelOptions, setModelOptions] = useState([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [advancedModel, setAdvancedModel] = useState(false);
 
   const fetchModels = useCallback(async (m) => {
+    // In-browser providers (WebLLM) don't have a server to enumerate; their model
+    // catalog is bundled client-side, so skip the relay round-trip.
+    if ((PROVIDER_META[m?.provider] || {}).inBrowser) { setModelOptions([]); return; }
     setLoadingModels(true);
     try {
       const resp = await fetch('/api/list-models', {
@@ -107,7 +124,7 @@ export default function StudyConfigForm({ config, onSave = () => {}, busy = fals
   };
 
   const cc = draft.conversationControl;
-  const modelPlaceholder = { ollama: 'llama3.1', vllm: 'org/model-name', openai: 'gpt-4o', anthropic: 'claude-3-5-sonnet-latest', gemini: 'gemini-1.5-pro' }[model.provider] || 'model';
+  const modelPlaceholder = { ollama: 'llama3.1', webllm: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', vllm: 'org/model-name', openai: 'gpt-4o', anthropic: 'claude-3-5-sonnet-latest', gemini: 'gemini-1.5-pro' }[model.provider] || 'model';
 
   return (
     <Stack spacing={0.5}>
@@ -125,19 +142,20 @@ export default function StudyConfigForm({ config, onSave = () => {}, busy = fals
           }}
           fullWidth
         >
-          {PROVIDERS.map((p) => <MenuItem key={p} value={p}>{(PROVIDER_META[p] || {}).label || p}</MenuItem>)}
+          {providerOptions.map((p) => <MenuItem key={p} value={p}>{(PROVIDER_META[p] || {}).label || p}</MenuItem>)}
         </TextField>
 
-        {meta.needsBaseUrl && (
-          <TextField
-            label="Server address" value={model.baseUrl || ''}
-            onChange={(e) => setModel({ baseUrl: e.target.value })} fullWidth
-            placeholder={meta.defaultBaseUrl || 'http://host:port'}
-            helperText={model.provider === 'ollama'
-              ? 'Where Ollama is running. The default reaches Ollama on your computer.'
-              : 'Your vLLM (OpenAI-compatible) endpoint, e.g. http://host:8000/v1'}
-          />
+        {showSelfHostNote && (
+          <Alert severity="info" variant="outlined" sx={{ '& a': { color: 'inherit' } }}>
+            This public audit offers the two connectors that keep data local:{' '}
+            <b>Ollama</b> (a model server on your own machine) and <b>WebLLM</b> (runs
+            entirely in the auditor&apos;s browser). Commercial providers — OpenAI,
+            Anthropic, Gemini, vLLM — are fully supported too, but only in a{' '}
+            <b>self-hosted deployment</b> of the open-source repo, where API keys stay
+            on your own server. See the repo&apos;s self-host guide to enable them.
+          </Alert>
         )}
+
         {meta.needsKey && (
           <Alert severity="info">
             {meta.label} needs an API key, which is configured <b>on the server</b> by
@@ -147,42 +165,75 @@ export default function StudyConfigForm({ config, onSave = () => {}, busy = fals
           </Alert>
         )}
 
-        {/* Model picker */}
-        <Autocomplete
-          freeSolo options={modelOptions} value={model.modelId || ''}
-          onChange={(e, val) => setModel({ modelId: val || '' })}
-          onInputChange={(e, val) => setModel({ modelId: val })}
-          renderInput={(params) => (
-            <TextField
-              {...params} label="Choose a model" required placeholder={modelPlaceholder}
-              helperText={modelOptions.length ? 'Pick one of your installed models, or type a name.' : 'Type a model name, or click ⟳ to load your installed models.'}
-              InputProps={{
-                ...params.InputProps,
-                endAdornment: (
-                  <>
-                    {loadingModels ? <CircularProgress size={18} /> : (
-                      <Tooltip title="Load available models">
-                        <IconButton size="small" onClick={() => fetchModels(draft.models[0])}><RefreshIcon fontSize="small" /></IconButton>
-                      </Tooltip>
-                    )}
-                    {params.InputProps.endAdornment}
-                  </>
-                ),
-              }}
-            />
-          )}
-        />
+        {model.provider === 'ollama' ? (
+          // Rich, commercial-grade Ollama panel: live connection status, an
+          // installed-model picker with metadata, and an in-app model-pull flow.
+          <OllamaConnectorPanel
+            baseUrl={model.baseUrl}
+            modelId={model.modelId}
+            defaultBaseUrl={meta.defaultBaseUrl}
+            onChange={setModel}
+          />
+        ) : model.provider === 'webllm' ? (
+          // In-browser (WebGPU) model: WebGPU check, full catalog, download & test.
+          <WebLLMConnectorPanel modelId={model.modelId} onChange={setModel} />
+        ) : (
+          <>
+            {meta.needsBaseUrl && (
+              <TextField
+                label="Server address" value={model.baseUrl || ''}
+                onChange={(e) => setModel({ baseUrl: e.target.value })} fullWidth
+                placeholder={meta.defaultBaseUrl || 'http://host:port'}
+                helperText="Your vLLM (OpenAI-compatible) endpoint, e.g. http://host:8000/v1"
+              />
+            )}
 
-        <Box>
-          <Button variant="outlined" size="small" onClick={runTest} disabled={testing}>
-            {testing ? 'Testing…' : 'Test connection'}
-          </Button>
-          {testResult && (
-            <Alert severity={testResult.ok ? 'success' : 'error'} sx={{ mt: 1.5 }}>
-              {testResult.message}
-            </Alert>
-          )}
-        </Box>
+            {/* Model picker */}
+            <Autocomplete
+              freeSolo options={modelOptions} value={model.modelId || ''}
+              onChange={(e, val) => setModel({ modelId: val || '' })}
+              onInputChange={(e, val) => setModel({ modelId: val })}
+              renderInput={(params) => (
+                <TextField
+                  {...params} label="Choose a model" required placeholder={modelPlaceholder}
+                  helperText={
+                    meta.inBrowser
+                      ? 'The WebLLM model id auditors will run in their browser.'
+                      : (modelOptions.length ? 'Pick one of your installed models, or type a name.' : 'Type a model name, or click ⟳ to load your installed models.')
+                  }
+                  InputProps={{
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {loadingModels ? <CircularProgress size={18} /> : (!meta.inBrowser && (
+                          <Tooltip title="Load available models">
+                            <IconButton size="small" onClick={() => fetchModels(draft.models[0])}><RefreshIcon fontSize="small" /></IconButton>
+                          </Tooltip>
+                        ))}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  }}
+                />
+              )}
+            />
+          </>
+        )}
+
+        {/* Relay-side connection test — not applicable to in-browser WebLLM, which
+            has its own "Download & test" inside its panel. */}
+        {!meta.inBrowser && (
+          <Box>
+            <Button variant="outlined" size="small" onClick={runTest} disabled={testing}>
+              {testing ? 'Testing…' : 'Test connection'}
+            </Button>
+            {testResult && (
+              <Alert severity={testResult.ok ? 'success' : 'error'} sx={{ mt: 1.5 }}>
+                {testResult.message}
+              </Alert>
+            )}
+          </Box>
+        )}
 
         <Button size="small" onClick={() => setAdvancedModel((v) => !v)} sx={{ alignSelf: 'flex-start' }}>
           {advancedModel ? 'Hide advanced settings' : 'Advanced settings (system prompt, creativity…)'}

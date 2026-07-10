@@ -7,6 +7,9 @@ import {
   STUDY_CONFIG_SCHEMA_VERSION,
   CONTROL_MODES,
   PROVIDERS,
+  PUBLIC_PROVIDERS,
+  availableProviders,
+  commercialConnectorsEnabled,
   REACTION_TYPES,
   LIFECYCLE_STATES,
   createDefaultStudyConfig,
@@ -36,9 +39,56 @@ describe('createDefaultStudyConfig', () => {
   test('exported constants reflect the locked scope decisions', () => {
     expect(CONTROL_MODES).toEqual(['seed_prompt', 'fixed_first_turn']);
     expect(CONTROL_MODES).not.toContain('scripted');
-    expect(PROVIDERS).toEqual(['ollama', 'vllm', 'openai', 'anthropic', 'gemini']);
+    expect(PROVIDERS).toEqual(['ollama', 'webllm', 'vllm', 'openai', 'anthropic', 'gemini']);
     expect(REACTION_TYPES).toEqual(['thumbs', 'star', 'flag', 'comment']);
     expect(LIFECYCLE_STATES).toEqual(['draft', 'open', 'closed']);
+  });
+});
+
+describe('connector gating (public vs self-hosted build)', () => {
+  const orig = process.env.REACT_APP_COMMERCIAL_CONNECTORS;
+  afterEach(() => {
+    if (orig === undefined) delete process.env.REACT_APP_COMMERCIAL_CONNECTORS;
+    else process.env.REACT_APP_COMMERCIAL_CONNECTORS = orig;
+  });
+
+  test('public build exposes only the local/in-browser providers', () => {
+    delete process.env.REACT_APP_COMMERCIAL_CONNECTORS;
+    expect(commercialConnectorsEnabled()).toBe(false);
+    expect(PUBLIC_PROVIDERS).toEqual(['ollama', 'webllm']);
+    expect(availableProviders()).toEqual(['ollama', 'webllm']);
+  });
+
+  test('self-hosted build (flag on) unlocks the commercial providers', () => {
+    process.env.REACT_APP_COMMERCIAL_CONNECTORS = 'true';
+    expect(commercialConnectorsEnabled()).toBe(true);
+    expect(availableProviders()).toEqual(PROVIDERS);
+    expect(availableProviders()).toContain('openai');
+  });
+
+  test('flag accepts on/1 truthy spellings, rejects others', () => {
+    for (const v of ['on', '1', 'TRUE']) {
+      process.env.REACT_APP_COMMERCIAL_CONNECTORS = v;
+      expect(commercialConnectorsEnabled()).toBe(true);
+    }
+    for (const v of ['', 'false', 'no', '0']) {
+      process.env.REACT_APP_COMMERCIAL_CONNECTORS = v;
+      expect(commercialConnectorsEnabled()).toBe(false);
+    }
+  });
+});
+
+describe('WebLLM provider (in-browser)', () => {
+  test('is a valid provider needing neither a base URL nor an API key', () => {
+    const cfg = clone(createDefaultStudyConfig());
+    cfg.models[0] = { role: 'primary', provider: 'webllm', modelId: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', baseUrl: '', systemPrompt: '', decoding: {} };
+    expect(validateStudyConfig(cfg)).toEqual({ valid: true, errors: [] });
+  });
+
+  test('still requires a modelId', () => {
+    const cfg = clone(createDefaultStudyConfig());
+    cfg.models[0] = { role: 'primary', provider: 'webllm', modelId: '', baseUrl: '', systemPrompt: '', decoding: {} };
+    expect(validateStudyConfig(cfg).valid).toBe(false);
   });
 });
 

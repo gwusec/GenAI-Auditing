@@ -76,6 +76,18 @@ describe('deriveRuntimeConfig — model block', () => {
       systemPrompt: '',
     });
     expect(openai.llmRelay).not.toHaveProperty('apiKey');
+
+    // WebLLM is in-browser: its wire object names the model but carries no URL and
+    // is never routed to the relay (APIClient intercepts backend:'webllm').
+    const webllm = deriveRuntimeConfig(withStudyConfigDefaults({
+      models: [{ provider: 'webllm', modelId: 'Llama-3.2-3B-Instruct-q4f16_1-MLC', baseUrl: '' }],
+    }));
+    expect(webllm.llmRelay).toEqual({
+      backend: 'webllm', webllmModel: 'Llama-3.2-3B-Instruct-q4f16_1-MLC',
+      decoding: { temperature: 0.7, topP: 0.95, maxTokens: 1024 },
+      systemPrompt: '',
+    });
+    expect(webllm.llmRelay).not.toHaveProperty('baseUrl');
   });
 
   test('the study system prompt + decoding reach the relay object (P3 wiring)', () => {

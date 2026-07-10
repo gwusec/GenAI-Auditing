@@ -22,6 +22,7 @@ services:
         REACT_APP_STUDIES: supabase
         REACT_APP_PERSISTENCE: supabase
         REACT_APP_FEATURE0: "on"
+        REACT_APP_COMMERCIAL_CONNECTORS: ${REACT_APP_COMMERCIAL_CONNECTORS:-true}
     ports:
       - "3000:3000"
     environment:

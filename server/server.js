@@ -928,6 +928,86 @@ app.get('/api/ollama/api/tags', async (req, res) => {
   }
 });
 
+// Detailed Ollama model list — names PLUS metadata (size on disk, parameter size,
+// family, quantization, last-modified) so the config UI can show a rich, commercial-
+// grade model picker rather than bare ids. Body: { baseUrl }.
+app.post('/api/ollama/models', async (req, res) => {
+  const baseUrl = (req.body && req.body.baseUrl) || '';
+  const v = validateOllamaUrl(baseUrl);
+  if (!v.valid) return res.status(400).json({ ok: false, models: [], error: v.error });
+  try {
+    const r = await axios.get(`${v.normalized}/api/tags`, { timeout: OLLAMA_TEST_TIMEOUT_MS });
+    const raw = r.data && Array.isArray(r.data.models) ? r.data.models : [];
+    const models = raw.map((m) => ({
+      name: m.name,
+      size: typeof m.size === 'number' ? m.size : null,
+      modifiedAt: m.modified_at || null,
+      family: (m.details && m.details.family) || null,
+      parameterSize: (m.details && m.details.parameter_size) || null,
+      quantization: (m.details && m.details.quantization_level) || null,
+    }));
+    return res.json({ ok: true, models });
+  } catch (error) {
+    const msg = /ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN/.test(error.code || error.message)
+      ? `Couldn't reach Ollama at ${v.normalized}. Make sure it's running and listening on all interfaces (OLLAMA_HOST=0.0.0.0 ollama serve).`
+      : error.message;
+    return res.json({ ok: false, models: [], error: msg });
+  }
+});
+
+// Pull (download) a model into the investigator's own Ollama, streaming live
+// progress to the browser as SSE. Body: { baseUrl, model }. Ollama's /api/pull
+// emits NDJSON status/progress lines; we normalize each to
+// { status, digest?, total?, completed?, percent? } and finish with { done:true }
+// on success or { error } on failure. The pull can take minutes for a large model,
+// so there is no request timeout; if the browser disconnects we abort the upstream.
+app.post('/api/ollama/pull', async (req, res) => {
+  const baseUrl = (req.body && req.body.baseUrl) || '';
+  const model = ((req.body && req.body.model) || '').trim();
+  const v = validateOllamaUrl(baseUrl);
+  if (!v.valid) return res.status(400).json({ error: v.error });
+  if (!model) return res.status(400).json({ error: 'A model name is required (e.g. "llama3.1" or "qwen2.5:3b").' });
+
+  let upstream;
+  try {
+    upstream = await axios.post(`${v.normalized}/api/pull`, { name: model, stream: true }, {
+      responseType: 'stream', timeout: 0,
+    });
+  } catch (error) {
+    const status = error.response && error.response.status;
+    const msg = status === 404
+      ? `Ollama couldn't find a model named "${model}". Check the name at ollama.com/library.`
+      : `Couldn't reach Ollama at ${v.normalized}: ${error.message}`;
+    return res.status(502).json({ error: msg });
+  }
+
+  setupSSE(res);
+  // If the browser navigates away / cancels, stop pulling upstream too.
+  req.on('close', () => { try { upstream.data.destroy(); } catch (_) { /* noop */ } });
+
+  let buffer = '';
+  upstream.data.on('data', (chunk) => {
+    if (res.writableEnded) return;
+    buffer += chunk.toString();
+    let idx;
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      let obj;
+      try { obj = JSON.parse(line); } catch (_) { continue; }
+      if (obj.error) { sseWrite(res, { error: obj.error }); res.end(); return; }
+      const total = typeof obj.total === 'number' ? obj.total : undefined;
+      const completed = typeof obj.completed === 'number' ? obj.completed : undefined;
+      const percent = total ? Math.min(100, Math.round(((completed || 0) / total) * 100)) : undefined;
+      sseWrite(res, { status: obj.status || '', digest: obj.digest, total, completed, percent });
+      if (obj.status === 'success') { sseWrite(res, { done: true }); res.end(); return; }
+    }
+  });
+  upstream.data.on('end', () => { if (!res.writableEnded) { sseWrite(res, { done: true }); res.end(); } });
+  upstream.data.on('error', (err) => { if (!res.writableEnded) { sseWrite(res, { error: err.message }); res.end(); } });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({

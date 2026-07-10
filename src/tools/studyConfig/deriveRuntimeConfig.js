@@ -26,6 +26,12 @@ export function modelToRelay(model) {
   if (model.provider === 'ollama') {
     return { backend: 'ollama', ollamaUrl: model.baseUrl, ollamaModel: model.modelId, decoding, systemPrompt };
   }
+  // WebLLM runs entirely in the auditor's browser (WebGPU) — it never touches the
+  // relay. The wire object just names the model + decoding so the client-side
+  // WebLLM path can pick it up; APIClient intercepts backend:'webllm' before any fetch.
+  if (model.provider === 'webllm') {
+    return { backend: 'webllm', webllmModel: model.modelId, decoding, systemPrompt };
+  }
   const baseUrl = (model.baseUrl && model.baseUrl.trim())
     || (PROVIDER_META[model.provider] && PROVIDER_META[model.provider].defaultBaseUrl)
     || '';

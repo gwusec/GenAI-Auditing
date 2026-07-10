@@ -23,13 +23,27 @@ export const CONTROL_MODES = ['seed_prompt', 'fixed_first_turn'];
  *  audit: a key stored in study config reaches the DB and every auditor's browser).
  *  Keys are never part of StudyConfig and never sent from the browser. */
 export const PROVIDER_META = {
-  ollama:    { label: 'Ollama (local)', needsKey: false, keyEnv: null,                needsBaseUrl: true,  defaultBaseUrl: 'http://host.docker.internal:11434' },
-  vllm:      { label: 'vLLM',           needsKey: false, keyEnv: 'VLLM_API_KEY',      needsBaseUrl: true,  defaultBaseUrl: '' },
-  openai:    { label: 'OpenAI',         needsKey: true,  keyEnv: 'OPENAI_API_KEY',    needsBaseUrl: false, defaultBaseUrl: 'https://api.openai.com/v1' },
-  anthropic: { label: 'Anthropic',      needsKey: true,  keyEnv: 'ANTHROPIC_API_KEY', needsBaseUrl: false, defaultBaseUrl: 'https://api.anthropic.com/v1' },
-  gemini:    { label: 'Gemini',         needsKey: true,  keyEnv: 'GEMINI_API_KEY',    needsBaseUrl: false, defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
+  ollama:    { label: 'Ollama (local)',      needsKey: false, keyEnv: null,                needsBaseUrl: true,  defaultBaseUrl: 'http://host.docker.internal:11434', inBrowser: false },
+  webllm:    { label: 'WebLLM (in-browser)', needsKey: false, keyEnv: null,                needsBaseUrl: false, defaultBaseUrl: '',                                 inBrowser: true  },
+  vllm:      { label: 'vLLM',                needsKey: false, keyEnv: 'VLLM_API_KEY',      needsBaseUrl: true,  defaultBaseUrl: '',                                 inBrowser: false },
+  openai:    { label: 'OpenAI',              needsKey: true,  keyEnv: 'OPENAI_API_KEY',    needsBaseUrl: false, defaultBaseUrl: 'https://api.openai.com/v1',         inBrowser: false },
+  anthropic: { label: 'Anthropic',           needsKey: true,  keyEnv: 'ANTHROPIC_API_KEY', needsBaseUrl: false, defaultBaseUrl: 'https://api.anthropic.com/v1',      inBrowser: false },
+  gemini:    { label: 'Gemini',              needsKey: true,  keyEnv: 'GEMINI_API_KEY',    needsBaseUrl: false, defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta', inBrowser: false },
 };
 export const PROVIDERS = Object.keys(PROVIDER_META);
+
+// Which providers the config UI offers. The public/hosted build exposes only the
+// local / in-browser providers (Ollama + WebLLM) — no API keys, no auditor data
+// routed to arbitrary commercial orgs. A self-hosted deployment unlocks the
+// commercial cloud providers by setting REACT_APP_COMMERCIAL_CONNECTORS.
+export const PUBLIC_PROVIDERS = ['ollama', 'webllm'];
+export function commercialConnectorsEnabled() {
+  const v = String(process.env.REACT_APP_COMMERCIAL_CONNECTORS || '').toLowerCase();
+  return v === 'true' || v === 'on' || v === '1';
+}
+export function availableProviders() {
+  return commercialConnectorsEnabled() ? PROVIDERS : PUBLIC_PROVIDERS;
+}
 
 /** Turn-level reaction types (PRD §6.1 / AUD-5). */
 export const REACTION_TYPES = ['thumbs', 'star', 'flag', 'comment'];
