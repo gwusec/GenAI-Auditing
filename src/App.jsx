@@ -6,15 +6,11 @@ import conversationHandler from './tools/ConversationHandler';
 import ChatBox from './components/ChatBox/ChatBox';
 import AppConfig from './tools/AppConfig';
 import ChatTimerSystem from './tools/ChatTimerSystem';
-import {
-    Box,
-    Button,
-    Typography,
-    Tabs,
-    Tab,
-    Tooltip,
-    LinearProgress,
-} from '@mui/material';
+import { Typography } from './components/ui/layout';
+import { Button } from './components/ui/button';
+import { Tooltip } from './components/ui/tooltip';
+import { Progress } from './components/ui/progress';
+import { cn } from './lib/utils';
 import styles from './App.module.css';
 import SurveyPage from "./pages/SurveyPage";
 import ChatPage from "./pages/ChatPage";
@@ -274,7 +270,7 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     };
 
     return (
-        <Box sx={{ display: 'flex', height: '100vh' }}>
+        <div className="flex h-screen">
             {currentAppState === AppState.SURVEY && (
                 <SurveyPage
                     debugMode={debugMode}
@@ -302,81 +298,44 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                     )}
 
                     {shouldShowSidebar() && (
-                        <Box
-                            className={styles['sidebar']}
-                            sx={{
-                                width: '300px',
-                                flexShrink: 0,
-                                background: (t) => (t.palette.mode === 'dark'
-                                    ? 'linear-gradient(180deg, #131c30 0%, #0c1322 100%)'
-                                    : 'linear-gradient(180deg, #ffffff 0%, #f5f8fc 100%)'),
-                                borderRight: '1px solid',
-                                borderColor: 'divider',
-                            }}
+                        <div
+                            className={cn(
+                                styles['sidebar'],
+                                'flex w-[300px] shrink-0 flex-col border-r bg-gradient-to-b from-card to-background',
+                            )}
                         >
-                            <Typography variant="h6" gutterBottom align="center" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>
+                            <Typography variant="h6" gutterBottom align="center" className="tracking-tight">
                                 AI Chatbot
                             </Typography>
-                            <Tabs
-                                orientation="vertical"
-                                variant="scrollable"
-                                value={activeConversationIndex}
-                                onChange={handleTabChange}
-                                sx={{ minHeight: '200px', '& .MuiTabs-indicator': { display: 'none' } }}
-                            >
-                                <Tab
-                                    label="Your recent conversations"
-                                    value="recent-header"
-                                    disabled
-                                    sx={{
-                                        fontWeight: 700,
-                                        fontSize: '0.7rem',
-                                        letterSpacing: '0.12em',
-                                        textTransform: 'uppercase',
-                                        color: 'text.disabled',
-                                        minHeight: 'auto',
-                                        alignItems: 'flex-start',
-                                        px: '14px',
-                                        '&.Mui-disabled': { opacity: 1 },
-                                    }}
-                                />
-                                {conversations.map((conversation, index) => (
-                                    <Tab
-                                        key={conversation.id}
-                                        label={`Conversation ${index + 1}`}
-                                        value={index}
-                                        sx={{
-                                            padding: '10px 14px',
-                                            borderRadius: '10px',
-                                            marginBottom: '6px',
-                                            minHeight: 'auto',
-                                            alignItems: 'flex-start',
-                                            textTransform: 'none',
-                                            transition: 'background-color .18s ease, transform .18s ease, color .18s ease',
-                                            backgroundColor: activeConversationIndex === index
-                                                ? (t) => (t.palette.mode === 'dark' ? 'rgba(20,184,166,0.18)' : 'rgba(13,148,136,0.12)')
-                                                : 'transparent',
-                                            color: activeConversationIndex === index ? 'primary.main' : 'text.secondary',
-                                            fontWeight: activeConversationIndex === index ? 700 : 500,
-                                            boxShadow: activeConversationIndex === index
-                                                ? (t) => `inset 3px 0 0 ${t.palette.primary.main}`
-                                                : 'none',
-                                            '&:hover': {
-                                                backgroundColor: (t) => (t.palette.mode === 'dark' ? 'rgba(148,163,184,0.10)' : 'rgba(15,23,42,0.04)'),
-                                                color: 'text.primary',
-                                                transform: 'translateX(2px)',
-                                            },
-                                        }}
-                                    />
-                                ))}
-                            </Tabs>
+                            <div className="flex min-h-[200px] flex-col gap-1.5">
+                                <div className="px-3.5 text-[0.7rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                                    Your recent conversations
+                                </div>
+                                {conversations.map((conversation, index) => {
+                                    const active = activeConversationIndex === index;
+                                    return (
+                                        <button
+                                            key={conversation.id}
+                                            onClick={() => handleTabChange(null, index)}
+                                            className={cn(
+                                                'rounded-[10px] px-3.5 py-2.5 text-left text-sm transition-colors',
+                                                active
+                                                    ? 'bg-primary/12 font-bold text-primary shadow-[inset_3px_0_0_hsl(var(--primary))]'
+                                                    : 'font-medium text-muted-foreground hover:bg-foreground/5 hover:text-foreground',
+                                            )}
+                                        >
+                                            {`Conversation ${index + 1}`}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                             {!isViewOnly && (
-                                <Box sx={{ mt: 'auto', backgroundColor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 3, padding: '14px' }}>
+                                <div className="mt-auto rounded-xl border bg-card p-3.5">
                                     {timerSystem !== null && (
-                                        <Box tutorial-step="timer-time-limit">
+                                        <div tutorial-step="timer-time-limit">
                                             {timerSystem.state.currentChatIndex <= 1 ? (
                                                 <>
-                                                    <Typography variant="body1" sx={{ mt: 1 }}>
+                                                    <Typography variant="body1" className="mt-2">
                                                         Time remaining: {timerState.currentChatTimeRemaining / 1000 / 60 > 1
                                                             ? Math.ceil(timerState.currentChatTimeRemaining / 1000 / 60) + ' minutes'
                                                             : timerState.currentChatTimeRemaining / 1000 === 0
@@ -384,16 +343,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                                                 : ' less than 1 minute'}
                                                     </Typography>
                                                     <Tooltip title={`${Math.ceil(timerSystem.state.currentChatTimeRemaining / 1000 / 60)} minute(s) remaining`}>
-                                                        <LinearProgress
-                                                            variant="determinate"
-                                                            value={timerState.percentageChatTimeRemaining}
-                                                            sx={{ width: '100%', height: 8, borderRadius: 4 }}
-                                                        />
+                                                        <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
                                                     </Tooltip>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Typography variant="body1" sx={{ mt: 1 }}>
+                                                    <Typography variant="body1" className="mt-2">
                                                         Time remaining: {timerState.overallTimeRemaining / 1000 / 60 > 1
                                                             ? Math.ceil(timerState.overallTimeRemaining / 1000 / 60) + ' minutes'
                                                             : timerState.overallTimeRemaining / 1000 === 0
@@ -401,62 +356,33 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                                                 : ' less than 1 minute'}
                                                     </Typography>
                                                     <Tooltip title={`${Math.ceil(timerSystem.state.overallTimeRemaining / 1000 / 60)} minute(s) remaining`}>
-                                                        <LinearProgress
-                                                            variant="determinate"
-                                                            value={timerState.percentageChatTimeRemaining}
-                                                            sx={{ width: '100%', height: 8, borderRadius: 4 }}
-                                                        />
+                                                        <Progress value={timerState.percentageChatTimeRemaining} className="mt-1 h-2" />
                                                     </Tooltip>
                                                 </>
                                             )}
-                                        </Box>
+                                        </div>
                                     )}
                                     <Button
                                         tutorial-step="end-chat-start-reporting-button"
-                                        variant="contained"
-                                        color="primary"
-                                        fullWidth
+                                        className="mt-4 mb-1 w-full py-2.5 leading-snug"
                                         onClick={handleEndChat}
                                         disabled={isLoading || currentAppState !== AppState.CHAT}
-                                        sx={{
-                                            mt: 2,
-                                            mb: 0.5,
-                                            py: 1.25,
-                                            borderRadius: '10px',
-                                            textTransform: 'none',
-                                            fontWeight: 600,
-                                            lineHeight: 1.3,
-                                            boxShadow: 'none',
-                                        }}
                                     >
                                         End Conversation &amp; Start Reporting
                                     </Button>
                                     <Typography variant="body2" className={styles['sidebar-guide-text']}>
                                         On average, people need 7 prompts in a conversation to review and make an assessment.
                                     </Typography>
-                                </Box>
+                                </div>
                             )}
-                        </Box>
+                        </div>
                     )}
 
-                    <Box
-                        sx={{
-                            flexGrow: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100vh',
-                            overflow: 'hidden',
-                            width: shouldShowSidebar() ? 'calc(100% - 300px)' : '100%',
-                        }}
+                    <div
+                        className="flex grow flex-col h-screen overflow-hidden"
+                        style={{ width: shouldShowSidebar() ? 'calc(100% - 300px)' : '100%' }}
                     >
-                        <Box
-                            sx={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                flexGrow: 1,
-                                overflow: 'hidden',
-                            }}
-                        >
+                        <div className="flex grow flex-col overflow-hidden">
                             {/* there may be some issues with bringing this part over. i'll observe any issues later.
                              Something like routing may solve this issue. */}
                             {activeConversation && currentAppState === AppState.CHAT && (
@@ -506,11 +432,11 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                         }} />
                                 </>
                             )}
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                 </>
             )}
-        </Box>
+        </div>
     );
 }
 

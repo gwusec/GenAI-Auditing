@@ -9,13 +9,22 @@
 // It owns no study state: reads { modelId } and reports changes via onChange.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Stack, Typography } from '../components/ui/layout';
+import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Alert } from '../components/ui/alert';
+import { Progress } from '../components/ui/progress';
+import { Spinner } from '../components/ui/spinner';
 import {
-  Box, Stack, Typography, Autocomplete, TextField, Alert, Button, LinearProgress,
-  Chip, CircularProgress,
-} from '@mui/material';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import MemoryIcon from '@mui/icons-material/Memory';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+  Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectLabel, SelectItem,
+} from '../components/ui/select';
+import {
+  CheckCircle as CheckCircleIcon,
+  Memory as MemoryIcon,
+  PlayArrow as PlayArrowIcon,
+  Close as CloseIcon,
+} from '../components/ui/icons';
 import {
   checkWebGPU, getModelCatalog, ensureModel, RECOMMENDED_MODEL_IDS,
 } from '../tools/webllm/webllmEngine';
@@ -90,92 +99,103 @@ export default function WebLLMConnectorPanel({ modelId, onChange }) {
   }, [modelId, testing]);
 
   const gpuBanner = gpu.state === 'checking'
-    ? <Alert severity="info" icon={<CircularProgress size={16} />}>Checking this browser for WebGPU…</Alert>
+    ? <Alert variant="info"><Spinner size={16} /><span>Checking this browser for WebGPU…</span></Alert>
     : gpu.state === 'ok'
-      ? <Alert severity="success">This browser supports WebGPU — WebLLM can run models locally here.</Alert>
-      : <Alert severity="warning">{gpu.reason} Auditors will need a WebGPU-capable browser to run this study.</Alert>;
+      ? <Alert variant="success">This browser supports WebGPU — WebLLM can run models locally here.</Alert>
+      : <Alert variant="warning">{gpu.reason} Auditors will need a WebGPU-capable browser to run this study.</Alert>;
+
+  const catalogLoading = !catalog.length && !catalogError;
+  const recommendedModels = catalog.filter((m) => m.recommended);
+  const otherModels = catalog.filter((m) => !m.recommended);
+  const renderModelItem = (option) => (
+    <SelectItem key={option.id} value={option.id}>
+      <span className="flex items-center gap-2">
+        <MemoryIcon className="size-4 text-muted-foreground" />
+        <span className="font-semibold">{option.id}</span>
+      </span>
+      {metaLine(option) && <span className="block pl-6 text-xs text-muted-foreground">{metaLine(option)}</span>}
+    </SelectItem>
+  );
 
   return (
     <Stack spacing={2}>
       {gpuBanner}
 
-      {catalogError && <Alert severity="error">{catalogError}</Alert>}
+      {catalogError && <Alert variant="destructive">{catalogError}</Alert>}
 
-      <Autocomplete
-        options={catalog}
-        loading={!catalog.length && !catalogError}
-        groupBy={(o) => (o.recommended ? 'Recommended' : 'All models')}
-        value={selected}
-        getOptionLabel={(o) => (typeof o === 'string' ? o : o.id || '')}
-        isOptionEqualToValue={(o, v) => o.id === (v.id || v)}
-        onChange={(e, val) => setModelId(val ? val.id : '')}
-        renderOption={(props, option) => (
-          <Box component="li" {...props} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start !important', gap: 0.25 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <MemoryIcon fontSize="small" color="action" />
-              <Typography sx={{ fontWeight: 600 }}>{option.id}</Typography>
-            </Stack>
-            {metaLine(option) && <Typography variant="caption" color="text.secondary" sx={{ pl: 3.5 }}>{metaLine(option)}</Typography>}
-          </Box>
-        )}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Model auditors will run in their browser"
-            required
-            placeholder="Llama-3.2-3B-Instruct-q4f16_1-MLC"
-            helperText={`Pick from ${catalog.length || '160+'} prebuilt models. Smaller (1–3B) models load fastest; larger ones need more VRAM.`}
-            InputProps={{
-              ...params.InputProps,
-              endAdornment: (
-                <>
-                  {!catalog.length && !catalogError ? <CircularProgress size={18} /> : null}
-                  {params.InputProps.endAdornment}
-                </>
-              ),
-            }}
-          />
-        )}
-      />
+      <div>
+        <Label htmlFor="webllm-model">Model auditors will run in their browser <span className="text-destructive">*</span></Label>
+        <Select value={modelId || ''} onValueChange={(val) => setModelId(val)} disabled={catalogLoading}>
+          <SelectTrigger id="webllm-model" className="mt-1.5">
+            {catalogLoading && <Spinner size={16} className="mr-2" />}
+            <SelectValue placeholder={catalogLoading ? 'Loading models…' : 'Llama-3.2-3B-Instruct-q4f16_1-MLC'} />
+          </SelectTrigger>
+          <SelectContent>
+            {recommendedModels.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>Recommended</SelectLabel>
+                {recommendedModels.map(renderModelItem)}
+              </SelectGroup>
+            )}
+            {otherModels.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>All models</SelectLabel>
+                {otherModels.map(renderModelItem)}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {`Pick from ${catalog.length || '160+'} prebuilt models. Smaller (1–3B) models load fastest; larger ones need more VRAM.`}
+        </p>
+      </div>
 
       {selected && (
-        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: -1 }}>
-          {selected.parameterSize && <Chip size="small" label={selected.parameterSize} />}
-          {selected.quantization && <Chip size="small" variant="outlined" label={selected.quantization} />}
-          {fmtVram(selected.vramMB) && <Chip size="small" variant="outlined" label={fmtVram(selected.vramMB)} />}
-          {selected.lowResource && <Chip size="small" color="success" variant="outlined" label="Runs on low-end devices" />}
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" className="-mt-2">
+          {selected.parameterSize && <Badge variant="secondary">{selected.parameterSize}</Badge>}
+          {selected.quantization && <Badge variant="outline">{selected.quantization}</Badge>}
+          {fmtVram(selected.vramMB) && <Badge variant="outline">{fmtVram(selected.vramMB)}</Badge>}
+          {selected.lowResource && <Badge variant="success">Runs on low-end devices</Badge>}
         </Stack>
       )}
 
       {/* Download & test the model in THIS browser to confirm it runs. */}
-      <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 2 }}>
+      <div className="rounded-md border border-dashed p-4">
         <Typography variant="subtitle2">Try it in this browser</Typography>
         <Typography variant="caption" color="text.secondary">
           Download and load the model here to confirm it runs before you open the study.
           The weights are cached, so auditors on this machine won&apos;t re-download them.
         </Typography>
-        <Box sx={{ mt: 1.5 }}>
+        <div className="mt-3">
           {testOk && testedRef.current === modelId ? (
-            <Chip color="success" icon={<CheckCircleIcon />} label="Loaded & ready — runs in your browser" />
+            <Badge variant="success"><CheckCircleIcon className="size-3.5" />Loaded &amp; ready — runs in your browser</Badge>
           ) : (
             <Button
-              variant="outlined" startIcon={testing ? <CircularProgress size={16} /> : <PlayArrowIcon />}
+              variant="outline"
               onClick={runTest} disabled={!modelId || testing || gpu.state === 'no'}
             >
+              {testing ? <Spinner size={16} /> : <PlayArrowIcon />}
               {testing ? 'Loading…' : 'Download & test'}
             </Button>
           )}
-        </Box>
+        </div>
         {testing && (
-          <Box sx={{ mt: 1.5 }}>
-            <LinearProgress variant={testPct == null ? 'indeterminate' : 'determinate'} value={testPct ?? 0} sx={{ borderRadius: 1, height: 8 }} />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+          <div className="mt-3">
+            <Progress value={testPct} className="h-2 rounded" />
+            <Typography variant="caption" color="text.secondary" className="mt-1 block">
               {testText}{testPct != null ? ` — ${testPct}%` : ''}
             </Typography>
-          </Box>
+          </div>
         )}
-        {testErr && <Alert severity="error" sx={{ mt: 1.5 }} onClose={() => setTestErr('')}>{testErr}</Alert>}
-      </Box>
+        {testErr && (
+          <Alert variant="destructive" className="mt-3 flex items-start justify-between gap-2">
+            <span>{testErr}</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setTestErr('')}>
+              <CloseIcon />
+            </Button>
+          </Alert>
+        )}
+      </div>
     </Stack>
   );
 }

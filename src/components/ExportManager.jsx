@@ -1,7 +1,7 @@
 // TRAILS-Chatbot/src/components/ExportManager.jsx
 
 import React from 'react';
-import { Button } from '@mui/material';
+import { Button } from './ui/button';
 import conversationHandler from '../tools/ConversationHandler';
 
 const ExportManager = ({ conversations }) => {
@@ -25,11 +25,8 @@ const ExportManager = ({ conversations }) => {
 
   return (
     <Button
-      variant="contained"
-      color="primary"
       onClick={handleExport}
-      fullWidth
-      sx={{ mt: 2 }}
+      className="mt-4 w-full"
     >
       Finish audit. Export conversation data.
     </Button>

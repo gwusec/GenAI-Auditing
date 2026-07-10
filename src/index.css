@@ -1,15 +1,126 @@
-* {
-  box-sizing: border-box;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens (ROADMAP Phase 1B, decision D1). Single source of truth for the
+ * teal light/dark theme, shared by Tailwind (see tailwind.config.js), the shadcn
+ * primitives in src/components/ui, and the SurveyJS --sjs-* bridge in
+ * Questionnaire.jsx. Values are HSL triplets so Tailwind's `/<alpha>` modifiers
+ * work (e.g. bg-primary/10). Carried over from the old MUI theme.js palette:
+ * teal accent #0d9488, slate neutrals, grass-green success.
+ */
+@layer base {
+  :root {
+    --background: 210 40% 98%;        /* #f8fafc slate-50 */
+    --foreground: 222 47% 11%;        /* #0f172a slate-900 */
+
+    --card: 0 0% 100%;                /* #ffffff */
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 175 84% 32%;           /* #0d9488 teal-600 */
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 173 66% 50%;     /* #2dd4bf teal-400 */
+    --primary-dark: 175 77% 26%;      /* #0f766e teal-700 */
+
+    --secondary: 210 40% 96%;         /* slate-100 */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;             /* slate-100 */
+    --muted-foreground: 215 19% 35%;  /* #475569 slate-600 */
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 72% 51%;         /* #dc2626 red-600 */
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;           /* #16a34a green-600 */
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 44%;            /* #d97706 amber-600 */
+    --warning-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;            /* #e2e8f0 slate-200 */
+    --input: 214 32% 91%;
+    --ring: 175 84% 32%;              /* teal */
+
+    --radius: 0.75rem;                /* 12px, matching the old MUI shape */
+
+    /* Soft shadows (consumed by the SurveyJS --sjs-* bridge in Questionnaire.jsx) */
+    --shadow-small: 0 1px 2px hsl(222 47% 11% / 0.08);
+    --shadow-inner: inset 0 1px 2px hsl(222 47% 11% / 0.08);
+  }
+
+  .dark {
+    --background: 222 47% 8%;         /* #0b1120 */
+    --foreground: 220 14% 91%;        /* #e5e7eb gray-200 */
+
+    --card: 221 39% 11%;             /* #111827 gray-900 */
+    --card-foreground: 220 14% 91%;
+    --popover: 221 39% 11%;
+    --popover-foreground: 220 14% 91%;
+
+    --primary: 175 84% 32%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 173 66% 50%;
+    --primary-dark: 175 77% 26%;
+
+    --secondary: 215 28% 17%;         /* gray-800 */
+    --secondary-foreground: 220 14% 91%;
+    --muted: 215 28% 17%;
+    --muted-foreground: 215 20% 65%;  /* #94a3b8 slate-400 */
+    --accent: 215 28% 17%;
+    --accent-foreground: 220 14% 91%;
+
+    --destructive: 0 91% 71%;         /* #f87171 red-400 */
+    --destructive-foreground: 222 47% 11%;
+    --success: 142 71% 45%;           /* #22c55e green-500 */
+    --success-foreground: 222 47% 11%;
+    --warning: 38 92% 50%;            /* #f59e0b amber-500 */
+    --warning-foreground: 222 47% 11%;
+
+    --border: 215 28% 17%;            /* #1f2937 gray-800 */
+    --input: 215 28% 17%;
+    --ring: 173 66% 50%;
+
+    --shadow-small: 0 1px 2px hsl(0 0% 0% / 0.5);
+    --shadow-inner: inset 0 1px 2px hsl(0 0% 0% / 0.5);
+  }
 }
 
-html,
-body {
-  margin: 0;
-  height: 100%;
-}
+@layer base {
+  * {
+    box-sizing: border-box;
+    border-color: hsl(var(--border));
+  }
+  html,
+  body {
+    margin: 0;
+    height: 100%;
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: theme('fontFamily.sans');
+    transition: background-color 220ms ease;
+  }
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
 
-/* Font + background come from the MUI theme (CssBaseline). Do not hardcode here. */
-#root {
-  width: 100%;
-  min-height: 100vh;
+  /*
+   * Neutralize the browser's yellow/blue autofill background so saved
+   * username/password fields match the theme surface instead of flashing an
+   * off-palette highlight (carried over from the old MUI CssBaseline override).
+   */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 100px hsl(var(--card)) inset !important;
+    -webkit-text-fill-color: hsl(var(--foreground)) !important;
+    caret-color: hsl(var(--foreground));
+    border-radius: inherit;
+    transition: background-color 9999s ease-in-out 0s;
+  }
 }

@@ -5,13 +5,16 @@
 // same projection (src/tools/export).
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Box, Typography, Stack, Divider, Grid } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../components/ui/table';
+import { Spinner } from '../components/ui/spinner';
 import {
-  Box, Button, Container, Typography, Paper, Stack, Alert, Chip, Divider,
-  Table, TableHead, TableRow, TableCell, TableBody, CircularProgress, Grid,
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DownloadIcon from '@mui/icons-material/Download';
-import RefreshIcon from '@mui/icons-material/Refresh';
+  ArrowBack as ArrowBackIcon, Download as DownloadIcon, Refresh as RefreshIcon, Close,
+} from '../components/ui/icons';
 import { getConversationStore } from '../tools/stores';
 import { buildStudyExport, toTidyRows, summarizeRows } from '../tools/export';
 
@@ -64,32 +67,41 @@ export default function StudyData({ study, onBack }) {
   };
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Button startIcon={<ArrowBackIcon />} onClick={onBack}>Back</Button>
+    <Box className="min-h-screen bg-background">
+      <Box className="mx-auto max-w-[900px] px-6 py-8">
+        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-4">
+          <Button variant="ghost" onClick={onBack}><ArrowBackIcon />Back</Button>
           <Stack direction="row" spacing={1}>
-            <Button size="small" startIcon={<RefreshIcon />} onClick={load}>Refresh</Button>
-            <Button size="small" variant="outlined" startIcon={<DownloadIcon />}
-              onClick={() => doExport('json')} disabled={rows.length === 0}>JSON</Button>
-            <Button size="small" variant="contained" startIcon={<DownloadIcon />}
-              onClick={() => doExport('csv')} disabled={rows.length === 0}>CSV</Button>
+            <Button variant="ghost" size="sm" onClick={load}><RefreshIcon />Refresh</Button>
+            <Button size="sm" variant="outline"
+              onClick={() => doExport('json')} disabled={rows.length === 0}><DownloadIcon />JSON</Button>
+            <Button size="sm"
+              onClick={() => doExport('csv')} disabled={rows.length === 0}><DownloadIcon />CSV</Button>
           </Stack>
         </Stack>
 
-        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{study.title}</Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        <Typography variant="h5" className="mb-1 font-bold">{study.title}</Typography>
+        <Typography variant="body2" color="text.secondary" className="mb-6">
           Collected data — one CSV/JSON row per observation (reaction, highlight, or questionnaire answer),
           each carrying the study-condition provenance.
         </Typography>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <div className="flex items-start justify-between gap-2">
+              <AlertDescription>{error}</AlertDescription>
+              <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-6 w-6 shrink-0" onClick={() => setError(null)}>
+                <Close />
+              </Button>
+            </div>
+          </Alert>
+        )}
 
         {loading ? (
-          <Box sx={{ textAlign: 'center', py: 6 }}><CircularProgress /></Box>
+          <Box className="flex justify-center py-12"><Spinner size={40} /></Box>
         ) : (
           <>
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={2} className="mb-6">
               {[
                 ['Conversations', summary.conversationCount],
                 ['Observations', summary.observationCount],
@@ -97,81 +109,81 @@ export default function StudyData({ study, onBack }) {
                 ['Text answers', summary.textResponseCount],
               ].map(([label, n]) => (
                 <Grid item xs={6} sm={3} key={label}>
-                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', borderRadius: 2 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>{n}</Typography>
+                  <Card className="p-4 text-center">
+                    <Typography variant="h4" className="font-bold">{n}</Typography>
                     <Typography variant="caption" color="text.secondary">{label}</Typography>
-                  </Paper>
+                  </Card>
                 </Grid>
               ))}
             </Grid>
 
             {Object.keys(summary.reactionCounts).length > 0 && (
-              <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Reactions</Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Card className="mb-6 p-4">
+                <Typography variant="subtitle2" className="mb-2">Reactions</Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
                   {Object.entries(summary.reactionCounts).flatMap(([kind, vals]) =>
                     Object.entries(vals).map(([v, n]) => (
-                      <Chip key={`${kind}:${v}`} size="small" label={`${kind} · ${v}: ${n}`} />
+                      <Badge key={`${kind}:${v}`} variant="secondary">{`${kind} · ${v}: ${n}`}</Badge>
                     ))
                   )}
                 </Stack>
-              </Paper>
+              </Card>
             )}
 
             {Object.keys(summary.likertByQuestion).length > 0 && (
-              <Paper variant="outlined" sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Questionnaire (Likert) distributions</Typography>
+              <Card className="mb-6 p-4">
+                <Typography variant="subtitle2" className="mb-2">Questionnaire (Likert) distributions</Typography>
                 {Object.entries(summary.likertByQuestion).map(([q, dist]) => (
-                  <Box key={q} sx={{ mb: 1 }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{q}</Typography>
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Box key={q} className="mb-2">
+                    <Typography variant="body2" className="font-semibold">{q}</Typography>
+                    <Stack direction="row" spacing={1} flexWrap="wrap">
                       {Object.entries(dist).map(([v, n]) => (
-                        <Chip key={v} size="small" variant="outlined" label={`${v}: ${n}`} />
+                        <Badge key={v} variant="outline">{`${v}: ${n}`}</Badge>
                       ))}
                     </Stack>
                   </Box>
                 ))}
-              </Paper>
+              </Card>
             )}
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Conversations</Typography>
+            <Typography variant="subtitle1" className="mb-2 font-semibold">Conversations</Typography>
             {conversations.length === 0 ? (
-              <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', borderRadius: 2, borderStyle: 'dashed' }}>
+              <Card className="border-dashed p-8 text-center">
                 <Typography color="text.secondary">No conversations collected yet.</Typography>
-              </Paper>
+              </Card>
             ) : (
-              <Paper variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
-                <Table size="small">
-                  <TableHead>
+              <Card className="overflow-hidden">
+                <Table>
+                  <TableHeader>
                     <TableRow>
-                      <TableCell>Conversation</TableCell>
-                      <TableCell>Auditor</TableCell>
-                      <TableCell>Condition</TableCell>
-                      <TableCell align="right">Observations</TableCell>
-                      <TableCell>State</TableCell>
+                      <TableHead>Conversation</TableHead>
+                      <TableHead>Auditor</TableHead>
+                      <TableHead>Condition</TableHead>
+                      <TableHead className="text-right">Observations</TableHead>
+                      <TableHead>State</TableHead>
                     </TableRow>
-                  </TableHead>
+                  </TableHeader>
                   <TableBody>
                     {conversations.map((c) => {
                       const obs = rows.filter((r) => r.conversation_id === c.id).length;
                       return (
-                        <TableRow key={c.id} hover>
-                          <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{String(c.id).slice(0, 8)}</TableCell>
+                        <TableRow key={c.id}>
+                          <TableCell className="font-mono text-xs">{String(c.id).slice(0, 8)}</TableCell>
                           <TableCell>{c.userID || c.userId || '—'}</TableCell>
                           <TableCell>{c.provenance?.controlMode || '—'}</TableCell>
-                          <TableCell align="right">{obs}</TableCell>
-                          <TableCell><Chip size="small" label={c.state || 'unknown'} /></TableCell>
+                          <TableCell className="text-right">{obs}</TableCell>
+                          <TableCell><Badge variant="secondary">{c.state || 'unknown'}</Badge></TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
                 <Divider />
-              </Paper>
+              </Card>
             )}
           </>
         )}
-      </Container>
+      </Box>
     </Box>
   );
 }

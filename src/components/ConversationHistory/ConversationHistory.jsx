@@ -1,6 +1,11 @@
 // src/components/ConversationHistory.jsx
 import React from 'react';
-import { Typography, Paper, TextField, Chip, Box } from '@mui/material';
+import { Typography, Box } from '../ui/layout';
+import { Card } from '../ui/card';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
+import { Badge } from '../ui/badge';
 import ChatHistory from '../ChatHistory/ChatHistory';
 import styles from './ConversationHistory.module.css';
 
@@ -33,7 +38,7 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                 auditFinished={true}
             />
             {audit && (
-                <Paper variant="outlined" sx={{ p: 3, mb: 2, borderRadius: 2 }} className="free-response">
+                <Card className="free-response p-6 mb-4 rounded-md">
                     <Typography variant="h6" gutterBottom align="center">
                         Your reported details
                     </Typography>
@@ -46,15 +51,14 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                                 const [questionId, row] = key.split('-');
                                 const question = effectiveSurveyQuestions.questions.find(q => q.id === questionId);
                                 return (
-                                    <TextField
-                                        key={key}
-                                        label={`${questionLabels[questionId] || questionId}: ${row}`}
-                                        value={value || ''}
-                                        variant="outlined"
-                                        fullWidth
-                                        margin="normal"
-                                        readOnly={true}
-                                    />
+                                    <div key={key} className="my-4">
+                                        <Label>{`${questionLabels[questionId] || questionId}: ${row}`}</Label>
+                                        <Input
+                                            value={value || ''}
+                                            readOnly={true}
+                                            className="mt-1"
+                                        />
+                                    </div>
                                 );
                             })}
                         </>
@@ -64,9 +68,9 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                             <Typography variant="subtitle1" gutterBottom>
                                 Highlighted Passages
                             </Typography>
-                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+                            <Box className="flex flex-wrap gap-2 mb-4">
                                 {audit.highlights.map((highlight, index) => (
-                                    <Chip key={index} label={highlight.quotedText || highlight.text} color="primary" size="small" />
+                                    <Badge key={index}>{highlight.quotedText || highlight.text}</Badge>
                                 ))}
                             </Box>
                         </>
@@ -77,17 +81,15 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                                 Free Response Answers
                             </Typography>
                             {Object.entries(audit.textResponses).map(([key, value]) => (
-                                <TextField
-                                    key={key}
-                                    label={questionLabels[key] || key}
-                                    multiline
-                                    rows={4}
-                                    variant="outlined"
-                                    fullWidth
-                                    margin="normal"
-                                    value={value || ''}
-                                    readOnly={true}
-                                />
+                                <div key={key} className="my-4">
+                                    <Label>{questionLabels[key] || key}</Label>
+                                    <Textarea
+                                        rows={4}
+                                        value={value || ''}
+                                        readOnly={true}
+                                        className="mt-1"
+                                    />
+                                </div>
                             ))}
                         </>
                     )}
@@ -97,15 +99,14 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                                 Questionnaire Answers
                             </Typography>
                             {Object.entries(audit.questionnaire).map(([key, value]) => (
-                                <TextField
-                                    key={key}
-                                    label={key}
-                                    value={typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '')}
-                                    variant="outlined"
-                                    fullWidth
-                                    margin="normal"
-                                    readOnly={true}
-                                />
+                                <div key={key} className="my-4">
+                                    <Label>{key}</Label>
+                                    <Input
+                                        value={typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value ?? '')}
+                                        readOnly={true}
+                                        className="mt-1"
+                                    />
+                                </div>
                             ))}
                         </>
                     )}
@@ -117,7 +118,7 @@ const ConversationHistory = ({ conversation, surveyQuestions }) => {
                             No audit responses provided.
                         </Typography>
                     )}
-                </Paper>
+                </Card>
             )}
         </>
     );

@@ -7,57 +7,49 @@
 // text was silently ignored.
 
 import React, { useState } from 'react';
-import { Box, Button, Typography, Paper, Checkbox, FormControlLabel, Stack } from '@mui/material';
+import { Box, Typography, Stack } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Card } from '../components/ui/card';
+import { Checkbox } from '../components/ui/checkbox';
 
 export default function ConsentGate({ text, version, onAgree, onDecline, busy = false }) {
   const [checked, setChecked] = useState(false);
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh', bgcolor: 'background.default',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2,
-      }}
-    >
-      <Paper variant="outlined" sx={{ p: 4, maxWidth: 680, width: '100%', borderRadius: 3 }}>
-        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+    <Box className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-[680px] rounded-xl p-8">
+        <Typography variant="h5" gutterBottom className="font-bold">
           Before you begin
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" className="mb-4">
           Please read the following and confirm your consent to participate.
         </Typography>
 
-        <Box
-          sx={{
-            maxHeight: '48vh', overflowY: 'auto', p: 2, mb: 2,
-            bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2,
-          }}
-        >
-          <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+        <Box className="mb-4 max-h-[48vh] overflow-y-auto rounded-md border bg-card p-4">
+          <Typography variant="body1" className="whitespace-pre-wrap">
             {text}
           </Typography>
         </Box>
 
-        <FormControlLabel
-          control={<Checkbox checked={checked} onChange={(e) => setChecked(e.target.checked)} />}
-          label="I have read the above and agree to participate."
-        />
+        <label className="flex items-center gap-2">
+          <Checkbox checked={checked} onCheckedChange={(v) => setChecked(v === true)} />
+          <span className="text-sm">I have read the above and agree to participate.</span>
+        </label>
 
-        <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
+        <Stack direction="row" spacing={2} className="mt-4">
           <Button
-            variant="contained"
             disabled={!checked || busy}
             onClick={() => onAgree && onAgree(version ?? null)}
           >
             Agree &amp; continue
           </Button>
           {onDecline && (
-            <Button variant="text" color="inherit" onClick={onDecline} disabled={busy}>
+            <Button variant="ghost" onClick={onDecline} disabled={busy}>
               Decline
             </Button>
           )}
         </Stack>
-      </Paper>
+      </Card>
     </Box>
   );
 }

@@ -1,27 +1,30 @@
 import React from "react";
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-} from "@mui/material";
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Typography } from "./ui/layout";
 
 function ErrorDialog({ open, onClose, title = "Error", message = "An unexpected error occurred." }) {
   return (
-    <Dialog open={open} onClose={onClose} aria-labelledby="error-dialog-title" maxWidth="sm" fullWidth>
-      <DialogTitle id="error-dialog-title">{title}</DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="sm:max-w-lg" aria-labelledby="error-dialog-title">
+        <DialogHeader>
+          <DialogTitle id="error-dialog-title">{title}</DialogTitle>
+        </DialogHeader>
         <Typography variant="body1" color="textSecondary">
           {message}
         </Typography>
+        <DialogFooter>
+          <Button onClick={onClose} autoFocus>
+            Close
+          </Button>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="primary" variant="contained" autoFocus>
-          Close
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 }

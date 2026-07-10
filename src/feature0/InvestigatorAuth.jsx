@@ -1,6 +1,12 @@
 // InvestigatorAuth — login / sign-up form for investigators.
 import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Tabs, Tab, Alert, Paper } from '@mui/material';
+import { Box, Typography } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Alert } from '../components/ui/alert';
+import { Card } from '../components/ui/card';
 import { useFeature0 } from './Feature0Context';
 
 export default function InvestigatorAuth() {
@@ -26,23 +32,34 @@ export default function InvestigatorAuth() {
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 4, maxWidth: 420, mx: 'auto', mt: 6, borderRadius: 3 }}>
+    <Card className="mx-auto mt-12 max-w-[420px] rounded-xl p-8">
       <Typography variant="h6" gutterBottom>Investigator access</Typography>
-      <Tabs value={mode} onChange={(_, v) => setMode(v)} sx={{ mb: 2 }}>
-        <Tab label="Sign in" value="signin" />
-        <Tab label="Create account" value="signup" />
+      <Tabs value={mode} onValueChange={setMode} className="mb-4">
+        <TabsList>
+          <TabsTrigger value="signin">Sign in</TabsTrigger>
+          <TabsTrigger value="signup">Create account</TabsTrigger>
+        </TabsList>
       </Tabs>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {error && <Alert variant="destructive" className="mb-4">{error}</Alert>}
+      <Box component="form" onSubmit={submit} className="flex flex-col gap-4">
         {mode === 'signup' && (
-          <TextField label="Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="inv-name">Name</Label>
+            <Input id="inv-name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+          </div>
         )}
-        <TextField label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required fullWidth />
-        <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required fullWidth />
-        <Button type="submit" variant="contained" disabled={busy}>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="inv-email">Email</Label>
+          <Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="inv-password">Password</Label>
+          <Input id="inv-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        <Button type="submit" disabled={busy}>
           {mode === 'signin' ? 'Sign in' : 'Create account'}
         </Button>
       </Box>
-    </Paper>
+    </Card>
   );
 }

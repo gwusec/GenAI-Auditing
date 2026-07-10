@@ -2,25 +2,27 @@ import React from "react";
 import ExportManager from "./ExportManager";
 import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-  Button,
-  Typography,
-  Stack
-} from "@mui/material";
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "./ui/dialog";
+import { Button } from "./ui/button";
+import { Typography, Stack } from "./ui/layout";
 
 function ChatDialog({ open, onClose, showNewChat = true, showExportManager = true }) {
   return (
-    <Dialog open={open} aria-labelledby="error-dialog-title" maxWidth="sm" fullWidth
-      disableEscapeKeyDown   // Prevent closing dialog with ESC key
-      onClose={(event, reason) => {
-        if (reason !== "backdropClick") {
-          onClose(event); // Only call onClose if it's not a backdrop click
-        }
-      }}>
-      <DialogTitle id="error-dialog-title">Thank You!</DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent
+        className="sm:max-w-lg"
+        aria-labelledby="error-dialog-title"
+        showCloseButton={false}
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle id="error-dialog-title">Thank You!</DialogTitle>
+        </DialogHeader>
         {showNewChat && showExportManager ? (
           <Typography variant="body1" color="textSecondary">
             You have enough time left to start another conversation. Would you like to
@@ -39,17 +41,17 @@ function ChatDialog({ open, onClose, showNewChat = true, showExportManager = tru
             Please start the first conversation.
           </Typography>
         )}
+        <DialogFooter>
+          <Stack spacing={2} direction="column" className="w-full">
+            {showNewChat && (
+              <Button onClick={onClose} autoFocus>
+                Start New Chat & Audit
+              </Button>
+            )}
+            {showExportManager && <ExportManager />}
+          </Stack>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        <Stack spacing={2} direction="column" width="100%">
-          {showNewChat && (
-            <Button onClick={onClose} color="primary" variant="contained" autoFocus>
-              Start New Chat & Audit
-            </Button>
-          )}
-          {showExportManager && <ExportManager />}
-        </Stack>
-      </DialogActions>
     </Dialog>
   );
 }

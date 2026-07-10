@@ -2,50 +2,45 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Alert,
     List,
     ListItem,
     Typography,
-    Paper,
-    IconButton,
     Divider,
-    Chip,
-    TextField,
     Box,
     Stack,
-    Button,
-    Tooltip,
-    Avatar,
-} from "@mui/material";
+} from '../ui/layout';
+import { Alert, AlertDescription } from '../ui/alert';
+import { Card } from '../ui/card';
+import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { Button } from '../ui/button';
+import { Tooltip } from '../ui/tooltip';
+import { Edit as EditIcon, Close as CancelIcon } from '../ui/icons';
 import {
-    Edit as EditIcon,
     Save as SaveIcon,
-    Cancel as CancelIcon,
-    ThumbUpAlt as ThumbUpIcon,
-    ThumbDownAlt as ThumbDownIcon,
+    ThumbsUp as ThumbUpIcon,
+    ThumbsDown as ThumbDownIcon,
     Star as StarIcon,
-    StarBorder as StarBorderIcon,
     Flag as FlagIcon,
-    ChatBubbleOutline as CommentIcon,
-    Person as PersonIcon,
-    AutoAwesome as BotIcon,
-} from "@mui/icons-material";
+    MessageCircle as CommentIcon,
+    User as PersonIcon,
+    Sparkles as BotIcon,
+} from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 // Speaker avatar: teal bot mark for the chatbot, neutral person circle for the auditor.
 function SpeakerAvatar({ author }) {
     const isUser = author === 'user';
     return (
-        <Avatar
-            variant="rounded"
-            sx={{
-                width: 32, height: 32, flex: 'none', mt: '2px',
-                borderRadius: '10px',
-                bgcolor: isUser ? 'action.selected' : 'primary.main',
-                color: isUser ? 'text.secondary' : 'primary.contrastText',
-            }}
+        <div
+            className={cn(
+                'mt-[2px] flex h-8 w-8 flex-none items-center justify-center rounded-[10px]',
+                isUser ? 'bg-accent text-muted-foreground' : 'bg-primary text-primary-foreground',
+            )}
         >
-            {isUser ? <PersonIcon sx={{ fontSize: 18 }} /> : <BotIcon sx={{ fontSize: 18 }} />}
-        </Avatar>
+            {isUser ? <PersonIcon size={18} /> : <BotIcon size={18} />}
+        </div>
     );
 }
 import ReactMarkdown from 'react-markdown';
@@ -68,29 +63,29 @@ function MessageReactions({ messageId, types, reactions, onReact }) {
     const commentCount = reactions.filter((r) => r.messageId === messageId && r.type === 'comment' && r.comment).length;
 
     return (
-        <Box onMouseUp={(e) => e.stopPropagation()} sx={{ mt: 0.5 }}>
+        <Box onMouseUp={(e) => e.stopPropagation()} className="mt-1">
             <Stack direction="row" spacing={0.5} alignItems="center">
                 {types.includes('thumbs') && (
                     <>
-                        <Tooltip title="Helpful"><IconButton size="small" color={thumbs === 'up' ? 'primary' : 'default'} onClick={() => onReact('thumbs', thumbs === 'up' ? null : 'up')}><ThumbUpIcon fontSize="small" /></IconButton></Tooltip>
-                        <Tooltip title="Not helpful"><IconButton size="small" color={thumbs === 'down' ? 'error' : 'default'} onClick={() => onReact('thumbs', thumbs === 'down' ? null : 'down')}><ThumbDownIcon fontSize="small" /></IconButton></Tooltip>
+                        <Tooltip title="Helpful"><Button variant="ghost" size="icon" className={cn('h-8 w-8', thumbs === 'up' && 'text-primary')} onClick={() => onReact('thumbs', thumbs === 'up' ? null : 'up')}><ThumbUpIcon size={18} /></Button></Tooltip>
+                        <Tooltip title="Not helpful"><Button variant="ghost" size="icon" className={cn('h-8 w-8', thumbs === 'down' && 'text-destructive')} onClick={() => onReact('thumbs', thumbs === 'down' ? null : 'down')}><ThumbDownIcon size={18} /></Button></Tooltip>
                     </>
                 )}
                 {types.includes('star') && (
-                    <Tooltip title="Star"><IconButton size="small" color={star ? 'warning' : 'default'} onClick={() => onReact('star', star ? null : true)}>{star ? <StarIcon fontSize="small" /> : <StarBorderIcon fontSize="small" />}</IconButton></Tooltip>
+                    <Tooltip title="Star"><Button variant="ghost" size="icon" className={cn('h-8 w-8', star && 'text-warning')} onClick={() => onReact('star', star ? null : true)}>{star ? <StarIcon size={18} className="fill-current" /> : <StarIcon size={18} />}</Button></Tooltip>
                 )}
                 {types.includes('flag') && (
-                    <Tooltip title="Flag as problematic"><IconButton size="small" color={flag ? 'error' : 'default'} onClick={() => onReact('flag', flag ? null : true)}><FlagIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Flag as problematic"><Button variant="ghost" size="icon" className={cn('h-8 w-8', flag && 'text-destructive')} onClick={() => onReact('flag', flag ? null : true)}><FlagIcon size={18} /></Button></Tooltip>
                 )}
                 {types.includes('comment') && (
-                    <Tooltip title="Add a comment"><IconButton size="small" color={commentCount ? 'primary' : 'default'} onClick={() => setCommentOpen((o) => !o)}><CommentIcon fontSize="small" /></IconButton></Tooltip>
+                    <Tooltip title="Add a comment"><Button variant="ghost" size="icon" className={cn('h-8 w-8', commentCount && 'text-primary')} onClick={() => setCommentOpen((o) => !o)}><CommentIcon size={18} /></Button></Tooltip>
                 )}
                 {commentCount > 0 && <Typography variant="caption" color="text.secondary">{commentCount} comment(s)</Typography>}
             </Stack>
             {commentOpen && (
-                <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                    <TextField size="small" placeholder="Add a comment…" value={comment} onChange={(e) => setComment(e.target.value)} fullWidth />
-                    <Button size="small" variant="contained" onClick={() => { if (comment.trim()) { onReact('comment', null, comment.trim()); setComment(''); setCommentOpen(false); } }}>Add</Button>
+                <Stack direction="row" spacing={1} className="mt-1">
+                    <Input placeholder="Add a comment…" value={comment} onChange={(e) => setComment(e.target.value)} />
+                    <Button size="sm" onClick={() => { if (comment.trim()) { onReact('comment', null, comment.trim()); setComment(''); setCommentOpen(false); } }}>Add</Button>
                 </Stack>
             )}
         </Box>
@@ -173,11 +168,19 @@ const ChatMessages = ({
         if (error) {
             return (
                 <Alert
-                    severity="error"
-                    onClose={() => setError(null)}
-                    className={styles['error-alert']}
+                    variant="destructive"
+                    className={cn('relative', styles['error-alert'])}
                 >
-                    {error}
+                    <AlertDescription>{error}</AlertDescription>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setError(null)}
+                        className="absolute right-2 top-2 h-6 w-6"
+                        aria-label="Close"
+                    >
+                        <CancelIcon fontSize="small" />
+                    </Button>
                 </Alert>
             );
         }
@@ -191,7 +194,7 @@ const ChatMessages = ({
       No messages yet. Send a message to start the conversation.
     </Typography>
   </ListItem>
-  
+
   <ListItem className={styles['no-messages']} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
     <Typography variant="body1" align="center">
       You can ask or request the AI chatbot anything you like that helps you determine if the AI chatbot produces outputs that are problematic, unfair, or questionable.
@@ -219,122 +222,91 @@ const ChatMessages = ({
                     return (
                         <ListItem
                             key={message.id}
-                            className={(message.id === animateId && message.author === 'user') ? styles['message-row'] : undefined}
+                            className={cn(
+                                'mb-4 max-w-full',
+                                message.author === 'user' ? 'justify-end' : 'justify-start',
+                                (message.id === animateId && message.author === 'user') && styles['message-row'],
+                            )}
                             onMouseUp={() =>
                                 handleTextSelection &&
                                 handleTextSelection(message.id, message.author, message.content)
                             }
-                            sx={{
-                                display: 'flex',
-                                marginBottom: '16px',
-                                justifyContent: message.author === 'user' ? 'flex-end' : 'flex-start',
-                                maxWidth: '100%',
-                            }}
                         >
-                            <Box sx={{
-                                display: 'flex',
-                                gap: 1.25,
-                                alignItems: 'flex-start',
-                                flexDirection: message.author === 'user' ? 'row-reverse' : 'row',
-                                maxWidth: '82%',
-                                minWidth: 0,
-                            }}>
+                            <Box className={cn(
+                                'flex items-start gap-2.5 min-w-0 max-w-[82%]',
+                                message.author === 'user' ? 'flex-row-reverse' : 'flex-row',
+                            )}>
                             <SpeakerAvatar author={message.author} />
                             <Box
-                                sx={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    minWidth: 0,
-                                    maxWidth: '100%',
-                                }}
-                                className={styles['message-bubble-container']}
+                                className={cn('flex flex-col min-w-0 max-w-full', styles['message-bubble-container'])}
                             >
                                 {/* Username */}
                                 <Typography
                                     variant="caption"
-                                    sx={{
-                                        marginBottom: '4px',
-                                        fontSize: '0.85em',
-                                        color: 'text.secondary',
-                                        textAlign: message.author === 'user' ? 'right' : 'left', // Align based on author
-                                        display: 'block', // Ensures the alignment applies properly
-                                    }}
-                                    className={styles['message-author']}
+                                    className={cn(
+                                        'mb-1 block text-[0.85em]',
+                                        message.author === 'user' ? 'text-right' : 'text-left',
+                                        styles['message-author'],
+                                    )}
                                 >
                                     <strong>{message.author === 'user' ? 'You' : 'AI Chatbot'}</strong>
                                 </Typography>
 
                                 {/* Message bubble */}
-                                <Paper
-                                    elevation={0}
-                                    sx={{
-                                        padding: '8px 13px',
-                                        wordBreak: 'break-word',
-                                        fontSize: '0.9rem',
-                                        lineHeight: 1.55,
-                                        width: 'fit-content',
-                                        maxWidth: '100%',
-                                        border: '1px solid',
-                                        borderColor: message.author === 'user' ? 'transparent' : 'divider',
-                                        color: message.author === 'user'
-                                            ? (t) => (t.palette.mode === 'dark' ? '#ccfbf1' : '#134e4a')
-                                            : 'text.primary',
-                                        backgroundColor: message.author === 'user'
-                                            ? (t) => (t.palette.mode === 'dark' ? 'rgba(20,184,166,0.20)' : 'rgba(13,148,136,0.12)')
-                                            : 'background.paper',
-                                        borderRadius: message.author === 'user' ? '16px 6px 16px 16px' : '6px 16px 16px 16px',
-                                    }}
-                                    className={`
-                                        ${styles['message-paper']} 
-                                        ${message.author === 'user' ? styles['user-message'] : styles['bot-message']}
-                                    `}
+                                <Card
+                                    className={cn(
+                                        'w-fit max-w-full break-words border px-[13px] py-2 text-[0.9rem] leading-[1.55]',
+                                        message.author === 'user'
+                                            ? 'border-transparent text-[#134e4a] dark:text-[#ccfbf1] bg-[rgba(13,148,136,0.12)] dark:bg-[rgba(20,184,166,0.20)] rounded-[16px_6px_16px_16px]'
+                                            : 'border-border text-foreground bg-card rounded-[6px_16px_16px_16px]',
+                                        styles['message-paper'],
+                                        message.author === 'user' ? styles['user-message'] : styles['bot-message'],
+                                    )}
                                 >
                                     {/* Status chips */}
                                     {isRestartedMessage && (
-                                        <Chip
-                                            label="Restarted Conversation"
-                                            size="small"
-                                            color="success"
-                                            sx={{ marginBottom: '8px' }}
-                                            className={`${styles['status-chip']} ${styles['restart-chip']}`}
-                                        />
+                                        <Badge
+                                            variant="success"
+                                            className={cn('mb-2', styles['status-chip'], styles['restart-chip'])}
+                                        >
+                                            Restarted Conversation
+                                        </Badge>
                                     )}
                                     {isEditedMessage && (
-                                        <Chip
-                                            label="Edited Message"
-                                            size="small"
-                                            color="warning"
-                                            sx={{ marginBottom: '8px' }}
-                                            className={`${styles['status-chip']} ${styles['edit-chip']}`}
-                                        />
+                                        <Badge
+                                            variant="warning"
+                                            className={cn('mb-2', styles['status-chip'], styles['edit-chip'])}
+                                        >
+                                            Edited Message
+                                        </Badge>
                                     )}
                                     {/* Message content */}
                                     <div className={styles['message-content']}>
                                         {editingMessageId === message.id ? (
                                             <div className={styles['edit-message-container']}>
-                                                <TextField
-                                                    fullWidth
-                                                    multiline
+                                                <Textarea
                                                     value={editedContent}
                                                     onChange={(e) => setEditedContent(e.target.value)}
                                                     className={styles['edit-textfield']}
                                                 />
-                                                <IconButton
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={onSaveEdit}
-                                                    size="small"
                                                     aria-label="Save edited message"
                                                     title="Save edited message"
                                                 >
-                                                    <SaveIcon fontSize="small" />
-                                                </IconButton>
-                                                <IconButton
+                                                    <SaveIcon size={18} />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
                                                     onClick={onCancelEdit}
-                                                    size="small"
                                                     aria-label="Cancel editing"
                                                     title="Cancel editing"
                                                 >
                                                     <CancelIcon fontSize="small" />
-                                                </IconButton>
+                                                </Button>
                                             </div>
                                         ) : (
                                             <ReactMarkdown
@@ -375,7 +347,7 @@ const ChatMessages = ({
                                             {formatTimestamp(message.timestamp)}
                                         </Typography>
                                     </div>
-                                </Paper>
+                                </Card>
 
                                 {/* Turn-level reactions on chatbot messages */}
                                 {reactionCfg.enabled && message.author !== 'user' && !editingMessageId && (
@@ -397,15 +369,16 @@ const ChatMessages = ({
                                 index === messages.length - 2 &&
                                 !message.isRestarted &&
                                 !editingMessageId && (
-                                    <IconButton
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
                                         onClick={() => onEditMessage(message.id)}
-                                        size="small"
                                         className={styles['edit-button']}
                                         aria-label="Edit message"
                                         title="Edit message"
                                     >
                                         <EditIcon fontSize="small" />
-                                    </IconButton>
+                                    </Button>
                                 )}
                         </ListItem>
                     );
@@ -414,33 +387,28 @@ const ChatMessages = ({
                 {/* Live streaming reply: typing dots until the first token, then
                     the reply flows in with a blinking caret. */}
                 {streaming !== null && (
-                    <ListItem className={styles['message-row']} sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2, maxWidth: '100%' }}>
-                        <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', flexDirection: 'row', maxWidth: '82%' }}>
+                    <ListItem className={cn('justify-start mb-4 max-w-full', styles['message-row'])}>
+                        <Box className="flex items-start gap-2.5 max-w-[82%] flex-row">
                             <SpeakerAvatar author="bot" />
-                            <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <Box className="flex flex-col min-w-0">
                                 <Typography
                                     variant="caption"
-                                    sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'left', display: 'block' }}
+                                    className="mb-1 block text-left text-[0.85em]"
                                 >
                                     <strong>AI Chatbot</strong>
                                 </Typography>
-                                <Paper
-                                    elevation={0}
-                                    sx={{
-                                        padding: '8px 13px', border: '1px solid', borderColor: 'divider',
-                                        backgroundColor: 'background.paper', borderRadius: '6px 16px 16px 16px',
-                                        wordBreak: 'break-word', width: 'fit-content', maxWidth: '100%',
-                                    }}
+                                <Card
+                                    className="w-fit max-w-full break-words border border-border bg-card px-[13px] py-2 rounded-[6px_16px_16px_16px]"
                                 >
                                     {streaming === '' ? (
                                         <LoadingDots />
                                     ) : (
-                                        <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                                        <Typography component="div" className="whitespace-pre-wrap text-[0.9rem] leading-[1.55]">
                                             {streaming}
                                             <span className={styles['stream-caret']} />
                                         </Typography>
                                     )}
-                                </Paper>
+                                </Card>
                             </Box>
                         </Box>
                     </ListItem>
@@ -448,16 +416,10 @@ const ChatMessages = ({
 
                 {/* Fallback loading indicator (only when not actively streaming). */}
                 {isLoading && streaming === null && (
-                    <ListItem
-                        sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-end",
-                            mb: 2,
-                        }}>
-                        <Paper elevation={1} className={styles['loading-paper']}>
+                    <ListItem className="flex-col items-end mb-4">
+                        <Card className={styles['loading-paper']}>
                             <LoadingDots />
-                        </Paper>
+                        </Card>
                     </ListItem>
                 )}
             </>

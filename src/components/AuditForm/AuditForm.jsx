@@ -8,23 +8,16 @@ import AuditPage0Tutorial from '../tutorials/AuditPage0Tutorial';
 import AuditPage1Tutorial from '../tutorials/AuditPage1Tutorial';
 import AuditPage2Tutorial from '../tutorials/AuditPage2Tutorial';
 import styles from './AuditForm.module.css';
-import {
-    Typography,
-    Box,
-    Checkbox,
-    Button,
-    Radio,
-    Table,
-    TableHead,
-    TableBody,
-    TableRow,
-    TableCell,
-    TextField,
-    Chip,
-    Paper,
-    Alert,
-} from '@mui/material';
-import InfoIcon from '@mui/icons-material/Info';
+import { Typography, Box } from '../ui/layout';
+import { Button } from '../ui/button';
+import { Checkbox } from '../ui/checkbox';
+import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
+import { Card } from '../ui/card';
+import { Alert } from '../ui/alert';
+import { Badge } from '../ui/badge';
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '../ui/table';
+import { Info, Close } from '../ui/icons';
 
 const fairnessPropertiesRandomOrder = [...fairnessProperties].sort(() => 0.5 - Math.random());
 
@@ -215,30 +208,12 @@ const AuditForm = ({
                 Reporting
             </Typography>
             <Box className={styles['main-content']}>
-                <Box
-                    sx={{
-                        width: '45%',
-                        overflowY: 'hidden',
-                        pl: 2,
-                        pr: 2,
-                        pt: 1,
-                        borderRight: '1px solid #ddd',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        height: '100%',
-                    }}
-                >
+                <Box className="w-[45%] overflow-hidden pl-4 pr-4 pt-2 border-r border-[#ddd] flex flex-col h-full">
                     <div tutorial-step="chat-history">
                         <Typography variant="h6" gutterBottom align="center">
                             Your previous conversation
                         </Typography>
-                        <Box
-                            sx={{
-                                overflowY: 'auto',
-                                flex: 1,
-                                maxHeight: 'calc(100vh - 64px)',
-                            }}
-                        >
+                        <Box className="overflow-y-auto flex-1 max-h-[calc(100vh-64px)]">
                             <ChatHistory
                                 conversationId={conversationId}
                                 addHighlight={handleHighlight}
@@ -252,50 +227,37 @@ const AuditForm = ({
                         </Box>
                     </div>
                 </Box>
-                <Box
-                    sx={{
-                        width: '55%',
-                        overflowY: 'auto',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        pr: 1,
-                        pt: 1,
-                        height: '100%',
-                    }}
-                >
-                    <Box sx={{ width: '95%', maxWidth: '800px' }}>
+                <Box className="w-[55%] overflow-y-auto flex flex-col items-center pr-2 pt-2 h-full">
+                    <Box className="w-[95%] max-w-[800px]">
                         {!hasAuditContent && conversationState === STATE.COMPLETE && (
-                            <Paper elevation={3} sx={{ p: 3, mb: 2 }}>
+                            <Card className="p-6 mb-4">
                                 <Typography variant="h6" gutterBottom align="center">
                                     No Audit Questions Available
                                 </Typography>
                                 <Typography variant="body1">
                                     There are no audit questions configured for this session. You can review the conversation or complete the audit.
                                 </Typography>
-                                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                                <Box className="flex justify-end mt-4">
                                     <Button
-                                        variant="contained"
-                                        color="primary"
                                         onClick={handleSubmit}
                                         disabled={isSubmitted}
                                     >
                                         Complete Audit
                                     </Button>
                                 </Box>
-                            </Paper>
+                            </Card>
                         )}
                         {conversationState === STATE.AUDIT_LIKERTRESPONSE && (
                             <>
-                                <Paper className={styles['fairness-properties']} elevation={3}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                                <Card className={styles['fairness-properties']}>
+                                    <Box className="flex items-center relative">
                                         <Typography variant="h6" gutterBottom align="center">
                                             Please rate the AI Chatbot's performance
                                         </Typography>
                                     </Box>
-                                </Paper>
-                                <Paper className={styles['fairness-properties']} elevation={3}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                                </Card>
+                                <Card className={styles['fairness-properties']}>
+                                    <Box className="flex items-center relative">
                                         <Typography variant="subtitle2" gutterBottom>
                                             Please verify that the AI chatbot upholds these principles:
                                         </Typography>
@@ -305,64 +267,56 @@ const AuditForm = ({
                                             <li key={index}>{property}</li>
                                         ))}
                                     </Box>
-                                </Paper>
+                                </Card>
                                 {effectiveSurveyQuestions.questions
                                     .filter(q => q.type === 'matrix')
                                     .map((question, qIndex) => (
-                                        <Paper key={question.id} elevation={3} sx={{ p: 3, mb: 2 }} className="likert-scale" tutorial-step="chat-performance-rating">
+                                        <Card key={question.id} className="p-6 mb-4 likert-scale" tutorial-step="chat-performance-rating">
                                             <Typography variant="subtitle2" gutterBottom>
                                                 {question.content || 'Matrix Question'}
                                             </Typography>
-                                            <Table size="small">
-                                                <TableHead>
+                                            <Table>
+                                                <TableHeader>
                                                     <TableRow>
-                                                        <TableCell sx={{ width: '40%', fontWeight: 'bold' }}>
+                                                        <TableHead className="w-[40%] font-bold">
                                                             Statements
-                                                        </TableCell>
+                                                        </TableHead>
                                                         {question.settings.columns.map((column, index) => (
-                                                            <TableCell
+                                                            <TableHead
                                                                 key={index}
-                                                                align="center"
-                                                                sx={{
-                                                                    fontWeight: 'bold',
-                                                                    padding: '6px 2px',
-                                                                    width: `${60 / question.settings.columns.length}%`,
-                                                                    fontSize: '0.75rem',
-                                                                    lineHeight: 1.2,
-                                                                    whiteSpace: 'normal',
-                                                                    wordWrap: 'break-word',
-                                                                }}
+                                                                className="font-bold text-center text-[0.75rem] leading-[1.2] whitespace-normal break-words px-[2px] py-[6px]"
+                                                                style={{ width: `${60 / question.settings.columns.length}%` }}
                                                             >
                                                                 <Typography
                                                                     component="div"
                                                                     variant="body2"
-                                                                    sx={{ whiteSpace: 'normal', wordWrap: 'break-word' }}
+                                                                    className="whitespace-normal break-words"
                                                                 >
                                                                     {column}
                                                                 </Typography>
-                                                            </TableCell>
+                                                            </TableHead>
                                                         ))}
                                                     </TableRow>
-                                                </TableHead>
+                                                </TableHeader>
                                                 <TableBody>
                                                     {question.settings.rows.map((row, rowIndex) => (
                                                         <TableRow key={rowIndex}>
-                                                            <TableCell sx={{ padding: '8px 4px' }}>
+                                                            <TableCell className="py-2 px-1">
                                                                 {row}
                                                             </TableCell>
                                                             {question.settings.columns.map((column, colIndex) => (
                                                                 <TableCell
                                                                     key={colIndex}
-                                                                    align="center"
-                                                                    sx={{ padding: '6px 2px' }}
+                                                                    className="text-center px-[2px] py-[6px]"
                                                                 >
-                                                                    <Radio
+                                                                    <input
+                                                                        type="radio"
                                                                         checked={auditData.likertResponses[`${question.id}-${row}`] === column}
                                                                         onChange={() => handleMatrixChange(question.id, row, column)}
                                                                         value={column}
                                                                         name={`${question.id}-${row}`}
                                                                         required={question.settings.required}
-                                                                        size="small"
+                                                                        className="h-4 w-4 accent-[hsl(var(--primary))]"
                                                                     />
                                                                 </TableCell>
                                                             ))}
@@ -372,20 +326,19 @@ const AuditForm = ({
                                             </Table>
                                             {question.settings.rows.map(row => (
                                                 errors[`${question.id}-${row}`] && (
-                                                    <Alert key={`${question.id}-${row}`} severity="error" sx={{ mt: 1 }}>
+                                                    <Alert key={`${question.id}-${row}`} variant="destructive" className="mt-2">
                                                         {errors[`${question.id}-${row}`]}
                                                     </Alert>
                                                 )
                                             ))}
-                                        </Paper>
+                                        </Card>
                                     ))}
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                                    <Button startIcon={<InfoIcon />} onClick={handleReplayTutorial}>
+                                <Box className="flex justify-between mt-4">
+                                    <Button variant="ghost" onClick={handleReplayTutorial}>
+                                        <Info />
                                         Replay Tutorial
                                     </Button>
                                     <Button
-                                        variant="contained"
-                                        color="primary"
                                         onClick={() => handleStateChange(getNextState())}
                                         disabled={
                                             effectiveSurveyQuestions.questions.some(q => q.type === 'matrix' && q.settings.required) &&
@@ -405,56 +358,59 @@ const AuditForm = ({
                                     .filter(q => q.type === 'textHighlight')
                                     .map((question, qIndex) => (
                                         <Box key={question.id}>
-                                            <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section">
+                                            <Card className="p-6 mb-4 highlight-section">
                                                 <Typography variant="h6" gutterBottom align="center">
                                                     {question.content || 'Highlighting passages'}
                                                 </Typography>
                                                 <Typography variant="body1" paragraph>
                                                     {question.content}
                                                 </Typography>
-                                            </Paper>
-                                            <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section" tutorial-step="marked-passages">
+                                            </Card>
+                                            <Card className="p-6 mb-4 highlight-section" tutorial-step="marked-passages">
                                                 <Typography variant="body1">
                                                     Your marked passages will appear here:
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center', minHeight: '200px' }}>
+                                                <Box className="flex flex-wrap gap-2 mb-4 justify-center min-h-[200px]">
                                                     {auditData.highlights.map((highlight, index) => (
-                                                        <Chip
-                                                            key={index}
-                                                            label={highlight.text}
-                                                            onDelete={() => handleRemoveHighlight(index)}
-                                                            color="primary"
-                                                            size="small"
-                                                        />
+                                                        <Badge key={index}>
+                                                            {highlight.text}
+                                                            <button
+                                                                type="button"
+                                                                aria-label="Remove highlight"
+                                                                onClick={() => handleRemoveHighlight(index)}
+                                                                className="inline-flex items-center rounded-full hover:bg-foreground/10"
+                                                            >
+                                                                <Close size={12} />
+                                                            </button>
+                                                        </Badge>
                                                     ))}
                                                 </Box>
-                                            </Paper>
-                                            <Paper elevation={3} sx={{ p: 3, mb: 2 }} className="highlight-section" tutorial-step="no-marked-passages">
+                                            </Card>
+                                            <Card className="p-6 mb-4 highlight-section" tutorial-step="no-marked-passages">
                                                 <Typography variant="body1">
                                                     In case you didn't find any part of the output to be problematic, you can proceed to the next page.
                                                 </Typography>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                                <Box className="flex items-center mb-4">
                                                     <Checkbox
                                                         checked={isCheckedNoProblematicOutputFound}
-                                                        onChange={(e) => setNoProblematicOutputFound(e.target.checked)}
-                                                        color="primary"
+                                                        onCheckedChange={(checked) => setNoProblematicOutputFound(checked === true)}
+                                                        className="mr-2"
                                                     />
                                                     <Typography variant="body1">
                                                         I didn't find any problematic, unfair, or biased outputs in this conversation.
                                                     </Typography>
                                                 </Box>
                                                 {errors[question.id] && (
-                                                    <Alert severity="error" sx={{ mb: 2 }}>
+                                                    <Alert variant="destructive" className="mb-4">
                                                         {errors[question.id]}
                                                     </Alert>
                                                 )}
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                    <Button startIcon={<InfoIcon />} onClick={handleReplayTutorial}>
+                                                <Box className="flex justify-between">
+                                                    <Button variant="ghost" onClick={handleReplayTutorial}>
+                                                        <Info />
                                                         Replay Tutorial
                                                     </Button>
                                                     <Button
-                                                        variant="contained"
-                                                        color="primary"
                                                         onClick={() => handleStateChange(getNextState())}
                                                         disabled={
                                                             !isCheckedNoProblematicOutputFound &&
@@ -464,7 +420,7 @@ const AuditForm = ({
                                                         Next
                                                     </Button>
                                                 </Box>
-                                            </Paper>
+                                            </Card>
                                         </Box>
                                     ))}
                             </>
@@ -474,47 +430,47 @@ const AuditForm = ({
                                 {effectiveSurveyQuestions.questions
                                     .filter(q => q.type === 'freeResponse')
                                     .map((question, qIndex) => (
-                                        <Paper key={question.id} elevation={3} sx={{ p: 3, mb: 2 }} className="free-response">
+                                        <Card key={question.id} className="p-6 mb-4 free-response">
                                             <Typography variant="h6" gutterBottom align="center">
                                                 {question.content || 'Free Response Question'}
                                             </Typography>
                                             <Typography variant="body1">
                                                 Please provide your feedback below.
                                             </Typography>
-                                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2, justifyContent: 'center' }}>
+                                            <Box className="flex flex-wrap gap-2 mb-4 justify-center">
                                                 {auditData.highlights.map((highlight, index) => (
-                                                    <Chip
-                                                        key={index}
-                                                        label={highlight.text}
-                                                        color="primary"
-                                                        sx={{ m: 0.5 }}
-                                                        size="small"
-                                                    />
+                                                    <Badge key={index} className="m-1">
+                                                        {highlight.text}
+                                                    </Badge>
                                                 ))}
                                             </Box>
-                                            <TextField
-                                                label={question.content}
-                                                multiline
-                                                rows={4}
-                                                variant="outlined"
-                                                fullWidth
-                                                margin="normal"
-                                                name={question.id}
-                                                value={auditData.textResponses[question.id] || ''}
-                                                onChange={(e) => handleTextChange(question.id, e.target.value)}
-                                                inputProps={{ maxLength: question.settings.maxLength }}
-                                                required={question.settings.required}
-                                                error={!!errors[question.id]}
-                                                helperText={errors[question.id]}
-                                            />
+                                            <div className="my-4 w-full">
+                                                {question.content && (
+                                                    <Label htmlFor={question.id} className="mb-1 block">
+                                                        {question.content}
+                                                    </Label>
+                                                )}
+                                                <Textarea
+                                                    id={question.id}
+                                                    rows={4}
+                                                    name={question.id}
+                                                    value={auditData.textResponses[question.id] || ''}
+                                                    onChange={(e) => handleTextChange(question.id, e.target.value)}
+                                                    maxLength={question.settings.maxLength}
+                                                    required={question.settings.required}
+                                                    className={errors[question.id] ? 'border-destructive' : undefined}
+                                                />
+                                                {errors[question.id] && (
+                                                    <p className="mt-1 text-sm text-destructive">{errors[question.id]}</p>
+                                                )}
+                                            </div>
                                             {qIndex === effectiveSurveyQuestions.questions.filter(q => q.type === 'freeResponse').length - 1 && (
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                                                    <Button startIcon={<InfoIcon />} onClick={handleReplayTutorial}>
+                                                <Box className="flex justify-between mt-4">
+                                                    <Button variant="ghost" onClick={handleReplayTutorial}>
+                                                        <Info />
                                                         Replay Tutorial
                                                     </Button>
                                                     <Button
-                                                        variant="contained"
-                                                        color="primary"
                                                         onClick={handleSubmit}
                                                         disabled={
                                                             isSubmitted ||
@@ -529,7 +485,7 @@ const AuditForm = ({
                                                     </Button>
                                                 </Box>
                                             )}
-                                        </Paper>
+                                        </Card>
                                     ))}
                             </>
                         )}

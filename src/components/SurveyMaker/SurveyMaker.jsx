@@ -1,24 +1,14 @@
 // src/components/SurveyMaker.jsx
 import React, { useState } from 'react';
-import {
-    Box,
-    Typography,
-    Button,
-    TextField,
-    IconButton,
-    Paper,
-    Checkbox,
-    FormControlLabel,
-    List,
-    ListItem,
-    ListItemSecondaryAction,
-    Alert,
-    Select,
-    MenuItem,
-    InputLabel,
-    FormControl,
-} from '@mui/material';
-import { Add, Delete } from '@mui/icons-material';
+import { Box, Typography, List, ListItem } from '../ui/layout';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
+import { Alert } from '../ui/alert';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Add, Delete } from '../ui/icons';
+import { cn } from '../../lib/utils';
 import {
     SurveyConfigurationManager,
     MatrixQuestion,
@@ -182,206 +172,201 @@ const SurveyMaker = ({ onSurveySave }) => {
                 };
 
                 return (
-                    <Box sx={{ width: '100%' }}>
-                        <TextField
-                            label="Question ID"
-                            value={id}
-                            disabled
-                            fullWidth
-                            margin="normal"
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Question Content"
-                            value={content}
-                            onChange={(e) => updateField('content', e.target.value)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-content`]}
-                            helperText={errors[`${id}-content`] || 'Main question or instruction for the matrix'}
-                            className={styles['form-field']}
-                        />
-                        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                    <Box className="w-full">
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Question ID</Label>
+                            <Input value={id} disabled />
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Question Content</Label>
+                            <Input
+                                value={content}
+                                onChange={(e) => updateField('content', e.target.value)}
+                                required
+                                className={errors[`${id}-content`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-content`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-content`] || 'Main question or instruction for the matrix'}
+                            </p>
+                        </div>
+                        <Typography variant="subtitle2" className="mt-4 mb-2">
                             Rows
                         </Typography>
                         {errors[`${id}-settings`] && settings.rows.length === 0 && (
-                            <Alert severity="error" sx={{ mb: 1 }}>
+                            <Alert variant="destructive" className="mb-2">
                                 At least one row is required.
                             </Alert>
                         )}
                         <List dense>
                             {settings.rows.map((row, index) => (
-                                <ListItem key={index} sx={{ py: 0.5 }}>
-                                    <TextField
-                                        label={`Row ${index + 1}`}
-                                        value={row}
-                                        onChange={(e) => updateRow(index, e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        error={!!errors[`${id}-settings`] && !row.trim()}
-                                        helperText={(!row.trim() && errors[`${id}-settings`]) ? 'Row label cannot be empty' : ''}
-                                    />
-                                    <IconButton onClick={() => removeRow(index)} size="small">
+                                <ListItem key={index} className="py-1 gap-2">
+                                    <div className="flex-1">
+                                        <Label className="mb-1 block">{`Row ${index + 1}`}</Label>
+                                        <Input
+                                            value={row}
+                                            onChange={(e) => updateRow(index, e.target.value)}
+                                            className={(!!errors[`${id}-settings`] && !row.trim()) ? 'border-destructive' : undefined}
+                                        />
+                                        {(!row.trim() && errors[`${id}-settings`]) && (
+                                            <p className="mt-1 text-xs text-destructive">Row label cannot be empty</p>
+                                        )}
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => removeRow(index)}>
                                         <Delete />
-                                    </IconButton>
+                                    </Button>
                                 </ListItem>
                             ))}
                         </List>
-                        <Button startIcon={<Add />} onClick={addRow} size="small" sx={{ mb: 2 }}>
+                        <Button variant="ghost" size="sm" className="mb-4" onClick={addRow}>
+                            <Add />
                             Add Row
                         </Button>
-                        <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                        <Typography variant="subtitle2" className="mt-4 mb-2">
                             Columns
                         </Typography>
                         {errors[`${id}-settings`] && settings.columns.length === 0 && (
-                            <Alert severity="error" sx={{ mb: 1 }}>
+                            <Alert variant="destructive" className="mb-2">
                                 At least one column is required.
                             </Alert>
                         )}
                         <List dense>
                             {settings.columns.map((column, index) => (
-                                <ListItem key={index} sx={{ py: 0.5 }}>
-                                    <TextField
-                                        label={`Column ${index + 1}`}
-                                        value={column}
-                                        onChange={(e) => updateColumn(index, e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        error={!!errors[`${id}-settings`] && !column.trim()}
-                                        helperText={(!column.trim() && errors[`${id}-settings`]) ? 'Column label cannot be empty' : ''}
-                                    />
-                                    <IconButton onClick={() => removeColumn(index)} size="small">
+                                <ListItem key={index} className="py-1 gap-2">
+                                    <div className="flex-1">
+                                        <Label className="mb-1 block">{`Column ${index + 1}`}</Label>
+                                        <Input
+                                            value={column}
+                                            onChange={(e) => updateColumn(index, e.target.value)}
+                                            className={(!!errors[`${id}-settings`] && !column.trim()) ? 'border-destructive' : undefined}
+                                        />
+                                        {(!column.trim() && errors[`${id}-settings`]) && (
+                                            <p className="mt-1 text-xs text-destructive">Column label cannot be empty</p>
+                                        )}
+                                    </div>
+                                    <Button variant="ghost" size="icon" onClick={() => removeColumn(index)}>
                                         <Delete />
-                                    </IconButton>
+                                    </Button>
                                 </ListItem>
                             ))}
                         </List>
-                        <Button startIcon={<Add />} onClick={addColumn} size="small" sx={{ mb: 2 }}>
+                        <Button variant="ghost" size="sm" className="mb-4" onClick={addColumn}>
+                            <Add />
                             Add Column
                         </Button>
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={settings.required}
-                                    onChange={(e) => updateField('required', e.target.checked)}
-                                />
-                            }
-                            label="Required"
-                        />
+                        <label className="flex items-center gap-2">
+                            <Checkbox
+                                checked={settings.required}
+                                onCheckedChange={(checked) => updateField('required', checked === true)}
+                            />
+                            <span className="text-sm">Required</span>
+                        </label>
                     </Box>
                 );
             case 'freeResponse':
                 return (
-                    <Box sx={{ width: '100%' }}>
-                        <TextField
-                            label="Question ID"
-                            value={id}
-                            disabled
-                            fullWidth
-                            margin="normal"
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Question Content"
-                            value={content}
-                            onChange={(e) => updateField('content', e.target.value)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-content`]}
-                            helperText={errors[`${id}-content`] || 'The question prompt'}
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Max Length"
-                            type="number"
-                            value={settings.maxLength}
-                            onChange={(e) => updateField('maxLength', parseInt(e.target.value) || 1000)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-settings`]}
-                            helperText={errors[`${id}-settings`] || 'Maximum characters allowed'}
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Min Length"
-                            type="number"
-                            value={settings.minLength}
-                            onChange={(e) => updateField('minLength', parseInt(e.target.value) || 0)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-settings`]}
-                            helperText={errors[`${id}-settings`] || 'Minimum characters required'}
-                            className={styles['form-field']}
-                        />
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={settings.required}
-                                    onChange={(e) => updateField('required', e.target.checked)}
-                                />
-                            }
-                            label="Required"
-                        />
+                    <Box className="w-full">
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Question ID</Label>
+                            <Input value={id} disabled />
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Question Content</Label>
+                            <Input
+                                value={content}
+                                onChange={(e) => updateField('content', e.target.value)}
+                                required
+                                className={errors[`${id}-content`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-content`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-content`] || 'The question prompt'}
+                            </p>
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Max Length</Label>
+                            <Input
+                                type="number"
+                                value={settings.maxLength}
+                                onChange={(e) => updateField('maxLength', parseInt(e.target.value) || 1000)}
+                                required
+                                className={errors[`${id}-settings`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-settings`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-settings`] || 'Maximum characters allowed'}
+                            </p>
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Min Length</Label>
+                            <Input
+                                type="number"
+                                value={settings.minLength}
+                                onChange={(e) => updateField('minLength', parseInt(e.target.value) || 0)}
+                                required
+                                className={errors[`${id}-settings`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-settings`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-settings`] || 'Minimum characters required'}
+                            </p>
+                        </div>
+                        <label className="flex items-center gap-2">
+                            <Checkbox
+                                checked={settings.required}
+                                onCheckedChange={(checked) => updateField('required', checked === true)}
+                            />
+                            <span className="text-sm">Required</span>
+                        </label>
                     </Box>
                 );
             case 'textHighlight':
                 return (
-                    <Box sx={{ width: '100%' }}>
-                        <TextField
-                            label="Question ID"
-                            value={id}
-                            disabled
-                            fullWidth
-                            margin="normal"
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Instructions"
-                            value={content}
-                            onChange={(e) => updateField('content', e.target.value)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-content`]}
-                            helperText={errors[`${id}-content`] || 'Instructions for highlighting text'}
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Text Source"
-                            value={settings.textSource}
-                            onChange={(e) => updateField('textSource', e.target.value)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-settings`]}
-                            helperText={errors[`${id}-settings`] || 'e.g., conversation'}
-                            className={styles['form-field']}
-                        />
-                        <TextField
-                            label="Minimum Highlights"
-                            type="number"
-                            value={settings.minHighlights}
-                            onChange={(e) => updateField('minHighlights', parseInt(e.target.value) || 0)}
-                            fullWidth
-                            margin="normal"
-                            required
-                            error={!!errors[`${id}-settings`]}
-                            helperText={errors[`${id}-settings`] || 'Minimum number of highlights required'}
-                            className={styles['form-field']}
-                        />
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={settings.required}
-                                    onChange={(e) => updateField('required', e.target.checked)}
-                                />
-                            }
-                            label="Required"
-                        />
+                    <Box className="w-full">
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Question ID</Label>
+                            <Input value={id} disabled />
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Instructions</Label>
+                            <Input
+                                value={content}
+                                onChange={(e) => updateField('content', e.target.value)}
+                                required
+                                className={errors[`${id}-content`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-content`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-content`] || 'Instructions for highlighting text'}
+                            </p>
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Text Source</Label>
+                            <Input
+                                value={settings.textSource}
+                                onChange={(e) => updateField('textSource', e.target.value)}
+                                required
+                                className={errors[`${id}-settings`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-settings`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-settings`] || 'e.g., conversation'}
+                            </p>
+                        </div>
+                        <div className={cn('my-4', styles['form-field'])}>
+                            <Label className="mb-1 block">Minimum Highlights</Label>
+                            <Input
+                                type="number"
+                                value={settings.minHighlights}
+                                onChange={(e) => updateField('minHighlights', parseInt(e.target.value) || 0)}
+                                required
+                                className={errors[`${id}-settings`] ? 'border-destructive' : undefined}
+                            />
+                            <p className={cn('mt-1 text-xs', errors[`${id}-settings`] ? 'text-destructive' : 'text-muted-foreground')}>
+                                {errors[`${id}-settings`] || 'Minimum number of highlights required'}
+                            </p>
+                        </div>
+                        <label className="flex items-center gap-2">
+                            <Checkbox
+                                checked={settings.required}
+                                onCheckedChange={(checked) => updateField('required', checked === true)}
+                            />
+                            <span className="text-sm">Required</span>
+                        </label>
                     </Box>
                 );
             default:
@@ -390,32 +375,37 @@ const SurveyMaker = ({ onSurveySave }) => {
     };
 
     return (
-        <Box sx={{ p: 3, maxWidth: '800px', mx: 'auto' }}>
+        <Box className="p-6 max-w-[800px] mx-auto">
             <Typography variant="h4" gutterBottom>
                 Create Your Survey
             </Typography>
-            <Typography variant="body1" sx={{ mb: 2 }}>
+            <Typography variant="body1" className="mb-4">
                 Define the questions for auditing the AI chatbot. Add matrix questions (grid-style with rows and columns), free-response questions, or text highlight tasks.
             </Typography>
             {errors.global && (
-                <Alert severity="error" sx={{ mb: 2 }}>
+                <Alert variant="destructive" className="mb-4">
                     {errors.global}
                 </Alert>
             )}
 
-            <FormControl fullWidth sx={{ mb: 2 }}>
-                <InputLabel>Question Type</InputLabel>
+            <div className="mb-4 w-full">
+                <Label className="mb-1 block">Question Type</Label>
                 <Select
                     value={newQuestionType}
-                    onChange={(e) => setNewQuestionType(e.target.value)}
-                    label="Question Type"
+                    onValueChange={(v) => setNewQuestionType(v)}
                 >
-                    <MenuItem value="matrix">Matrix Question</MenuItem>
-                    <MenuItem value="freeResponse">Free-Response Question</MenuItem>
-                    <MenuItem value="textHighlight">Text Highlight Task</MenuItem>
+                    <SelectTrigger>
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="matrix">Matrix Question</SelectItem>
+                        <SelectItem value="freeResponse">Free-Response Question</SelectItem>
+                        <SelectItem value="textHighlight">Text Highlight Task</SelectItem>
+                    </SelectContent>
                 </Select>
-            </FormControl>
-            <Button startIcon={<Add />} onClick={addQuestion} sx={{ mb: 2 }}>
+            </div>
+            <Button variant="ghost" className="mb-4" onClick={addQuestion}>
+                <Add />
                 Add Question
             </Button>
 
@@ -423,25 +413,25 @@ const SurveyMaker = ({ onSurveySave }) => {
                 {questions.map((question) => (
                     <ListItem
                         key={question.getId()}
-                        sx={{ flexDirection: 'column', alignItems: 'flex-start', mb: 2, p: 2, bgcolor: '#f5f5f5', borderRadius: 1 }}
+                        className="relative flex-col items-start mb-4 p-4 bg-[#f5f5f5] rounded"
                     >
-                        <Box sx={{ width: '100%' }}>
+                        <Box className="w-full">
                             {renderQuestionForm(question)}
                         </Box>
-                        <ListItemSecondaryAction>
-                            <IconButton onClick={() => removeQuestion(question.getId())}>
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                            <Button variant="ghost" size="icon" onClick={() => removeQuestion(question.getId())}>
                                 <Delete />
-                            </IconButton>
-                        </ListItemSecondaryAction>
+                            </Button>
+                        </div>
                     </ListItem>
                 ))}
             </List>
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
-                <Button variant="contained" color="primary" onClick={handleSave}>
+            <Box className="flex gap-4">
+                <Button onClick={handleSave}>
                     Save Survey and Start Chat
                 </Button>
-                <Button variant="outlined" color="secondary" onClick={handleSkip}>
+                <Button variant="outline" onClick={handleSkip}>
                     Skip and Use Default
                 </Button>
             </Box>

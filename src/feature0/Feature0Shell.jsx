@@ -9,8 +9,8 @@
 // (see src/index.js); otherwise it renders the plain <App>, unchanged.
 
 import React, { useEffect, useMemo } from 'react';
-import { Box, Button } from '@mui/material';
-import LogoutIcon from '@mui/icons-material/Logout';
+import { Button } from '../components/ui/button';
+import { Logout as LogoutIcon } from '../components/ui/icons';
 import App from '../App';
 import { Feature0Provider, useFeature0, DEFAULT_QUESTIONNAIRE } from './Feature0Context';
 import Feature0Gate from './Feature0Gate';
@@ -24,15 +24,10 @@ function ExitBar({ label, onExit }) {
   return (
     <Button
       onClick={onExit}
-      variant="contained"
-      color="inherit"
-      size="small"
-      startIcon={<LogoutIcon />}
-      sx={{
-        position: 'fixed', top: 12, right: 12, zIndex: 2000,
-        bgcolor: 'rgba(0,0,0,0.7)', color: '#fff', '&:hover': { bgcolor: 'rgba(0,0,0,0.85)' },
-      }}
+      size="sm"
+      className="fixed right-3 top-3 z-[2000] bg-black/70 text-white hover:bg-black/85"
     >
+      <LogoutIcon />
       {label}
     </Button>
   );

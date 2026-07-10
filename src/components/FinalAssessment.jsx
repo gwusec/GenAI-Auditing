@@ -1,7 +1,8 @@
 // TRAILS-Chatbot/src/components/FinalAssessment.jsx
 
 import React from 'react';
-import { Typography, Box, Button } from '@mui/material';
+import { Typography, Box } from './ui/layout';
+import { Button } from './ui/button';
 import db from '../tools/db';
 
 const FinalAssessment = ({ userId, onStartNewAudit, onEndConversation }) => {
@@ -11,25 +12,22 @@ const FinalAssessment = ({ userId, onStartNewAudit, onEndConversation }) => {
   };
 
   return (
-    <Box sx={{ textAlign: 'center', mt: 4 }}>
+    <Box className="text-center mt-8">
       <Typography variant="h5" gutterBottom>
         Thank you for participating in the audit!
       </Typography>
       <Typography variant="body1" gutterBottom>
         Your feedback is valuable to us. You can start a new audit or end the conversation.
       </Typography>
-      <Box sx={{ mt: 3 }}>
-        <Button 
-          variant="contained" 
-          color="primary" 
+      <Box className="mt-6">
+        <Button
           onClick={handleStartNewAudit}
-          sx={{ mr: 2 }}
+          className="mr-4"
         >
           Start New Audit
         </Button>
-        <Button 
-          variant="contained" 
-          color="secondary" 
+        <Button
+          variant="secondary"
           onClick={onEndConversation}
         >
           End Conversation

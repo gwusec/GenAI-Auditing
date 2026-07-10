@@ -8,17 +8,11 @@ import { fairnessProperties } from '../../tools/principles';
 import ChatBoxTutorial from '../tutorials/ChatBoxTutorial';
 import styles from './ChatBox.module.css';
 import ChatMessages from '../ChatMessages/ChatMessages';
-import {
-    Typography,
-    Box,
-    Button,
-    Container,
-    Chip,
-    Tooltip,
-} from "@mui/material";
-import {
-    Info as InfoIcon,
-} from "@mui/icons-material";
+import { Typography, Box } from '../ui/layout';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Tooltip } from '../ui/tooltip';
+import { Info as InfoIcon } from '../ui/icons';
 
 const fairnessPropertiesRandomOrder = [...fairnessProperties].sort(() => 0.5 - Math.random());
 
@@ -38,7 +32,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
             const conversation = conversationHandler.getVisibleConversation();
             setMessages(conversation);
         };
-        
+
         // Check for tutorial
         const chatTutorialShown = localStorage.getItem("chatTutorialShown");
         if (!chatTutorialShown) {
@@ -78,10 +72,10 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
 
     const handleSendChatMessage = async (content) => {
         if (!isActive || isLoading) return;
-    
+
         setIsLoading(true);
         setError(null);
-    
+
         try {
             if (!conversation || !conversation.id) {
                 throw new Error('No active conversation');
@@ -115,7 +109,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
     const handleSaveEdit = async () => {
         if (!editingMessageId || isLoading) return;
         setIsLoading(true);
-    
+
         try {
             const editedMessage = new Message({
                 conversationID: conversation.id,
@@ -123,11 +117,11 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                 content: editedContent,
                 referencedMessageId: editingMessageId
             });
-    
+
             const editEvent = new ChatEvent(CHAT_EVENT_TYPE.EDIT_MESSAGE, editedMessage, conversation.id);
-        
+
             await conversationHandler.addChatEvent(conversation.id, editEvent);
-        
+
             setEditingMessageId(null);
             setEditedContent('');
         } catch (error) {
@@ -148,7 +142,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
             setError('Failed to restart conversation. Please try again.');
         }
     };
-    
+
     const handleTutorialCompleteInternal = useCallback(() => {
         setShowTutorial(false);
         localStorage.setItem("chatTutorialShown", "true");
@@ -157,7 +151,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
         }
         setTutorialCompleted(true);
     }, [onTutorialComplete]);
-    
+
     const formatTimestamp = (timestamp) => {
         const date = new Date(timestamp);
         return date.toLocaleString();
@@ -173,9 +167,7 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
             <Box className={styles['main-content']}>
                 {/* Message list area */}
                 <Box className={styles['message-list-area']} tutorial-step="chat-content">
-                    <Container 
-                        maxWidth="md"
-                    >
+                    <Box className="mx-auto w-full max-w-4xl px-4">
                         <ChatMessages
                             messages={messages}
                             onEditMessage={handleEditMessage}
@@ -191,79 +183,74 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                             isScrollToBottom={true}
                             canEditLastMessage={() => conversationHandler.canEditLastMessage()}
                         />
-                    </Container>
+                    </Box>
                 </Box>
                 {/* Input area and footer */}
                 <Box>
-                    <Container maxWidth="md">
+                    <Box className="mx-auto w-full max-w-4xl px-4">
                         {isActive && conversation.id && (
                             <Box className={styles['chat-footer']}>
                                 {/* Fairness principles — a quiet, compact chip row (hover a chip
                                     for the full description; "+N more" reveals the rest). */}
-                                <Box tutorial-step="fairness-properties" sx={{ mb: 1.25 }}>
+                                <Box tutorial-step="fairness-properties" className="mb-2.5">
                                     <Typography
                                         variant="caption"
-                                        sx={{ display: 'block', color: 'text.secondary', fontWeight: 600, mb: 1, px: 0.5 }}
+                                        className="block font-semibold mb-2 px-1"
                                     >
                                         Please verify the AI chatbot upholds these principles
                                     </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                                    <Box className="flex flex-wrap gap-1.5">
                                         {(showAllPrinciples ? fairnessPropertiesRandomOrder : fairnessPropertiesRandomOrder.slice(0, 4)).map((property, index) => {
                                             const [title] = property.split(':');
                                             return (
-                                                <Tooltip key={index} title={property} arrow placement="top">
-                                                    <Chip
-                                                        label={title}
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{
-                                                            borderRadius: '999px',
-                                                            color: 'text.secondary',
-                                                            borderColor: 'divider',
-                                                            fontWeight: 500,
-                                                            transition: 'border-color .15s ease, color .15s ease',
-                                                            '&:hover': { borderColor: 'primary.main', color: 'text.primary' },
-                                                        }}
-                                                    />
+                                                <Tooltip key={index} title={property} side="top">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="rounded-full font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                                                    >
+                                                        {title}
+                                                    </Badge>
                                                 </Tooltip>
                                             );
                                         })}
                                         {!showAllPrinciples && fairnessPropertiesRandomOrder.length > 4 && (
-                                            <Chip
-                                                label={`+${fairnessPropertiesRandomOrder.length - 4} more`}
-                                                size="small"
+                                            <Badge
+                                                variant="secondary"
                                                 onClick={() => setShowAllPrinciples(true)}
-                                                sx={{ borderRadius: '999px', bgcolor: 'action.hover', fontWeight: 500 }}
-                                            />
+                                                className="rounded-full font-medium cursor-pointer"
+                                            >
+                                                {`+${fairnessPropertiesRandomOrder.length - 4} more`}
+                                            </Badge>
                                         )}
                                         {showAllPrinciples && (
-                                            <Chip
-                                                label="Show less"
-                                                size="small"
+                                            <Badge
+                                                variant="secondary"
                                                 onClick={() => setShowAllPrinciples(false)}
-                                                sx={{ borderRadius: '999px', bgcolor: 'action.hover', fontWeight: 500 }}
-                                            />
+                                                className="rounded-full font-medium cursor-pointer"
+                                            >
+                                                Show less
+                                            </Badge>
                                         )}
                                     </Box>
                                 </Box>
                                 {/* Message input form */}
                                 <Box className={styles['input-area']} tutorial-step="message-form">
-                                    <MessageForm 
-                                        onsendChatMessage={handleSendChatMessage} 
-                                        disabled={isLoading} 
+                                    <MessageForm
+                                        onsendChatMessage={handleSendChatMessage}
+                                        disabled={isLoading}
                                     />
                                     {/* Action buttons */}
                                     <Box className={styles['action-buttons']}>
-                                        <Button 
-                                            startIcon={<InfoIcon />} 
+                                        <Button
+                                            variant="ghost"
                                             onClick={() => setShowTutorial(true)}
                                         >
+                                            <InfoIcon />
                                             Replay Tutorial
                                         </Button>
                                         <Button
                                             tutorial-step="restart-conversation-button"
-                                            variant="outlined"
-                                            color="secondary"
+                                            variant="outline"
                                             onClick={handleRestartConversation}
                                             className={styles['restart-button']}
                                         >
@@ -273,10 +260,10 @@ const ChatBox = ({ conversation, isActive, setLoading, onTutorialComplete, onTut
                                 </Box>
                             </Box>
                         )}
-                    </Container>
+                    </Box>
                 </Box>
             </Box>
-    
+
             {/* Tutorial modal */}
             {showTutorial && <ChatBoxTutorial onComplete={handleTutorialCompleteInternal} />}
         </Box>

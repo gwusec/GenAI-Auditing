@@ -1,11 +1,16 @@
 // Feature0Gate — landing screen: try the demo, join with a code, or sign in as
 // an investigator.
 import React, { useState } from 'react';
-import { Box, ToggleButton, ToggleButtonGroup, Typography, Button, Stack, Divider, IconButton, Tooltip } from '@mui/material';
-import ScienceIcon from '@mui/icons-material/Science';
-import PlayCircleIcon from '@mui/icons-material/PlayCircle';
-import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
-import LightModeIcon from '@mui/icons-material/LightModeOutlined';
+import { Box, Typography, Stack, Divider } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '../components/ui/toggle-group';
+import { Tooltip } from '../components/ui/tooltip';
+import {
+  Science as ScienceIcon,
+  PlayCircle as PlayCircleIcon,
+  DarkModeOutlined as DarkModeIcon,
+  LightModeOutlined as LightModeIcon,
+} from '../components/ui/icons';
 import InvestigatorAuth from './InvestigatorAuth';
 import AuditorJoin from './AuditorJoin';
 import { useFeature0 } from './Feature0Context';
@@ -17,36 +22,40 @@ export default function Feature0Gate() {
   const [role, setRole] = useState('auditor');
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pt: { xs: 4, sm: 8 }, px: 2, position: 'relative' }}>
+    <Box className="relative min-h-screen bg-background px-4 pt-8 sm:pt-16">
       <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
-        <IconButton onClick={toggleColorMode} sx={{ position: 'absolute', top: 16, right: 16 }}>
+        <Button variant="ghost" size="icon" onClick={toggleColorMode} className="absolute right-4 top-4">
           {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-        </IconButton>
+        </Button>
       </Tooltip>
-      <Stack alignItems="center" spacing={1} sx={{ mb: 3 }}>
-        <ScienceIcon color="primary" sx={{ fontSize: 44 }} />
-        <Typography variant="h4" align="center" sx={{ fontWeight: 700 }}>TRAILS Chatbot Audit</Typography>
-        <Typography variant="body1" color="text.secondary" align="center" sx={{ maxWidth: 480 }}>
+      <Stack alignItems="center" spacing={1} className="mb-6">
+        <ScienceIcon color="primary" size={44} />
+        <Typography variant="h4" align="center" className="font-bold">TRAILS Chatbot Audit</Typography>
+        <Typography variant="body1" color="text.secondary" align="center" className="max-w-[480px]">
           Help evaluate AI chatbot responses for fairness, bias, and harm.
         </Typography>
       </Stack>
 
       {/* Demo CTA */}
-      <Box sx={{ maxWidth: 420, mx: 'auto', mb: 3 }}>
+      <Box className="mx-auto mb-6 max-w-[420px]">
         <Button
-          fullWidth size="large" variant="contained" startIcon={<PlayCircleIcon />}
-          onClick={startDemo} sx={{ py: 1.4, borderRadius: 2 }}
+          size="lg" onClick={startDemo} className="w-full rounded-md py-[0.7rem]"
         >
+          <PlayCircleIcon />
           Try the demo — no sign-up
         </Button>
-        <Divider sx={{ my: 2 }}>or</Divider>
+        <div className="my-4 flex items-center gap-2 text-xs text-muted-foreground">
+          <Divider className="flex-1" />
+          <span>or</span>
+          <Divider className="flex-1" />
+        </div>
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
-        <ToggleButtonGroup value={role} exclusive onChange={(_, v) => v && setRole(v)} size="small">
-          <ToggleButton value="auditor">I have an access code</ToggleButton>
-          <ToggleButton value="investigator">I'm an investigator</ToggleButton>
-        </ToggleButtonGroup>
+      <Box className="mb-2 flex justify-center">
+        <ToggleGroup type="single" value={role} onValueChange={(v) => v && setRole(v)}>
+          <ToggleGroupItem value="auditor">I have an access code</ToggleGroupItem>
+          <ToggleGroupItem value="investigator">I'm an investigator</ToggleGroupItem>
+        </ToggleGroup>
       </Box>
 
       {role === 'auditor' ? <AuditorJoin /> : <InvestigatorAuth />}

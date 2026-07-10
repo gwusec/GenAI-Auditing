@@ -5,12 +5,21 @@
 // tier; anything beyond it is reached via the Raw JSON tab.
 
 import React, { useState, useMemo } from 'react';
+import { Box, Stack, Typography, Divider } from '../ui/layout';
+import { Card, CardContent } from '../ui/card';
+import { Input } from '../ui/input';
+import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
+import { Switch } from '../ui/switch';
+import { Button } from '../ui/button';
+import { Alert } from '../ui/alert';
+import { Badge } from '../ui/badge';
+import { Tooltip } from '../ui/tooltip';
 import {
-  Box, Card, CardContent, Stack, Typography, TextField, MenuItem, Switch,
-  FormControlLabel, Button, IconButton, Divider, Tabs, Tab, Alert, Chip, Tooltip,
-} from '@mui/material';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '../ui/select';
+import { Delete, Add } from '../ui/icons';
+import { cn } from '../../lib/utils';
 import {
   QUESTION_TYPES, blankQuestionnaire, addPage, removePage,
   addQuestion, updateQuestion, removeQuestion, setTitle,
@@ -26,34 +35,40 @@ const surveyTypeToKey = (t) => (QUESTION_TYPES.find((q) => q.surveyType === t) |
 
 function ChoiceLines({ label, value, onChange }) {
   return (
-    <TextField
-      label={label} value={arrayToLines(value)} onChange={(e) => onChange(linesToArray(e.target.value))}
-      fullWidth multiline minRows={2} size="small"
-      helperText="One per line"
-    />
+    <div className="w-full">
+      <Label className="mb-1 block">{label}</Label>
+      <Textarea
+        value={arrayToLines(value)} onChange={(e) => onChange(linesToArray(e.target.value))}
+        rows={2}
+      />
+      <p className="mt-1 text-xs text-muted-foreground">One per line</p>
+    </div>
   );
 }
 
 function QuestionEditor({ q, onPatch, onRemove }) {
   return (
-    <Card variant="outlined" sx={{ mb: 1.5 }}>
-      <CardContent sx={{ pb: 1.5 }}>
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
-          <Chip label={surveyTypeToKey(q.type)} size="small" />
-          <Box sx={{ flexGrow: 1 }} />
-          <FormControlLabel
-            control={<Switch checked={!!q.isRequired} onChange={(e) => onPatch({ isRequired: e.target.checked })} size="small" />}
-            label="Required"
-          />
+    <Card className="mb-3">
+      <CardContent className="pb-3">
+        <Stack direction="row" alignItems="center" spacing={1} className="mb-2">
+          <Badge>{surveyTypeToKey(q.type)}</Badge>
+          <Box className="grow" />
+          <label className="flex items-center gap-2">
+            <Switch checked={!!q.isRequired} onCheckedChange={(checked) => onPatch({ isRequired: checked === true })} />
+            <span className="text-sm">Required</span>
+          </label>
           <Tooltip title="Remove question">
-            <IconButton size="small" onClick={onRemove}><DeleteIcon fontSize="small" /></IconButton>
+            <Button variant="ghost" size="icon" onClick={onRemove}><Delete /></Button>
           </Tooltip>
         </Stack>
         <Stack spacing={1.5}>
-          <TextField
-            label="Question / instructions" value={q.title || ''} size="small" fullWidth
-            onChange={(e) => onPatch({ title: e.target.value })}
-          />
+          <div className="w-full">
+            <Label className="mb-1 block">Question / instructions</Label>
+            <Input
+              value={q.title || ''}
+              onChange={(e) => onPatch({ title: e.target.value })}
+            />
+          </div>
           {(q.type === 'radiogroup' || q.type === 'checkbox') && (
             <ChoiceLines label="Choices" value={q.choices} onChange={(choices) => onPatch({ choices })} />
           )}
@@ -65,17 +80,26 @@ function QuestionEditor({ q, onPatch, onRemove }) {
           )}
           {q.type === 'rating' && (
             <Stack direction="row" spacing={1.5}>
-              <TextField type="number" size="small" label="Min" value={q.rateMin ?? 1}
-                onChange={(e) => onPatch({ rateMin: Number(e.target.value) })} />
-              <TextField type="number" size="small" label="Max" value={q.rateMax ?? 5}
-                onChange={(e) => onPatch({ rateMax: Number(e.target.value) })} />
+              <div>
+                <Label className="mb-1 block">Min</Label>
+                <Input type="number" value={q.rateMin ?? 1}
+                  onChange={(e) => onPatch({ rateMin: Number(e.target.value) })} />
+              </div>
+              <div>
+                <Label className="mb-1 block">Max</Label>
+                <Input type="number" value={q.rateMax ?? 5}
+                  onChange={(e) => onPatch({ rateMax: Number(e.target.value) })} />
+              </div>
             </Stack>
           )}
-          <TextField
-            label="Show only if (optional, e.g. {q1} = 'Yes')" value={q.visibleIf || ''} size="small" fullWidth
-            onChange={(e) => onPatch({ visibleIf: e.target.value || undefined })}
-            helperText="Basic conditional visibility"
-          />
+          <div className="w-full">
+            <Label className="mb-1 block">{"Show only if (optional, e.g. {q1} = 'Yes')"}</Label>
+            <Input
+              value={q.visibleIf || ''}
+              onChange={(e) => onPatch({ visibleIf: e.target.value || undefined })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">Basic conditional visibility</p>
+          </div>
         </Stack>
       </CardContent>
     </Card>
@@ -105,45 +129,57 @@ export default function QuestionnaireAuthor({ value, onSave = () => {} }) {
     setTab(0);
   };
 
+  const tabBtn = 'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all';
+  const tabActive = 'bg-card text-foreground shadow-sm';
+  const tabInactive = 'text-muted-foreground hover:text-foreground';
+
   return (
     <Box>
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" useFlexGap>
-        <TextField
-          select size="small" label="Start from a template" value="" sx={{ minWidth: 200 }}
-          onChange={(e) => adoptTemplate(e.target.value)}
-        >
-          <MenuItem value="blank">Blank</MenuItem>
-          {QUESTIONNAIRE_TEMPLATES.map((t) => <MenuItem key={t.id} value={t.id}>{t.label}</MenuItem>)}
-        </TextField>
-        <Box sx={{ flexGrow: 1 }} />
+      <Stack direction="row" spacing={2} alignItems="center" className="mb-4" flexWrap="wrap">
+        <div className="min-w-[200px]">
+          <Label className="mb-1 block">Start from a template</Label>
+          <Select value="" onValueChange={(v) => adoptTemplate(v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Start from a template" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="blank">Blank</SelectItem>
+              {QUESTIONNAIRE_TEMPLATES.map((t) => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <Box className="grow" />
         <Typography variant="body2" color="text.secondary">{countQuestions(schema)} question(s)</Typography>
         {validation.valid
-          ? <Chip label="Valid" color="success" size="small" />
-          : <Chip label="Invalid" color="error" size="small" />}
+          ? <Badge variant="success">Valid</Badge>
+          : <Badge variant="destructive">Invalid</Badge>}
       </Stack>
 
-      <Tabs value={tab} onChange={(_, v) => (v === 1 ? enterJsonTab() : setTab(0))} sx={{ mb: 2 }}>
-        <Tab label="Visual" />
-        <Tab label="Raw JSON" />
-      </Tabs>
+      <div className="mb-4 inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1">
+        <button type="button" onClick={() => setTab(0)} className={cn(tabBtn, tab === 0 ? tabActive : tabInactive)}>Visual</button>
+        <button type="button" onClick={() => enterJsonTab()} className={cn(tabBtn, tab === 1 ? tabActive : tabInactive)}>Raw JSON</button>
+      </div>
 
       {tab === 0 && (
         <Box>
-          <TextField
-            label="Questionnaire title" value={schema.title || ''} fullWidth sx={{ mb: 2 }}
-            onChange={(e) => setSchema(setTitle(schema, e.target.value))}
-          />
+          <div className="mb-4">
+            <Label className="mb-1 block">Questionnaire title</Label>
+            <Input
+              value={schema.title || ''}
+              onChange={(e) => setSchema(setTitle(schema, e.target.value))}
+            />
+          </div>
           {(schema.pages || []).map((page, pi) => (
-            <Card key={pi} variant="outlined" sx={{ mb: 2, bgcolor: 'grey.50' }}>
+            <Card key={pi} className="mb-4 bg-muted/50">
               <CardContent>
-                <Stack direction="row" alignItems="center" sx={{ mb: 1 }}>
+                <Stack direction="row" alignItems="center" className="mb-2">
                   <Typography variant="subtitle2">Page {pi + 1}</Typography>
-                  <Box sx={{ flexGrow: 1 }} />
+                  <Box className="grow" />
                   {(schema.pages.length > 1) && (
-                    <Button size="small" color="inherit" onClick={() => setSchema(removePage(schema, pi))}>Remove page</Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSchema(removePage(schema, pi))}>Remove page</Button>
                   )}
                 </Stack>
-                <Divider sx={{ mb: 1.5 }} />
+                <Divider className="mb-3" />
                 {(page.elements || []).map((q, qi) => (
                   <QuestionEditor
                     key={q.name || qi} q={q}
@@ -151,39 +187,42 @@ export default function QuestionnaireAuthor({ value, onSave = () => {} }) {
                     onRemove={() => setSchema(removeQuestion(schema, pi, qi))}
                   />
                 ))}
-                <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
-                  <TextField
-                    select size="small" value={addType} onChange={(e) => setAddType(e.target.value)} sx={{ minWidth: 180 }}
-                  >
-                    {QUESTION_TYPES.map((t) => <MenuItem key={t.key} value={t.key}>{t.label}</MenuItem>)}
-                  </TextField>
-                  <Button size="small" startIcon={<AddIcon />} onClick={() => setSchema(addQuestion(schema, pi, addType))}>
+                <Stack direction="row" spacing={1} alignItems="center" className="mt-2">
+                  <Select value={addType} onValueChange={(v) => setAddType(v)}>
+                    <SelectTrigger className="min-w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {QUESTION_TYPES.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" variant="ghost" onClick={() => setSchema(addQuestion(schema, pi, addType))}>
+                    <Add />
                     Add question
                   </Button>
                 </Stack>
               </CardContent>
             </Card>
           ))}
-          <Button startIcon={<AddIcon />} onClick={() => setSchema(addPage(schema))}>Add page</Button>
+          <Button variant="ghost" onClick={() => setSchema(addPage(schema))}><Add />Add page</Button>
         </Box>
       )}
 
       {tab === 1 && (
         <Box>
-          <TextField
+          <Textarea
             value={rawText} onChange={(e) => setRawText(e.target.value)}
-            fullWidth multiline minRows={12}
-            slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
+            rows={12}
+            className="font-mono text-[13px]"
           />
-          {rawError && <Alert severity="error" sx={{ mt: 1 }}>{rawError}</Alert>}
-          <Button variant="outlined" sx={{ mt: 1 }} onClick={applyJson}>Apply JSON</Button>
+          {rawError && <Alert variant="destructive" className="mt-2">{rawError}</Alert>}
+          <Button variant="outline" className="mt-2" onClick={applyJson}>Apply JSON</Button>
         </Box>
       )}
 
-      <Divider sx={{ my: 2 }} />
-      {!validation.valid && <Alert severity="warning" sx={{ mb: 2 }}>{validation.error}</Alert>}
+      <Divider className="my-4" />
+      {!validation.valid && <Alert variant="warning" className="mb-4">{validation.error}</Alert>}
       <Button
-        variant="contained"
         disabled={!validation.valid}
         onClick={() => onSave(validateSurveyJSON(schema).schema)}
       >

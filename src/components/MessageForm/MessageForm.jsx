@@ -1,7 +1,8 @@
-// TRAILS-Chatbot/src/components/MessageForm.jsx  
+// TRAILS-Chatbot/src/components/MessageForm.jsx
 import React, { useState, useCallback, useRef } from 'react';
-import { Box, IconButton, Typography } from '@mui/material';
-import SendIcon from '@mui/icons-material/Send';
+import { Box, Typography } from '../ui/layout';
+import { Button } from '../ui/button';
+import { Send as SendIcon } from '../ui/icons';
 import styles from "./MessageForm.module.css";
 
 const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
@@ -36,7 +37,7 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
 
   return (
     <>
-      <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
+      <Box component="form" onSubmit={handleSubmit} className="flex items-end gap-4">
         <div className={styles.container}>
           <textarea
             ref={textareaRef}
@@ -49,29 +50,19 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
             className={styles.textarea}
           />
         </div>
-        <IconButton
+        <Button
           type="submit"
+          size="icon"
           disabled={!message.trim() || disabled}
-          sx={{
-            backgroundColor: 'primary.main',
-            color: 'white',
-            '&:hover': {
-              backgroundColor: 'primary.dark',
-            },
-            '&:disabled': {
-              backgroundColor: 'action.disabledBackground',
-              color: 'action.disabled',
-            },
-          }}
         >
           <SendIcon fontSize="small" />
-        </IconButton>
+        </Button>
       </Box>
       {/* Persistent, quiet safety notes below the input (no floating / overlap). */}
       <Box className={styles['composer-notes']}>
         <span className={styles.notice}>Don&apos;t include personal information</span>
         <span className={styles.notice}>Stored and used for research</span>
-        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+        <Typography variant="caption" className="text-muted-foreground opacity-70">
           The chatbot may say sensitive things based on your interactions.
         </Typography>
       </Box>

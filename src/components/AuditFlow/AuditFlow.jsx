@@ -5,7 +5,13 @@
 // AuditForm when a study configures a SurveyJS questionnaire and/or span highlighting.
 
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Paper, Divider, Alert, Button, Chip } from '@mui/material';
+import { Box, Typography, Divider } from '../ui/layout';
+import { Card } from '../ui/card';
+import { Alert } from '../ui/alert';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Close } from '../ui/icons';
+import { cn } from '../../lib/utils';
 import conversationHandler from '../../tools/ConversationHandler';
 import AppConfig from '../../tools/AppConfig';
 import { STATE } from '../../tools/models';
@@ -67,13 +73,13 @@ export default function AuditFlow({ conversationId, onAuditComplete = () => {}, 
   };
 
   const Transcript = () => (
-    <Box sx={{ width: '38%', p: 2, borderRight: '1px solid', borderColor: 'divider', overflowY: 'auto', maxHeight: '100vh' }}>
+    <Box className="w-[38%] p-4 border-r overflow-y-auto max-h-screen">
       <Typography variant="h6" align="center" gutterBottom>Your conversation</Typography>
       {messages.map((m) => (
-        <Paper key={m.id} elevation={0} variant="outlined" sx={{ p: 1.25, mb: 1, borderRadius: 2, bgcolor: m.author === 'user' ? (t) => (t.palette.mode === 'dark' ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.10)') : 'background.paper' }}>
-          <Typography variant="caption" sx={{ fontWeight: 600, display: 'block' }}>{m.author === 'user' ? 'You' : 'AI Chatbot'}</Typography>
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{String(m.content)}</Typography>
-        </Paper>
+        <Card key={m.id} className={cn('p-2.5 mb-2 rounded-md', m.author === 'user' ? 'bg-primary/10' : 'bg-card')}>
+          <Typography variant="caption" className="font-semibold block">{m.author === 'user' ? 'You' : 'AI Chatbot'}</Typography>
+          <Typography variant="body2" className="whitespace-pre-wrap">{String(m.content)}</Typography>
+        </Card>
       ))}
     </Box>
   );
@@ -85,23 +91,33 @@ export default function AuditFlow({ conversationId, onAuditComplete = () => {}, 
   if (step === AUDIT_STEP.SPAN_HIGHLIGHT) {
     const nextLabel = stepIndex + 1 >= plan.length ? 'Finish' : 'Continue to the questions →';
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
-        <Box sx={{ px: 3, pt: 2 }}>
+      <Box className="flex flex-col h-full w-full">
+        <Box className="px-6 pt-4">
           <Typography variant="overline" color="text.secondary">Step {stepNumber} of {totalSteps}</Typography>
           <Typography variant="h6">Highlight anything problematic</Typography>
           <Typography variant="body2" color="text.secondary">
             Select any words in the chatbot's replies that seem unfair, biased, or harmful. Your highlights are saved automatically.
           </Typography>
           {highlights.length > 0 && (
-            <Box sx={{ mt: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Box className="mt-2 flex gap-2 flex-wrap">
               {highlights.map((h, i) => (
-                <Chip key={i} label={h.text} size="small" onDelete={() => removeHighlight(i)} />
+                <Badge key={i}>
+                  {h.text}
+                  <button
+                    type="button"
+                    aria-label="Remove highlight"
+                    onClick={() => removeHighlight(i)}
+                    className="inline-flex items-center rounded-full hover:bg-foreground/10"
+                  >
+                    <Close size={12} />
+                  </button>
+                </Badge>
               ))}
             </Box>
           )}
         </Box>
-        <Divider sx={{ my: 1 }} />
-        <Box sx={{ flex: 1, overflowY: 'auto', px: 2 }}>
+        <Divider className="my-2" />
+        <Box className="flex-1 overflow-y-auto px-4">
           <ChatHistory
             conversationId={conversationId}
             addHighlight={addHighlight}
@@ -109,8 +125,8 @@ export default function AuditFlow({ conversationId, onAuditComplete = () => {}, 
             highlights={highlights}
           />
         </Box>
-        <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider', textAlign: 'right' }}>
-          <Button variant="contained" onClick={advanceFromHighlight} disabled={submitting}>{nextLabel}</Button>
+        <Box className="p-4 border-t text-right">
+          <Button onClick={advanceFromHighlight} disabled={submitting}>{nextLabel}</Button>
         </Box>
       </Box>
     );
@@ -119,15 +135,15 @@ export default function AuditFlow({ conversationId, onAuditComplete = () => {}, 
   // --- Questionnaire step ---
   if (step === AUDIT_STEP.QUESTIONNAIRE) {
     return (
-      <Box sx={{ display: 'flex', height: '100%', width: '100%' }}>
+      <Box className="flex h-full w-full">
         <Transcript />
-        <Box sx={{ flex: 1, p: 3, overflowY: 'auto', maxHeight: '100vh' }}>
+        <Box className="flex-1 p-6 overflow-y-auto max-h-screen">
           <Typography variant="overline" color="text.secondary">Step {stepNumber} of {totalSteps}</Typography>
           <Typography variant="h6" gutterBottom>Please answer a few questions about this conversation</Typography>
-          <Divider sx={{ mb: 2 }} />
+          <Divider className="mb-4" />
           {schema
             ? <Questionnaire schema={schema} onComplete={(responses) => finish(responses)} />
-            : <Alert severity="info">No questionnaire configured for this study.</Alert>}
+            : <Alert variant="info">No questionnaire configured for this study.</Alert>}
         </Box>
       </Box>
     );
@@ -135,7 +151,7 @@ export default function AuditFlow({ conversationId, onAuditComplete = () => {}, 
 
   // Plan exhausted / empty — completing.
   return (
-    <Box sx={{ p: 4, textAlign: 'center' }}>
+    <Box className="p-8 text-center">
       <Typography variant="body1">Finishing…</Typography>
     </Box>
   );

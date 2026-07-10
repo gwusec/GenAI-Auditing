@@ -3,17 +3,19 @@
 // take/preview studies they're an auditor on.
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { Typography, Box, Stack, Grid, Divider } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent, CardFooter } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Avatar, AvatarFallback } from '../components/ui/avatar';
+import { Tooltip } from '../components/ui/tooltip';
 import {
-  AppBar, Toolbar, Typography, Box, Container, Button, TextField, Card, CardContent,
-  CardActions, Grid, Chip, Stack, Alert, Paper, Avatar, Divider, IconButton, Tooltip,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import SettingsIcon from '@mui/icons-material/Settings';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import BarChartIcon from '@mui/icons-material/BarChart';
-import ScienceIcon from '@mui/icons-material/Science';
-import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
-import LightModeIcon from '@mui/icons-material/LightModeOutlined';
+  Add as AddIcon, Settings as SettingsIcon, PlayArrow as PlayArrowIcon,
+  BarChart as BarChartIcon, Science as ScienceIcon,
+  DarkModeOutlined as DarkModeIcon, LightModeOutlined as LightModeIcon, Close,
+} from '../components/ui/icons';
 import { useFeature0 } from './Feature0Context';
 import StudySetup from './StudySetup';
 import StudyData from './StudyData';
@@ -62,51 +64,62 @@ export default function StudyDashboard() {
   }
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
-      <AppBar position="sticky">
-        <Toolbar>
-          <ScienceIcon sx={{ mr: 1.5, color: 'primary.main' }} />
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700, letterSpacing: '-0.01em' }}>TRAILS</Typography>
+    <Box className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 bg-primary text-primary-foreground shadow-sm">
+        <div className="flex min-h-[64px] items-center px-6">
+          <ScienceIcon className="mr-3 text-primary" />
+          <Typography variant="h6" className="grow font-bold tracking-[-0.01em]">TRAILS</Typography>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Tooltip title={mode === 'dark' ? 'Light mode' : 'Dark mode'}>
-              <IconButton color="inherit" size="small" onClick={toggleColorMode}>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-inherit hover:bg-white/10" onClick={toggleColorMode}>
                 {mode === 'dark' ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
-              </IconButton>
+              </Button>
             </Tooltip>
-            <Avatar sx={{ width: 30, height: 30, bgcolor: 'primary.dark', fontSize: 14 }}>
-              {(user?.email || user?.displayName || '?').charAt(0).toUpperCase()}
+            <Avatar className="h-[30px] w-[30px]">
+              <AvatarFallback className="bg-primary-dark text-[14px] text-primary-foreground">
+                {(user?.email || user?.displayName || '?').charAt(0).toUpperCase()}
+              </AvatarFallback>
             </Avatar>
-            <Typography variant="body2" sx={{ opacity: 0.9 }}>{user?.email || user?.displayName}</Typography>
-            <Button color="inherit" size="small" onClick={signOut}>Sign out</Button>
+            <Typography variant="body2" className="opacity-90">{user?.email || user?.displayName}</Typography>
+            <Button variant="ghost" size="sm" className="text-inherit hover:bg-white/10" onClick={signOut}>Sign out</Button>
           </Stack>
-        </Toolbar>
-      </AppBar>
+        </div>
+      </header>
 
-      <Container maxWidth="md" sx={{ py: 4 }}>
-        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+      <Box className="mx-auto max-w-[900px] px-6 py-8">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <div className="flex items-start justify-between gap-2">
+              <AlertDescription>{error}</AlertDescription>
+              <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-6 w-6 shrink-0" onClick={() => setError(null)}>
+                <Close />
+              </Button>
+            </div>
+          </Alert>
+        )}
 
-        <Paper elevation={0} variant="outlined" sx={{ p: 3, mb: 4, borderRadius: 2, bgcolor: 'background.paper' }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>Create a new study</Typography>
-          <Box component="form" onSubmit={createStudy} sx={{ display: 'flex', gap: 2 }}>
-            <TextField
+        <Card className="mb-8 p-6">
+          <Typography variant="subtitle1" className="mb-3 font-semibold">Create a new study</Typography>
+          <Box as="form" onSubmit={createStudy} className="flex gap-4">
+            <Input
               placeholder="e.g. Fairness audit — customer support bot"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              fullWidth size="small"
             />
-            <Button type="submit" variant="contained" startIcon={<AddIcon />} disabled={!title.trim()} sx={{ whiteSpace: 'nowrap' }}>
+            <Button type="submit" disabled={!title.trim()} className="whitespace-nowrap">
+              <AddIcon />
               Create &amp; set up
             </Button>
           </Box>
-        </Paper>
+        </Card>
 
-        <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>Your studies</Typography>
+        <Typography variant="h6" className="mb-4 font-semibold">Your studies</Typography>
 
         {list.length === 0 ? (
-          <Paper variant="outlined" sx={{ p: 5, textAlign: 'center', borderRadius: 2, borderStyle: 'dashed' }}>
-            <ScienceIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+          <Card className="border-dashed p-10 text-center">
+            <ScienceIcon size={40} className="mx-auto mb-2 text-muted-foreground opacity-50" />
             <Typography color="text.secondary">No studies yet. Create your first one above.</Typography>
-          </Paper>
+          </Card>
         ) : (
           <Grid container spacing={2}>
             {list.map((s) => {
@@ -116,53 +129,53 @@ export default function StudyDashboard() {
               const configured = validateStudyConfig(withStudyConfigDefaults(s.config || {})).valid;
               return (
                 <Grid item xs={12} sm={6} key={s.id}>
-                  <Card variant="outlined" sx={{ borderRadius: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                    <CardContent sx={{ flexGrow: 1 }}>
-                      <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                  <Card className="flex h-full flex-col">
+                    <CardContent className="grow pt-6">
+                      <Stack direction="row" spacing={1} className="mb-2">
                         {s.roles.map((r) => (
-                          <Chip key={r} label={r} size="small"
-                            color={r === 'investigator' ? 'primary' : 'default'} variant="outlined" />
+                          <Badge key={r} variant={r === 'investigator' ? 'default' : 'outline'}>{r}</Badge>
                         ))}
                         {isInvestigator && (
-                          <Chip
-                            label={configured ? 'Ready' : 'Needs setup'}
-                            size="small"
-                            color={configured ? 'success' : 'warning'}
-                          />
+                          <Badge variant={configured ? 'success' : 'warning'}>
+                            {configured ? 'Ready' : 'Needs setup'}
+                          </Badge>
                         )}
                       </Stack>
-                      <Typography variant="h6" sx={{ fontWeight: 600 }}>{s.title}</Typography>
+                      <Typography variant="h6" className="font-semibold">{s.title}</Typography>
                       {s.description && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{s.description}</Typography>
+                        <Typography variant="body2" color="text.secondary" className="mt-1">{s.description}</Typography>
                       )}
                     </CardContent>
                     <Divider />
-                    <CardActions sx={{ px: 2, py: 1.5 }}>
+                    <CardFooter className="gap-2 px-4 py-3">
                       {isInvestigator && (
-                        <Button size="small" startIcon={<SettingsIcon />} onClick={() => setSelected(s)}>
+                        <Button variant="ghost" size="sm" onClick={() => setSelected(s)}>
+                          <SettingsIcon />
                           Set up
                         </Button>
                       )}
                       {isInvestigator && (
-                        <Button size="small" startIcon={<BarChartIcon />} onClick={() => setViewingData(s)}>
+                        <Button variant="ghost" size="sm" onClick={() => setViewingData(s)}>
+                          <BarChartIcon />
                           Data
                         </Button>
                       )}
                       <Button
-                        size="small" startIcon={<PlayArrowIcon />}
+                        variant="ghost" size="sm"
                         onClick={() => previewStudy(s)}
                         disabled={isInvestigator && !configured}
                       >
+                        <PlayArrowIcon />
                         {isInvestigator ? 'Preview' : 'Take study'}
                       </Button>
-                    </CardActions>
+                    </CardFooter>
                   </Card>
                 </Grid>
               );
             })}
           </Grid>
         )}
-      </Container>
+      </Box>
     </Box>
   );
 }

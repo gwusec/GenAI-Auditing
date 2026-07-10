@@ -2,15 +2,21 @@
 // configuration, the questionnaire (authored with the SurveyJS QuestionnaireAuthor,
 // stored at config.evaluation.questionnaire.schema), and share/preview.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Stack, Divider } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Textarea } from '../components/ui/textarea';
+import { Label } from '../components/ui/label';
+import { Card, CardContent } from '../components/ui/card';
+import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { Tooltip } from '../components/ui/tooltip';
 import {
-  Box, Button, TextField, Typography, Paper, Stack, Divider, Chip, Snackbar,
-  Card, CardContent, Step, StepButton, Stepper, IconButton, Tooltip, Alert,
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+  ArrowBack as ArrowBackIcon, ContentCopy as ContentCopyIcon,
+  PlayArrow as PlayArrowIcon, CheckCircle as CheckCircleIcon, Close,
+} from '../components/ui/icons';
+import { cn } from '../lib/utils';
 import QuestionnaireAuthor from '../components/QuestionnaireAuthor/QuestionnaireAuthor';
 import StudyConfigForm from './StudyConfigForm';
 import { useFeature0 } from './Feature0Context';
@@ -24,6 +30,13 @@ export default function StudySetup({ study: initialStudy, onBack }) {
   const [code, setCode] = useState(null);
   const [toast, setToast] = useState(null);
   const [error, setError] = useState(null);
+
+  // Auto-dismiss the toast (preserves MUI Snackbar autoHideDuration=2500).
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 2500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const questionnaireSchema =
     (study.config && study.config.evaluation && study.config.evaluation.questionnaire
@@ -101,49 +114,81 @@ export default function StudySetup({ study: initialStudy, onBack }) {
   const [step, setStep] = useState(0);
 
   return (
-    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh', pb: 8 }}>
+    <Box className="min-h-screen bg-background pb-16">
       {/* Header */}
-      <Box sx={{ bgcolor: 'background.paper', borderBottom: '1px solid', borderColor: 'divider', px: 3, py: 2, position: 'sticky', top: 0, zIndex: 10 }}>
+      <Box className="sticky top-0 z-10 border-b bg-card px-6 py-4">
         <Stack direction="row" alignItems="center" spacing={2}>
-          <IconButton onClick={onBack} aria-label="Back to studies">
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to studies">
             <ArrowBackIcon />
-          </IconButton>
+          </Button>
           <Box>
             <Typography variant="overline" color="text.secondary">Study setup</Typography>
-            <Typography variant="h5" sx={{ fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.01em' }}>{study.title}</Typography>
+            <Typography variant="h5" className="font-bold leading-[1.1] tracking-[-0.01em]">{study.title}</Typography>
           </Box>
         </Stack>
       </Box>
 
-      <Box sx={{ maxWidth: 880, mx: 'auto', px: 2, mt: 3 }}>
-        <Stepper activeStep={step} nonLinear sx={{ mb: 4 }}>
-          {['Details', 'Configuration', 'Questionnaire', 'Share & preview'].map((label, i) => (
-            <Step key={label} completed={
+      <Box className="mx-auto mt-6 max-w-[880px] px-4">
+        <div className="mb-8 flex flex-wrap items-center gap-2">
+          {['Details', 'Configuration', 'Questionnaire', 'Share & preview'].map((label, i) => {
+            const completed =
               i === 0 ? Boolean(title.trim())
                 : i === 1 ? configValid
                   : i === 2 ? hasQuestionnaire
-                    : false
-            }>
-              <StepButton onClick={() => setStep(i)}>{label}</StepButton>
-            </Step>
-          ))}
-        </Stepper>
+                    : false;
+            const active = step === i;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setStep(i)}
+                className={cn(
+                  'flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition-colors',
+                  active ? 'bg-primary/12 font-semibold text-primary' : 'text-muted-foreground hover:bg-foreground/5',
+                )}
+              >
+                <span className={cn(
+                  'flex h-6 w-6 items-center justify-center rounded-full border text-xs',
+                  completed ? 'border-success bg-success text-success-foreground'
+                    : active ? 'border-primary text-primary' : 'border-border',
+                )}>
+                  {completed ? <CheckCircleIcon size={16} /> : i + 1}
+                </span>
+                {label}
+              </button>
+            );
+          })}
+        </div>
 
-        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <div className="flex items-start justify-between gap-2">
+              <AlertDescription>{error}</AlertDescription>
+              <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-6 w-6 shrink-0" onClick={() => setError(null)}>
+                <Close />
+              </Button>
+            </div>
+          </Alert>
+        )}
 
         {step === 0 && (
-        <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-          <CardContent>
+        <Card className="mb-6">
+          <CardContent className="pt-6">
             <Typography variant="h6" gutterBottom>1 · Study details</Typography>
-            <Stack spacing={2} sx={{ mt: 1 }}>
-              <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} fullWidth />
-              <TextField
-                label="Description (what auditors will see)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                fullWidth multiline minRows={2}
-              />
-              <Box><Button variant="contained" onClick={saveDetails} disabled={!title.trim()}>Save details</Button></Box>
+            <Stack spacing={2} className="mt-2">
+              <div>
+                <Label className="mb-1.5 block">Title</Label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+              </div>
+              <div>
+                <Label className="mb-1.5 block">Description (what auditors will see)</Label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                />
+              </div>
+              <Box><Button onClick={saveDetails} disabled={!title.trim()}>Save details</Button></Box>
             </Stack>
           </CardContent>
         </Card>
@@ -151,17 +196,17 @@ export default function StudySetup({ study: initialStudy, onBack }) {
         )}
 
         {step === 1 && (
-        <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-          <CardContent>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <Stack direction="row" alignItems="center" spacing={1} className="mb-2">
               <Typography variant="h6">2 · Configuration</Typography>
-              {configValid && <Chip icon={<CheckCircleIcon />} label="Valid" color="success" size="small" />}
+              {configValid && <Badge variant="success"><CheckCircleIcon size={14} />Valid</Badge>}
             </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" className="mb-4">
               Define the auditor experience — conversation control, model, limits, evaluation
               methods, consent, and recruitment. The study can't be opened until this is valid.
             </Typography>
-            <Divider sx={{ mb: 2 }} />
+            <Divider className="mb-4" />
             <StudyConfigForm config={study.config} onSave={saveConfig} />
           </CardContent>
         </Card>
@@ -169,18 +214,18 @@ export default function StudySetup({ study: initialStudy, onBack }) {
         )}
 
         {step === 2 && (
-        <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-          <CardContent>
-            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <Stack direction="row" alignItems="center" spacing={1} className="mb-2">
               <Typography variant="h6">3 · Questionnaire</Typography>
-              {hasQuestionnaire && <Chip icon={<CheckCircleIcon />} label="Configured" color="success" size="small" />}
+              {hasQuestionnaire && <Badge variant="success"><CheckCircleIcon size={14} />Configured</Badge>}
             </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            <Typography variant="body2" color="text.secondary" className="mb-4">
               The questions auditors answer after each conversation. Start from a template, add
               questions visually, or paste your own — then save.
             </Typography>
-            <Divider sx={{ mb: 2 }} />
-            <Box sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
+            <Divider className="mb-4" />
+            <Box className="rounded bg-card">
               <QuestionnaireAuthor value={questionnaireSchema} onSave={saveQuestionnaireSchema} />
             </Box>
           </CardContent>
@@ -189,29 +234,28 @@ export default function StudySetup({ study: initialStudy, onBack }) {
         )}
 
         {step === 3 && (
-        <Card variant="outlined" sx={{ mb: 3, borderRadius: 2 }}>
-          <CardContent>
+        <Card className="mb-6">
+          <CardContent className="pt-6">
             <Typography variant="h6" gutterBottom>4 · Share &amp; preview</Typography>
-            <Stack spacing={2} sx={{ mt: 1 }}>
+            <Stack spacing={2} className="mt-2">
               {/* Lifecycle */}
               <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>Status:</Typography>
-                <Chip
-                  label={status}
-                  color={status === 'open' ? 'success' : status === 'closed' ? 'default' : 'warning'}
-                  size="small"
-                />
+                <Typography variant="body2" className="font-semibold">Status:</Typography>
+                <Badge variant={status === 'open' ? 'success' : status === 'closed' ? 'secondary' : 'warning'}>
+                  {status}
+                </Badge>
                 {status !== 'open' ? (
                   <Tooltip title={configValid ? '' : 'Complete the configuration first'}>
                     <span>
-                      <Button variant="contained" size="small" disabled={!configValid}
+                      <Button size="sm" disabled={!configValid}
                         onClick={() => setStatus('open')}>
                         Open study
                       </Button>
                     </span>
                   </Tooltip>
                 ) : (
-                  <Button variant="outlined" size="small" color="warning"
+                  <Button variant="outline" size="sm"
+                    className="border-warning text-warning hover:bg-warning/10"
                     onClick={() => setStatus('closed')}>
                     Close study
                   </Button>
@@ -222,14 +266,14 @@ export default function StudySetup({ study: initialStudy, onBack }) {
               </Stack>
               <Divider />
               <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
-                <Button variant="outlined" onClick={generateCode}>Generate access code</Button>
+                <Button variant="outline" onClick={generateCode}>Generate access code</Button>
                 {code && (
-                  <Paper variant="outlined" sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="h6" sx={{ letterSpacing: 2, fontFamily: 'monospace' }}>{code}</Typography>
+                  <Card className="flex items-center gap-2 px-4 py-2">
+                    <Typography variant="h6" className="font-mono tracking-[2px]">{code}</Typography>
                     <Tooltip title="Copy code">
-                      <IconButton size="small" onClick={() => copy(code)}><ContentCopyIcon fontSize="small" /></IconButton>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copy(code)}><ContentCopyIcon size={18} /></Button>
                     </Tooltip>
-                  </Paper>
+                  </Card>
                 )}
               </Stack>
               <Typography variant="body2" color="text.secondary">
@@ -238,15 +282,14 @@ export default function StudySetup({ study: initialStudy, onBack }) {
               <Divider />
               <Box>
                 <Button
-                  variant="contained"
-                  startIcon={<PlayArrowIcon />}
                   onClick={() => previewStudy(study)}
                   disabled={!hasQuestionnaire}
                 >
+                  <PlayArrowIcon />
                   Preview as auditor
                 </Button>
                 {!hasQuestionnaire && (
-                  <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                  <Typography variant="caption" color="text.secondary" className="ml-4">
                     Save a questionnaire first to preview.
                   </Typography>
                 )}
@@ -257,25 +300,23 @@ export default function StudySetup({ study: initialStudy, onBack }) {
         )}
 
         {/* Wizard navigation */}
-        <Stack direction="row" justifyContent="space-between" sx={{ mt: 1, mb: 6 }}>
-          <Button disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
+        <Stack direction="row" justifyContent="space-between" className="mb-12 mt-2">
+          <Button variant="ghost" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
             ← Back
           </Button>
           {step < 3 && (
-            <Button variant="contained" onClick={() => setStep((s) => Math.min(3, s + 1))}>
+            <Button onClick={() => setStep((s) => Math.min(3, s + 1))}>
               Next →
             </Button>
           )}
         </Stack>
       </Box>
 
-      <Snackbar
-        open={Boolean(toast)}
-        autoHideDuration={2500}
-        onClose={() => setToast(null)}
-        message={toast}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      />
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-foreground px-4 py-2 text-sm text-background shadow-lg">
+          {toast}
+        </div>
+      )}
     </Box>
   );
 }

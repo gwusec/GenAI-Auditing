@@ -7,16 +7,22 @@
 // changes up via onChange, so it drops into StudyConfigForm's model[0] block.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Stack, Typography } from '../components/ui/layout';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Alert } from '../components/ui/alert';
+import { Progress } from '../components/ui/progress';
+import { Spinner } from '../components/ui/spinner';
+import { Tooltip } from '../components/ui/tooltip';
 import {
-  Box, Stack, Typography, TextField, Autocomplete, Chip, IconButton, Tooltip,
-  Button, LinearProgress, Alert, CircularProgress, InputAdornment, Collapse,
-} from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
-import DownloadIcon from '@mui/icons-material/Download';
-import CloseIcon from '@mui/icons-material/Close';
-import MemoryIcon from '@mui/icons-material/Memory';
+  Refresh as RefreshIcon,
+  CheckCircle as CheckCircleIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  Download as DownloadIcon,
+  Close as CloseIcon,
+} from '../components/ui/icons';
 import { streamPost } from '../tools/streamSSE';
 
 function fmtBytes(n) {
@@ -119,9 +125,9 @@ export default function OllamaConnectorPanel({ baseUrl, modelId, onChange, defau
   }, []);
 
   const statusChip = useMemo(() => {
-    if (status === 'checking') return <Chip size="small" icon={<CircularProgress size={12} />} label="Checking…" />;
-    if (status === 'ok') return <Chip size="small" color="success" icon={<CheckCircleIcon />} label={`Connected · ${models.length} model${models.length === 1 ? '' : 's'}`} />;
-    if (status === 'error') return <Chip size="small" color="error" icon={<ErrorOutlineIcon />} label="Not reachable" />;
+    if (status === 'checking') return <Badge variant="outline"><Spinner size={12} />Checking…</Badge>;
+    if (status === 'ok') return <Badge variant="success"><CheckCircleIcon className="size-3.5" />{`Connected · ${models.length} model${models.length === 1 ? '' : 's'}`}</Badge>;
+    if (status === 'error') return <Badge variant="destructive"><ErrorOutlineIcon className="size-3.5" />Not reachable</Badge>;
     return null;
   }, [status, models.length]);
 
@@ -130,116 +136,129 @@ export default function OllamaConnectorPanel({ baseUrl, modelId, onChange, defau
   return (
     <Stack spacing={2}>
       {/* Server address + status */}
-      <TextField
-        label="Ollama server address"
-        value={baseUrl || ''}
-        onChange={(e) => setBaseUrl(e.target.value)}
-        fullWidth
-        placeholder={defaultBaseUrl || 'http://host.docker.internal:11434'}
-        helperText="Where Ollama is running. The default reaches Ollama on the machine hosting this app."
-        InputProps={{
-          endAdornment: (
-            <InputAdornment position="end">
-              <Tooltip title="Re-check connection & reload models">
-                <span>
-                  <IconButton size="small" onClick={() => refresh(baseUrl)} disabled={status === 'checking'}>
-                    <RefreshIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </InputAdornment>
-          ),
-        }}
-      />
-      <Box sx={{ mt: -1 }}>{statusChip}</Box>
-      {status === 'error' && statusMsg && <Alert severity="warning">{statusMsg}</Alert>}
-
-      {/* Installed-model picker (rich options) */}
-      <Autocomplete
-        freeSolo
-        options={models}
-        value={selected || modelId || null}
-        getOptionLabel={(o) => (typeof o === 'string' ? o : o.name || '')}
-        isOptionEqualToValue={(o, v) => (o.name || o) === (v.name || v)}
-        onChange={(e, val) => setModelId(typeof val === 'string' ? val : (val && val.name) || '')}
-        onInputChange={(e, val, reason) => { if (reason === 'input') setModelId(val); }}
-        renderOption={(props, option) => (
-          <Box component="li" {...props} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start !important', gap: 0.25 }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <MemoryIcon fontSize="small" color="action" />
-              <Typography sx={{ fontWeight: 600 }}>{option.name}</Typography>
-            </Stack>
-            {modelMeta(option) && <Typography variant="caption" color="text.secondary" sx={{ pl: 3.5 }}>{modelMeta(option)}</Typography>}
-          </Box>
-        )}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            label="Model auditors will talk to"
-            required
-            placeholder="llama3.1"
-            helperText={
-              models.length
-                ? 'Pick one of your installed models, or pull a new one below.'
-                : (status === 'ok' ? 'No models installed yet — pull one below.' : 'Set the server address to load your installed models.')
-            }
+      <div>
+        <Label htmlFor="ollama-base-url">Ollama server address</Label>
+        <div className="relative mt-1.5">
+          <Input
+            id="ollama-base-url"
+            value={baseUrl || ''}
+            onChange={(e) => setBaseUrl(e.target.value)}
+            placeholder={defaultBaseUrl || 'http://host.docker.internal:11434'}
+            className="pr-10"
           />
-        )}
-      />
+          <div className="absolute right-1 top-1/2 -translate-y-1/2">
+            <Tooltip title="Re-check connection & reload models">
+              <span>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => refresh(baseUrl)} disabled={status === 'checking'}>
+                  <RefreshIcon />
+                </Button>
+              </span>
+            </Tooltip>
+          </div>
+        </div>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Where Ollama is running. The default reaches Ollama on the machine hosting this app.
+        </p>
+      </div>
+      <div className="-mt-2">{statusChip}</div>
+      {status === 'error' && statusMsg && <Alert variant="warning">{statusMsg}</Alert>}
+
+      {/* Installed-model picker (free-text with installed-model suggestions) */}
+      <div>
+        <Label htmlFor="ollama-model">Model auditors will talk to <span className="text-destructive">*</span></Label>
+        <Input
+          id="ollama-model"
+          list="ollama-model-options"
+          required
+          className="mt-1.5"
+          placeholder="llama3.1"
+          value={modelId || ''}
+          onChange={(e) => setModelId(e.target.value)}
+        />
+        <datalist id="ollama-model-options">
+          {models.map((m) => (
+            <option key={m.name} value={m.name}>{modelMeta(m)}</option>
+          ))}
+        </datalist>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {models.length
+            ? 'Pick one of your installed models, or pull a new one below.'
+            : (status === 'ok' ? 'No models installed yet — pull one below.' : 'Set the server address to load your installed models.')}
+        </p>
+      </div>
       {selected && modelMeta(selected) && (
-        <Typography variant="caption" color="text.secondary" sx={{ mt: -1 }}>
+        <Typography variant="caption" color="text.secondary" className="-mt-2">
           Selected: <b>{selected.name}</b> — {modelMeta(selected)}
         </Typography>
       )}
 
       {/* Pull a new model */}
-      <Box sx={{ border: '1px dashed', borderColor: 'divider', borderRadius: 2, p: 2 }}>
-        <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Add a model</Typography>
+      <div className="rounded-md border border-dashed p-4">
+        <Typography variant="subtitle2" className="mb-1">Add a model</Typography>
         <Typography variant="caption" color="text.secondary">
           Download any model from the Ollama library straight into your server.
         </Typography>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mt: 1.5 }} alignItems="flex-start">
-          <TextField
-            size="small"
-            fullWidth
-            label="Model name"
-            placeholder="e.g. qwen2.5:3b"
-            value={pullName}
-            onChange={(e) => setPullName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); startPull(); } }}
-            disabled={pulling}
-          />
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} className="mt-3" alignItems="flex-start">
+          <div className="w-full">
+            <Label htmlFor="ollama-pull-name" className="sr-only">Model name</Label>
+            <Input
+              id="ollama-pull-name"
+              placeholder="e.g. qwen2.5:3b"
+              value={pullName}
+              onChange={(e) => setPullName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); startPull(); } }}
+              disabled={pulling}
+            />
+          </div>
           {pulling ? (
-            <Button variant="outlined" color="inherit" startIcon={<CloseIcon />} onClick={cancelPull} sx={{ whiteSpace: 'nowrap' }}>
+            <Button variant="outline" onClick={cancelPull} className="whitespace-nowrap">
+              <CloseIcon />
               Cancel
             </Button>
           ) : (
-            <Button variant="contained" startIcon={<DownloadIcon />} onClick={() => startPull()} disabled={!pullName.trim() || !(baseUrl || '').trim()} sx={{ whiteSpace: 'nowrap' }}>
+            <Button onClick={() => startPull()} disabled={!pullName.trim() || !(baseUrl || '').trim()} className="whitespace-nowrap">
+              <DownloadIcon />
               Pull
             </Button>
           )}
         </Stack>
 
         {!pulling && !pullDone && !pullError && (
-          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+          <Stack direction="row" spacing={0.75} flexWrap="wrap" className="mt-3">
             {SUGGESTED_PULLS.map((s) => (
-              <Chip key={s} label={s} size="small" variant="outlined" onClick={() => { setPullName(s); startPull(s); }} disabled={!(baseUrl || '').trim()} />
+              <Button key={s} variant="outline" size="sm" className="rounded-full" onClick={() => { setPullName(s); startPull(s); }} disabled={!(baseUrl || '').trim()}>
+                {s}
+              </Button>
             ))}
           </Stack>
         )}
 
-        <Collapse in={pulling}>
-          <Box sx={{ mt: 2 }}>
-            <LinearProgress variant={pullPercent == null ? 'indeterminate' : 'determinate'} value={pullPercent ?? 0} sx={{ borderRadius: 1, height: 8 }} />
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+        {pulling && (
+          <div className="mt-4">
+            <Progress value={pullPercent} className="h-2 rounded" />
+            <Typography variant="caption" color="text.secondary" className="mt-1 block">
               {pullStatus}{pullPercent != null ? ` — ${pullPercent}%` : ''}
             </Typography>
-          </Box>
-        </Collapse>
+          </div>
+        )}
 
-        {pullError && <Alert severity="error" sx={{ mt: 1.5 }} onClose={() => setPullError('')}>{pullError}</Alert>}
-        {pullDone && <Alert severity="success" sx={{ mt: 1.5 }} icon={<CheckCircleIcon fontSize="inherit" />} onClose={() => setPullDone('')}>Pulled <b>{pullDone}</b> and selected it.</Alert>}
-      </Box>
+        {pullError && (
+          <Alert variant="destructive" className="mt-3 flex items-start justify-between gap-2">
+            <span>{pullError}</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setPullError('')}>
+              <CloseIcon />
+            </Button>
+          </Alert>
+        )}
+        {pullDone && (
+          <Alert variant="success" className="mt-3 flex items-start justify-between gap-2">
+            <span className="flex items-center gap-2"><CheckCircleIcon className="size-4" />Pulled <b>{pullDone}</b> and selected it.</span>
+            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setPullDone('')}>
+              <CloseIcon />
+            </Button>
+          </Alert>
+        )}
+      </div>
     </Stack>
   );
 }

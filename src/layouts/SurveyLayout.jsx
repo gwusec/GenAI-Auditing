@@ -1,6 +1,8 @@
 import Debugger from "../components/Debugger";
 import SurveyMaker from "../components/SurveyMaker/SurveyMaker";
-import { Alert, CssBaseline } from "@mui/material";
+import { Alert } from "../components/ui/alert";
+import { Button } from "../components/ui/button";
+import { Close } from "../components/ui/icons";
 import ErrorDialog from "../components/ErrorDialog";
 
 function SurveyLayout({
@@ -18,10 +20,18 @@ function SurveyLayout({
             {!isViewOnly && (
                 <SurveyMaker onSurveySave={handleSurveySave} />
             )}
-            <CssBaseline />
             {error && (
-                <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2 }}>
+                <Alert variant="destructive" className="mb-4 pr-10">
                     {error}
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1 h-7 w-7"
+                        onClick={() => setError(null)}
+                        aria-label="Close"
+                    >
+                        <Close />
+                    </Button>
                 </Alert>
             )}
 

@@ -1,7 +1,8 @@
 // AuditPage0Tutorial.jsx
 
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Typography } from '../ui/layout';
+import { Button } from '../ui/button';
 
 const steps = [
   {
@@ -62,66 +63,28 @@ const AuditPage0Tutorial = ({ onComplete }) => {
   }
 
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 9999,
-        pointerEvents: 'none', // Allows interactions with underlying elements
-      }}
-    >
+    <Box className="fixed inset-0 z-[9999] pointer-events-none">
       {/* Overlay Background */}
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        }}
-      />
+      <Box className="absolute inset-0 bg-black/50" />
 
       {/* Highlight Box */}
       <Box
-        sx={{
-          position: 'absolute',
+        className="absolute box-border pointer-events-none rounded border-2 border-white"
+        style={{
           top: highlightStyle.top,
           left: highlightStyle.left,
           width: highlightStyle.width,
           height: highlightStyle.height,
-          border: '2px solid #fff',
-          boxSizing: 'border-box',
-          pointerEvents: 'none',
-          borderRadius: '4px',
         }}
       />
 
       {/* Centered Tutorial Dialogue */}
-      <Box
-        sx={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          backgroundColor: '#fff',
-          padding: 3,
-          borderRadius: 2,
-          maxWidth: '80%',
-          textAlign: 'center',
-          boxShadow: '0 0 10px rgba(0,0,0,0.3)',
-          zIndex: 10000,
-          pointerEvents: 'auto', // Allows interaction with the dialogue
-        }}
-      >
+      <Box className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white p-6 rounded-md max-w-[80%] text-center shadow-[0_0_10px_rgba(0,0,0,0.3)] z-[10000] pointer-events-auto">
 
         <Typography variant="body1" gutterBottom>
           {steps[step].content}
         </Typography>
-        <Button variant="contained" onClick={handleNext} sx={{ mt: 2 }}>
+        <Button onClick={handleNext} className="mt-4">
           {step < steps.length - 1 ? 'Next' : 'Close Tutorial'}
         </Button>
       </Box>

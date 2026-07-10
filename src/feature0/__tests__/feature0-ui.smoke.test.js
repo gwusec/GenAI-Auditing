@@ -1,5 +1,5 @@
 // Import-smoke test for the Feature 0 UI. Importing each component validates it
-// transpiles and its import graph (MUI, icons, context, seams, SurveyMaker)
+// transpiles and its import graph (shadcn/ui primitives, icons, context, seams, SurveyMaker)
 // resolves — the same class of error a production build would surface.
 
 import Feature0Context, { Feature0Provider, useFeature0, DEFAULT_QUESTIONNAIRE } from '../Feature0Context';

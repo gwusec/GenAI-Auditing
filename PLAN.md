@@ -1,6 +1,6 @@
 # TRAILS Chatbot Audit Tool — Project Plan (single source of truth)
 
-**Last updated:** 2026-07-10 · **Branch:** `audit-fixes` · **Tests:** 231 passing · `vite build` clean · `node --check` OK
+**Last updated:** 2026-07-10 · **Branch:** `audit-fixes` · **Tests:** 232 passing · `vite build` clean · `node --check` OK
 
 This is the **one** living plan for the TRAILS chatbot-audit web app. It replaces the
 previously scattered set of docs (the old `PLAN.md`, `docs/PRD.md`, `docs/AUDIT-FIX-PLAN.md`,
@@ -29,7 +29,7 @@ That disciplines scope toward solid self-hosting + docs over breadth.
 
 ## 2. Architecture snapshot
 
-- **Frontend:** React 19 + MUI 6, built with **Vite** (migrated off CRA). Event-sourced
+- **Frontend:** React 19 + **shadcn/ui (Radix + Tailwind)**, built with **Vite** (migrated off CRA; MUI retired in Phase 1B). Event-sourced
   conversation model; no react-router (state-based routing via `Feature0Shell`).
 - **Two entry paths** (`src/index.js`): `REACT_APP_FEATURE0` off → legacy standalone `<App>`;
   on → `<Feature0Shell>` (gate → dashboard / auditor / demo). Production runs Feature 0.
@@ -150,7 +150,7 @@ Each cell: what's done → what remains.
 
 | Area | Done | Remaining |
 |------|------|-----------|
-| **Global** | Design system (`theme.js`: teal accent, light+dark, persisted toggle, MUI cssVariables, SurveyJS bridged via `--sjs-*`); `Feature0Shell` state routing; chat redesign (avatars, slim bubbles, typing indicator, entrance animation); footer-clipping + autofill-styling fixes | UX-rework steps 2–6 (auditor chat polish → investigator wizard polish → responsive/a11y); floating "personal info" tooltip bubbles bug; broader polish |
+| **Global** | Design system (**Tailwind + shadcn/ui**: teal accent as CSS-variable tokens in `index.css`, light+dark via `.dark` class, persisted toggle in `theme.js`, SurveyJS bridged via `--sjs-*` → the same tokens); `Feature0Shell` state routing; chat redesign (avatars, slim bubbles, typing indicator, entrance animation); footer-clipping + autofill-styling fixes | UX-rework steps 2–6 (auditor chat polish → investigator wizard polish → responsive/a11y); floating "personal info" tooltip bubbles bug; broader polish |
 | **Setup** | `StudyConfigForm` (collapsible sections, minutes-based timers, provider picker, reaction toggles, consent); `OllamaConnectorPanel` + `WebLLMConnectorPanel`; `QuestionnaireAuthor` (visual + raw-JSON); `StudySetup`; bundled fairness/bias templates | Fully retire legacy `SurveyMaker`; dashboard "Create & set up" button clipped at card edge |
 | **Chatbot** | `ChatBox`/`ChatMessages`/`MessageForm`/`ChatHistory`, `LoadingDots` typing indicator, streaming bubble, timer countdown/warnings, teal user bubbles, safety notices | Floating tooltip-bubble bug; UX polish pass (step 2) |
 | **Audit** | Inline turn reactions; `AuditFlow` (span-highlight step + SurveyJS questionnaire); `Questionnaire`; `FinalAssessment`; gating via `auditPlan` — verified live | Reactions wrongly render on the audit transcript; ~1-char highlight boundary; 8-step tutorial too long; legacy `AuditForm` still present as fallback |
@@ -337,11 +337,31 @@ Suite at 220.
   surfaces load progress via `onStatus`). Removed the stale legacy `src/utils/WebLLMClient.js`.
 - Tests: connector gating, webllm schema/wire mapping, WebLLM engine helpers. Suite at **231**.
 
+### 2026-07-10 — Phase 1B: UI foundation swap (MUI → shadcn/ui + Tailwind) `[D1]`
+- **Tailwind + shadcn set up:** Tailwind v3 + PostCSS + `tailwindcss-animate`; teal light/dark
+  palette moved into CSS-variable tokens (`src/index.css`) driving `tailwind.config.js`; `cn()`
+  helper (`clsx` + `tailwind-merge`).
+- **Primitive library** (`src/components/ui/*`): button, input, textarea, label, card, dialog,
+  alert, badge, separator, tabs, tooltip, checkbox, switch, select, radio-group, toggle-group,
+  avatar, progress, spinner, table, accordion (Radix-based), plus compat layout primitives
+  (Box/Stack/Grid/Typography/List/Divider) and a lucide-react icon shim under the old MUI names.
+- **theme.js** rewritten to a Tailwind dark-class provider (toggles `.dark` on `<html>`,
+  persists `themeMode`); `ThemeModeProvider`/`useColorMode` API unchanged. `CssBaseline` retired.
+- **SurveyJS re-bridged:** `--sjs-*` variables now point at the new CSS-variable tokens (no MUI
+  `useTheme`/`alpha`), so the questionnaire follows light/dark automatically.
+- **All 32 `@mui` files migrated** (App.jsx, feature0/, components/, layouts/) to the new
+  primitives; every `sx` prop converted to Tailwind `className` (or plain `style` for dynamic
+  values); `<Grid>` → Tailwind 12-col grid. **`@mui/*` + `@emotion/*` removed** from
+  `package.json` — build verified clean with them deleted from `node_modules`.
+- Added a `ui.smoke.test.jsx` render check for the primitive library. Suite at **232**,
+  `vite build` clean, `node --check server/server.js` OK. Visual/behavioral parity to be
+  confirmed live in the Cowork chat (Phase 1B exit criterion).
+
 ---
 
 ## 8. How to verify / run
 
-- **Tests:** `npx vitest run` (231 passing). **Build:** `npx vite build`. **Relay syntax:**
+- **Tests:** `npx vitest run` (232 passing). **Build:** `npx vite build`. **Relay syntax:**
   `node --check server/server.js`.
 - **Local dev:** `npm run dev` (Vite). Local mode uses IndexedDB; no backend required.
 - **Self-host:** `self-host/docker-compose.trails.yml` (app + relay + Supabase). See

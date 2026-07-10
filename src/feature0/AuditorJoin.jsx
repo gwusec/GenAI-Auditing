@@ -1,6 +1,11 @@
 // AuditorJoin — anonymous auditor entry via an access code.
 import React, { useState, useEffect } from 'react';
-import { Box, Button, TextField, Typography, Alert, Paper } from '@mui/material';
+import { Box, Typography } from '../components/ui/layout';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Alert } from '../components/ui/alert';
+import { Card } from '../components/ui/card';
 import { useFeature0 } from './Feature0Context';
 
 // Read a join-by-link code from the URL: ?code=ABC123 (no router needed).
@@ -38,23 +43,25 @@ export default function AuditorJoin({ onJoined }) {
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 4, maxWidth: 420, mx: 'auto', mt: 6, borderRadius: 3 }}>
+    <Card className="mx-auto mt-12 max-w-[420px] rounded-xl p-8">
       <Typography variant="h6" gutterBottom>Join a study</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography variant="body2" color="text.secondary" className="mb-4">
         Enter the access code you were given. No account required.
       </Typography>
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <Box component="form" onSubmit={submit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <TextField
-          label="Access code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          required
-          fullWidth
-          inputProps={{ style: { textTransform: 'uppercase' } }}
-        />
-        <Button type="submit" variant="contained" disabled={busy || !code.trim()}>Join</Button>
+      {error && <Alert variant="destructive" className="mb-4">{error}</Alert>}
+      <Box component="form" onSubmit={submit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="join-code">Access code</Label>
+          <Input
+            id="join-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            required
+            className="uppercase"
+          />
+        </div>
+        <Button type="submit" disabled={busy || !code.trim()}>Join</Button>
       </Box>
-    </Paper>
+    </Card>
   );
 }

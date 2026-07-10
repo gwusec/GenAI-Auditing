@@ -1,11 +1,13 @@
 import React from 'react';
-import { Typography, Paper, Button } from '@mui/material';
+import { Typography } from '../ui/layout';
+import { Card } from '../ui/card';
+import { Button } from '../ui/button';
 import './AuditInstructions.module.css';
 
 // In AuditInstructions.jsx
 const AuditInstructions = ({ onComplete }) => {
   return (
-    <Paper className="instructions-container">
+    <Card className="instructions-container">
       <Typography variant="h4" gutterBottom>
         TRAILS RESEARCH
       </Typography>
@@ -15,10 +17,10 @@ const AuditInstructions = ({ onComplete }) => {
       <Typography variant="body1">
         You can start multiple audits to check different aspects. Click 'Start New Audit' in the sidebar to proceed.
       </Typography>
-      <Button variant="contained" color="primary" onClick={onComplete} sx={{ mt: 2 }}>
+      <Button onClick={onComplete} className="mt-4">
         I Understand, Proceed to Audit
       </Button>
-    </Paper>
+    </Card>
   );
 };
 
