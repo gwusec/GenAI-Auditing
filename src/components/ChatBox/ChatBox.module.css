@@ -28,14 +28,25 @@
 .main-content {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0; /* take the space after the header (not 100% of the container) so
+                    the footer can't be pushed below the viewport and clipped */
 }
 
 /* Message list area; rename as .chatBox__messageList; Element: Container for the list of messages. */
 .message-list-area {
   flex: 1;
+  min-height: 0; /* allow the scroll area to shrink so the footer always fits */
   padding: 20px 0;
   overflow-y: auto;
+}
+
+/* Footer (principles + composer + action buttons) — keep its natural height and
+   add breathing room so the Replay/Restart buttons don't sit flush against the
+   bottom edge. */
+.chat-footer {
+  flex-shrink: 0;
+  padding-bottom: 16px;
 }
 
 /* Chat content; rename as .chatBox__chatContent; Element: Specific area within chatBox for chat content. */

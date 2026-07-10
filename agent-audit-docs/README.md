@@ -10,6 +10,7 @@ This folder holds the initial design documentation. It is a scoping and position
 
 | Doc | What it covers |
 |-----|----------------|
+| [`00-start-here.md`](00-start-here.md) | **Read first.** Status, decisions already made, open questions, next step, and sources. The resume point. |
 | [`01-vision.md`](01-vision.md) | The problem, who it's for, what changes from the chatbot tool, and the three human-in-the-loop modes. |
 | [`02-borrow-vs-build.md`](02-borrow-vs-build.md) | What we reuse vs build from scratch, with a verified open-source license table and the reuse strategy. |
 | [`03-architecture.md`](03-architecture.md) | The trace-as-stimulus design, the event-log extension, the AI-judge and benchmark boundaries, and the data model. |
