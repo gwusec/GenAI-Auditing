@@ -22,6 +22,7 @@ WORKDIR /app
 COPY --from=build /app/build ./build
 COPY server/package.json ./package.json
 COPY server/server.js ./server.js
+COPY server/relayHelpers.js ./relayHelpers.js
 RUN npm install --only=production
 
 EXPOSE 3000
