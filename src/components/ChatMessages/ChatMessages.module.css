@@ -185,3 +185,18 @@
 /* .highlightHandleEnd; .chatMessages__highlightHandle--end; Modifier: Positions the end handle. */
 
 /* .edit-button; .chatMessages__editButton; Element: Styles the edit button within messages.*/
+/* Blinking caret shown at the end of a streaming reply while tokens arrive. */
+.stream-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  border-radius: 2px;
+  background-color: var(--mui-palette-primary-main, #0d9488);
+  animation: stream-caret-blink 0.9s steps(1) infinite;
+}
+
+@keyframes stream-caret-blink {
+  50% { opacity: 0; }
+}

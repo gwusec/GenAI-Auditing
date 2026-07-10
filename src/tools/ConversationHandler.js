@@ -14,6 +14,36 @@ class ConversationHandler extends EventEmitter {
         this.visibleMessages = [];
         this.contextMessages = [];
         this.lastUserMessageIndex = -1;
+        // Transient streaming buffer for the in-flight bot reply. `null` when not
+        // streaming; '' before the first token (UI shows a typing indicator); then
+        // the accumulating text. This is UI-only — the committed NEW_BOT_MESSAGE
+        // event still carries the full final content, so the event log stays clean.
+        this.streamingContent = null;
+    }
+
+    // --- streaming reply state (UI subscribes via registerOnStreamingUpdated) ---
+    _beginStreaming() { this.streamingContent = ''; this.emit('streamingUpdated', ''); }
+    _appendStreaming(delta) {
+        this.streamingContent = (this.streamingContent || '') + delta;
+        this.emit('streamingUpdated', this.streamingContent);
+    }
+    _endStreaming() { this.streamingContent = null; this.emit('streamingUpdated', null); }
+    registerOnStreamingUpdated(cb) { this.on('streamingUpdated', cb); }
+    unregisterOnStreamingUpdated(cb) { this.removeListener('streamingUpdated', cb); }
+
+    // Send the current context to the model, streaming tokens into the transient
+    // buffer as they arrive. Returns the same {status, data} shape as the
+    // non-streaming path (and falls back to it automatically for non-streaming
+    // providers/errors — see APIClient.sendChatMessageStream).
+    async _streamReply() {
+        this._beginStreaming();
+        try {
+            return await apiClient.sendChatMessageStream(this.contextMessages, {
+                onToken: (delta) => this._appendStreaming(delta),
+            });
+        } finally {
+            this._endStreaming();
+        }
     }
 
     initialize(apiClient, db) {
@@ -119,7 +149,7 @@ class ConversationHandler extends EventEmitter {
                     this.buildVisibleMessages(conversation);
                     this.buildContext(conversation);
 
-                    const newResponse = await apiClient.sendChatMessage(this.contextMessages);
+                    const newResponse = await this._streamReply();
                     if (newResponse?.status === "error400") {
                         const newBotEvent = new ChatEvent(CHAT_EVENT_TYPE.API_ERROR, null);
                         await this.addChatEvent(conversationId, newBotEvent);
@@ -153,8 +183,8 @@ class ConversationHandler extends EventEmitter {
                     this.buildVisibleMessages(conversation);
                     this.buildContext(conversation);
 
-                    // Send message to API
-                    const editResponse = await apiClient.sendChatMessage(this.contextMessages);
+                    // Send message to API (streamed)
+                    const editResponse = await this._streamReply();
                     if (editResponse?.status === "error400") {
                         const newBotEvent = new ChatEvent(CHAT_EVENT_TYPE.API_ERROR, null);
                         await this.addChatEvent(conversationId, newBotEvent);

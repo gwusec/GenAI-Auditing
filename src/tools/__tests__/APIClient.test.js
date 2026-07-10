@@ -13,7 +13,7 @@ vi.mock('axios', () => ({
   },
 }));
 
-import apiClient from '../APIClient';
+import apiClient, { parseSSEEvents } from '../APIClient';
 import AppConfig from '../AppConfig';
 
 const RELAY = { backend: 'ollama', ollamaUrl: 'http://localhost:11434', ollamaModel: 'llama3.1' };
@@ -63,5 +63,35 @@ describe('APIClient — relay contract', () => {
     mockPost.mockRejectedValueOnce({ response: { status: 400 } });
     const res = await apiClient.sendChatMessage([{ author: 'user', content: 'x' }]);
     expect(res).toEqual({ status: 'error400', data: null });
+  });
+});
+
+describe('parseSSEEvents (streaming)', () => {
+  test('decodes consecutive data: delta events', () => {
+    const { events, rest } = parseSSEEvents('data: {"delta":"Hel"}\n\ndata: {"delta":"lo"}\n\n');
+    expect(events).toEqual([{ delta: 'Hel' }, { delta: 'lo' }]);
+    expect(rest).toBe('');
+  });
+
+  test('keeps a partial trailing event in rest until the terminator arrives', () => {
+    const first = parseSSEEvents('data: {"delta":"a"}\n\ndata: {"del');
+    expect(first.events).toEqual([{ delta: 'a' }]);
+    expect(first.rest).toBe('data: {"del');
+    // next chunk completes it
+    const second = parseSSEEvents(first.rest + 'ta":"b"}\n\n');
+    expect(second.events).toEqual([{ delta: 'b' }]);
+    expect(second.rest).toBe('');
+  });
+
+  test('handles done markers and skips malformed / non-data lines', () => {
+    const { events } = parseSSEEvents(
+      ': keep-alive\n\ndata: [DONE]\n\ndata: {bad json}\n\ndata: {"done":true}\n\n'
+    );
+    expect(events).toEqual([{ done: true }, { done: true }]);
+  });
+
+  test('surfaces error events', () => {
+    const { events } = parseSSEEvents('data: {"error":"upstream 500"}\n\n');
+    expect(events).toEqual([{ error: 'upstream 500' }]);
   });
 });

@@ -101,12 +101,13 @@
 }
 
 .toast {
-  background-color: #333;
-  color: #fff;
-  padding: 8px;
-  border-radius: 4px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  background-color: #1e293b;
+  color: #e2e8f0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(2, 6, 23, 0.35);
   width: 180px;
   font-size: 0.8em;
+  line-height: 1.4;
   z-index: 1;
 }

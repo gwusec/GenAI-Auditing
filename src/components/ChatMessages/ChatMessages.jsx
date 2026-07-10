@@ -100,6 +100,15 @@ const ChatMessages = ({
         && AppConfig.getAll().config.evaluation.turnReactions) || { enabled: false, types: [] };
     const [reactions, setReactions] = useState([]);
 
+    // Live streaming reply: null = idle, '' = awaiting first token (typing dots),
+    // else the accumulating text. Driven by ConversationHandler.
+    const [streaming, setStreaming] = useState(null);
+    useEffect(() => {
+        const cb = (content) => setStreaming(content);
+        conversationHandler.registerOnStreamingUpdated(cb);
+        return () => conversationHandler.unregisterOnStreamingUpdated(cb);
+    }, []);
+
     useEffect(() => {
         const conv = conversationHandler.getActiveConversation();
         setReactions(conv && conv.getReactions ? conv.getReactions() : []);
@@ -120,9 +129,8 @@ const ChatMessages = ({
     };
 
     useEffect(() => {
-        console.log("Messages updated:", messages);
         if (isScrollToBottom) scrollToBottom();
-    }, [messages]);
+    }, [messages, streaming]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -226,10 +234,10 @@ const ChatMessages = ({
                                         border: '1px solid',
                                         borderColor: message.author === 'user' ? 'transparent' : 'divider',
                                         color: message.author === 'user'
-                                            ? (t) => (t.palette.mode === 'dark' ? '#e0e7ff' : '#312e81')
+                                            ? (t) => (t.palette.mode === 'dark' ? '#ccfbf1' : '#134e4a')
                                             : 'text.primary',
                                         backgroundColor: message.author === 'user'
-                                            ? (t) => (t.palette.mode === 'dark' ? 'rgba(99,102,241,0.22)' : 'rgba(99,102,241,0.12)')
+                                            ? (t) => (t.palette.mode === 'dark' ? 'rgba(20,184,166,0.20)' : 'rgba(13,148,136,0.12)')
                                             : 'background.paper',
                                         borderRadius: message.author === 'user' ? '4px 14px 14px 14px' : '14px 4px 14px 14px',
                                     }}
@@ -359,8 +367,40 @@ const ChatMessages = ({
                     );
                 })}
 
-                {/* Loading indicator */}
-                {isLoading && (
+                {/* Live streaming reply: typing dots until the first token, then
+                    the reply flows in with a blinking caret. */}
+                {streaming !== null && (
+                    <ListItem sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, maxWidth: '100%' }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: '70%' }}>
+                            <Typography
+                                variant="caption"
+                                sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'right', display: 'block' }}
+                            >
+                                <strong>AI Chatbot</strong>
+                            </Typography>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    padding: '10px 14px', border: '1px solid', borderColor: 'divider',
+                                    backgroundColor: 'background.paper', borderRadius: '14px 4px 14px 14px',
+                                    wordBreak: 'break-word', width: 'fit-content', maxWidth: '100%',
+                                }}
+                            >
+                                {streaming === '' ? (
+                                    <LoadingDots />
+                                ) : (
+                                    <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '1em', lineHeight: 1.5 }}>
+                                        {streaming}
+                                        <span className={styles['stream-caret']} />
+                                    </Typography>
+                                )}
+                            </Paper>
+                        </Box>
+                    </ListItem>
+                )}
+
+                {/* Fallback loading indicator (only when not actively streaming). */}
+                {isLoading && streaming === null && (
                     <ListItem
                         sx={{
                             display: "flex",

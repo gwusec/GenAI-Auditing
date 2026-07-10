@@ -364,6 +364,19 @@ app.post('/chat', chatRateLimit, async (req, res) => {
     );
     const ollamaDecoding = resolveDecoding(relay);
 
+    if (req.body.stream) {
+      try {
+        await streamOllamaChat(res, ollamaUrl, ollamaModel, ollamaMessages, ollamaDecoding);
+        return;
+      } catch (err) {
+        console.error('Ollama stream failed:', err.message);
+        if (!res.headersSent) {
+          return res.status(502).json({ statusCode: 502, error: `Ollama stream failed: ${err.message}` });
+        }
+        return;
+      }
+    }
+
     try {
       console.log(`SENDING REQUEST TO OLLAMA API at ${ollamaUrl}/api/chat`);
       const ollamaResponse = await axios.post(`${ollamaUrl}/api/chat`, {
@@ -541,6 +554,21 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    // Stream OpenAI-compatible providers (openai, vLLM) when requested; other
+    // providers fall through to the non-streaming JSON path below.
+    if (req.body.stream && provider === 'openai') {
+      try {
+        await streamOpenAICompatible(res, apiEndpoint, headers, requestBody);
+        return;
+      } catch (err) {
+        console.error(`${provider} stream failed:`, err.message);
+        if (!res.headersSent) {
+          return res.status(502).json({ statusCode: 502, error: `Stream failed: ${err.message}` });
+        }
+        return;
+      }
+    }
+
     console.log('API REQUEST START', {
       provider,
       hostname: safeHostname(apiEndpoint),
@@ -656,6 +684,90 @@ function formatMessagesForProvider(messages, provider) {
       // OpenAI format is our default
       return formattedMessages;
   }
+}
+
+// --- Streaming (SSE) ---------------------------------------------------------
+// When the client requests { stream: true }, the relay streams tokens to the
+// browser as Server-Sent Events: `data: {"delta":"..."}` per token, a final
+// `data: {"done":true}`, and `data: {"error":"..."}` on failure. Ollama and
+// OpenAI-compatible (openai/vLLM) upstreams are streamed; other providers fall
+// back to the non-streaming JSON path. Decoding + system prompt are already
+// applied by the caller (same as the non-streaming path).
+function setupSSE(res) {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable proxy buffering (nginx)
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+}
+
+function sseWrite(res, obj) {
+  if (res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(obj)}\n\n`);
+}
+
+// Ollama /api/chat with stream:true emits one JSON object per line (NDJSON),
+// each carrying an incremental { message: { content } } and a final { done }.
+async function streamOllamaChat(res, url, model, messages, decoding) {
+  const upstream = await axios.post(`${url}/api/chat`, {
+    model,
+    messages,
+    stream: true,
+    options: {
+      temperature: decoding.temperature,
+      num_predict: decoding.maxTokens,
+      ...(decoding.topP !== undefined ? { top_p: decoding.topP } : {}),
+    },
+  }, { responseType: 'stream', timeout: REQUEST_TIMEOUT_MS });
+
+  setupSSE(res);
+  let buffer = '';
+  upstream.data.on('data', (chunk) => {
+    if (res.writableEnded) return;
+    buffer += chunk.toString();
+    let idx;
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line) continue;
+      let obj;
+      try { obj = JSON.parse(line); } catch (_) { continue; }
+      const delta = obj.message && obj.message.content;
+      if (delta) sseWrite(res, { delta });
+      if (obj.done) { sseWrite(res, { done: true }); res.end(); return; }
+    }
+  });
+  upstream.data.on('end', () => { if (!res.writableEnded) { sseWrite(res, { done: true }); res.end(); } });
+  upstream.data.on('error', (err) => { if (!res.writableEnded) { sseWrite(res, { error: err.message }); res.end(); } });
+}
+
+// OpenAI-compatible /chat/completions with stream:true emits SSE lines
+// `data: {choices:[{delta:{content}}]}` and a terminal `data: [DONE]`.
+async function streamOpenAICompatible(res, endpoint, headers, body) {
+  const upstream = await axios.post(endpoint, { ...body, stream: true }, {
+    headers, responseType: 'stream', timeout: REQUEST_TIMEOUT_MS,
+  });
+
+  setupSSE(res);
+  let buffer = '';
+  upstream.data.on('data', (chunk) => {
+    if (res.writableEnded) return;
+    buffer += chunk.toString();
+    let idx;
+    while ((idx = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (payload === '[DONE]') { sseWrite(res, { done: true }); res.end(); return; }
+      let obj;
+      try { obj = JSON.parse(payload); } catch (_) { continue; }
+      const delta = obj.choices && obj.choices[0] && obj.choices[0].delta && obj.choices[0].delta.content;
+      if (delta) sseWrite(res, { delta });
+    }
+  });
+  upstream.data.on('end', () => { if (!res.writableEnded) { sseWrite(res, { done: true }); res.end(); } });
+  upstream.data.on('error', (err) => { if (!res.writableEnded) { sseWrite(res, { error: err.message }); res.end(); } });
 }
 
 // API endpoint to test API keys

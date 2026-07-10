@@ -1,6 +1,6 @@
 // TRAILS-Chatbot/src/components/MessageForm.jsx  
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Box, IconButton, Typography, useTheme } from '@mui/material';
+import { Box, IconButton, Typography } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import styles from "./MessageForm.module.css";
 
@@ -9,7 +9,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
   const textareaRef = useRef(null);
   const [isTextareaActive, setIsTextareaActive] = useState(false);
   const [toastPosition, setToastPosition] = useState({ top: 0, left: 0 });
-  const theme = useTheme();
 
   const handleSubmit = useCallback((e) => {
     if (textareaRef.current) {
@@ -66,7 +65,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
               <div
                 className={styles.toast}
                 style={{
-                  backgroundColor: theme.palette.info.main,
                   position: 'absolute',
                   top: `${toastPosition.top - 25}px`,
                   left: `${toastPosition.left}px`,
@@ -79,7 +77,6 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
               <div
                 className={styles.toast}
                 style={{
-                  backgroundColor: theme.palette.info.main,
                   position: 'absolute',
                   top: `${toastPosition.top + 60}px`,
                   left: `${toastPosition.left}px`,
