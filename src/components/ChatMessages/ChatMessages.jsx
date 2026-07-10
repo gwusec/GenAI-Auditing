@@ -15,6 +15,7 @@ import {
     Stack,
     Button,
     Tooltip,
+    Avatar,
 } from "@mui/material";
 import {
     Edit as EditIcon,
@@ -26,7 +27,27 @@ import {
     StarBorder as StarBorderIcon,
     Flag as FlagIcon,
     ChatBubbleOutline as CommentIcon,
+    Person as PersonIcon,
+    AutoAwesome as BotIcon,
 } from "@mui/icons-material";
+
+// Speaker avatar: teal bot mark for the chatbot, neutral person circle for the auditor.
+function SpeakerAvatar({ author }) {
+    const isUser = author === 'user';
+    return (
+        <Avatar
+            variant="rounded"
+            sx={{
+                width: 32, height: 32, flex: 'none', mt: '2px',
+                borderRadius: '10px',
+                bgcolor: isUser ? 'action.selected' : 'primary.main',
+                color: isUser ? 'text.secondary' : 'primary.contrastText',
+            }}
+        >
+            {isUser ? <PersonIcon sx={{ fontSize: 18 }} /> : <BotIcon sx={{ fontSize: 18 }} />}
+        </Avatar>
+    );
+}
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -186,6 +207,7 @@ const ChatMessages = ({
                     return (
                         <ListItem
                             key={message.id}
+                            className={styles['message-row']}
                             onMouseUp={() =>
                                 handleTextSelection &&
                                 handleTextSelection(message.id, message.author, message.content)
@@ -193,16 +215,25 @@ const ChatMessages = ({
                             sx={{
                                 display: 'flex',
                                 marginBottom: '16px',
-                                flexWrap: 'wrap',
                                 justifyContent: message.author === 'user' ? 'flex-start' : 'flex-end',
                                 maxWidth: '100%',
                             }}
                         >
+                            <Box sx={{
+                                display: 'flex',
+                                gap: 1.25,
+                                alignItems: 'flex-start',
+                                flexDirection: message.author === 'user' ? 'row' : 'row-reverse',
+                                maxWidth: '82%',
+                                minWidth: 0,
+                            }}>
+                            <SpeakerAvatar author={message.author} />
                             <Box
                                 sx={{
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    maxWidth: '70%',
+                                    minWidth: 0,
+                                    maxWidth: '100%',
                                 }}
                                 className={styles['message-bubble-container']}
                             >
@@ -344,6 +375,7 @@ const ChatMessages = ({
                                     />
                                 )}
                             </Box>
+                            </Box>
 
                             {/* Edit icon for user's most recent message */}
                             {message.author === 'user' &&
@@ -370,31 +402,34 @@ const ChatMessages = ({
                 {/* Live streaming reply: typing dots until the first token, then
                     the reply flows in with a blinking caret. */}
                 {streaming !== null && (
-                    <ListItem sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, maxWidth: '100%' }}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', maxWidth: '70%' }}>
-                            <Typography
-                                variant="caption"
-                                sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'right', display: 'block' }}
-                            >
-                                <strong>AI Chatbot</strong>
-                            </Typography>
-                            <Paper
-                                elevation={0}
-                                sx={{
-                                    padding: '10px 14px', border: '1px solid', borderColor: 'divider',
-                                    backgroundColor: 'background.paper', borderRadius: '14px 4px 14px 14px',
-                                    wordBreak: 'break-word', width: 'fit-content', maxWidth: '100%',
-                                }}
-                            >
-                                {streaming === '' ? (
-                                    <LoadingDots />
-                                ) : (
-                                    <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '1em', lineHeight: 1.5 }}>
-                                        {streaming}
-                                        <span className={styles['stream-caret']} />
-                                    </Typography>
-                                )}
-                            </Paper>
+                    <ListItem className={styles['message-row']} sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, maxWidth: '100%' }}>
+                        <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', flexDirection: 'row-reverse', maxWidth: '82%' }}>
+                            <SpeakerAvatar author="bot" />
+                            <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                                <Typography
+                                    variant="caption"
+                                    sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'right', display: 'block' }}
+                                >
+                                    <strong>AI Chatbot</strong>
+                                </Typography>
+                                <Paper
+                                    elevation={0}
+                                    sx={{
+                                        padding: '10px 14px', border: '1px solid', borderColor: 'divider',
+                                        backgroundColor: 'background.paper', borderRadius: '14px 4px 14px 14px',
+                                        wordBreak: 'break-word', width: 'fit-content', maxWidth: '100%',
+                                    }}
+                                >
+                                    {streaming === '' ? (
+                                        <LoadingDots />
+                                    ) : (
+                                        <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '1em', lineHeight: 1.5 }}>
+                                            {streaming}
+                                            <span className={styles['stream-caret']} />
+                                        </Typography>
+                                    )}
+                                </Paper>
+                            </Box>
                         </Box>
                     </ListItem>
                 )}
