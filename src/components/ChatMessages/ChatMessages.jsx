@@ -227,7 +227,7 @@ const ChatMessages = ({
                             sx={{
                                 display: 'flex',
                                 marginBottom: '16px',
-                                justifyContent: message.author === 'user' ? 'flex-start' : 'flex-end',
+                                justifyContent: message.author === 'user' ? 'flex-end' : 'flex-start',
                                 maxWidth: '100%',
                             }}
                         >
@@ -235,7 +235,7 @@ const ChatMessages = ({
                                 display: 'flex',
                                 gap: 1.25,
                                 alignItems: 'flex-start',
-                                flexDirection: message.author === 'user' ? 'row' : 'row-reverse',
+                                flexDirection: message.author === 'user' ? 'row-reverse' : 'row',
                                 maxWidth: '82%',
                                 minWidth: 0,
                             }}>
@@ -256,7 +256,7 @@ const ChatMessages = ({
                                         marginBottom: '4px',
                                         fontSize: '0.85em',
                                         color: 'text.secondary',
-                                        textAlign: message.author === 'user' ? 'left' : 'right', // Align based on author
+                                        textAlign: message.author === 'user' ? 'right' : 'left', // Align based on author
                                         display: 'block', // Ensures the alignment applies properly
                                     }}
                                     className={styles['message-author']}
@@ -268,10 +268,10 @@ const ChatMessages = ({
                                 <Paper
                                     elevation={0}
                                     sx={{
-                                        padding: '10px 14px',
+                                        padding: '8px 13px',
                                         wordBreak: 'break-word',
-                                        fontSize: '1em',
-                                        lineHeight: '1.5',
+                                        fontSize: '0.9rem',
+                                        lineHeight: 1.55,
                                         width: 'fit-content',
                                         maxWidth: '100%',
                                         border: '1px solid',
@@ -282,7 +282,7 @@ const ChatMessages = ({
                                         backgroundColor: message.author === 'user'
                                             ? (t) => (t.palette.mode === 'dark' ? 'rgba(20,184,166,0.20)' : 'rgba(13,148,136,0.12)')
                                             : 'background.paper',
-                                        borderRadius: message.author === 'user' ? '4px 14px 14px 14px' : '14px 4px 14px 14px',
+                                        borderRadius: message.author === 'user' ? '16px 6px 16px 16px' : '6px 16px 16px 16px',
                                     }}
                                     className={`
                                         ${styles['message-paper']} 
@@ -414,28 +414,28 @@ const ChatMessages = ({
                 {/* Live streaming reply: typing dots until the first token, then
                     the reply flows in with a blinking caret. */}
                 {streaming !== null && (
-                    <ListItem className={styles['message-row']} sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, maxWidth: '100%' }}>
-                        <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', flexDirection: 'row-reverse', maxWidth: '82%' }}>
+                    <ListItem className={styles['message-row']} sx={{ display: 'flex', justifyContent: 'flex-start', mb: 2, maxWidth: '100%' }}>
+                        <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', flexDirection: 'row', maxWidth: '82%' }}>
                             <SpeakerAvatar author="bot" />
                             <Box sx={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
                                 <Typography
                                     variant="caption"
-                                    sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'right', display: 'block' }}
+                                    sx={{ mb: '4px', fontSize: '0.85em', color: 'text.secondary', textAlign: 'left', display: 'block' }}
                                 >
                                     <strong>AI Chatbot</strong>
                                 </Typography>
                                 <Paper
                                     elevation={0}
                                     sx={{
-                                        padding: '10px 14px', border: '1px solid', borderColor: 'divider',
-                                        backgroundColor: 'background.paper', borderRadius: '14px 4px 14px 14px',
+                                        padding: '8px 13px', border: '1px solid', borderColor: 'divider',
+                                        backgroundColor: 'background.paper', borderRadius: '6px 16px 16px 16px',
                                         wordBreak: 'break-word', width: 'fit-content', maxWidth: '100%',
                                     }}
                                 >
                                     {streaming === '' ? (
                                         <LoadingDots />
                                     ) : (
-                                        <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '1em', lineHeight: 1.5 }}>
+                                        <Typography component="div" sx={{ whiteSpace: 'pre-wrap', fontSize: '0.9rem', lineHeight: 1.55 }}>
                                             {streaming}
                                             <span className={styles['stream-caret']} />
                                         </Typography>

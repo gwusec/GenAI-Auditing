@@ -49,22 +49,22 @@
 
 /* Message bubble; rename as .chatMessages__messagePaper; Element: Styles the Paper component wrapping the message content. */
 .message-paper {
-    padding: 10px;
+    padding: 8px 13px;
     word-break: break-word;
-    font-size: 1em;
-    line-height: 1.5;
+    font-size: 0.9rem;
+    line-height: 1.55;
     width: fit-content;
     max-width: 100%;
 }
 
-/* User message bubble; rename as .chatMessages__userMessage; Element: Styles user message bubbles. */
+/* User message bubble (right side): tail at top-right. */
 .user-message {
-    border-radius: 4px 14px 14px 14px;
+    border-radius: 16px 6px 16px 16px;
 }
 
-/* Bot message bubble; rename as .chatMessages__botMessage; Element: Styles bot message bubbles.*/
+/* Bot message bubble (left side): tail at top-left. */
 .bot-message {
-    border-radius: 14px 4px 14px 14px;
+    border-radius: 6px 16px 16px 16px;
 }
 
 /* Status chips; rename as .chatMessages__statusChip; Element: Styles status chips within messages. */
@@ -141,7 +141,11 @@
 
 /* Markdown styles; rename as .chatMessages__markdownParagraph; Element: Styles paragraphs rendered via Markdown. */
 .markdown-paragraph {
-    margin-bottom: 8px;
+    margin-top: 0;
+    margin-bottom: 6px;
+}
+.markdown-paragraph:last-child {
+    margin-bottom: 0;
 }
 
 /* rename as .chatMessages__markdownLink; Element: Styles links rendered via Markdown. */
