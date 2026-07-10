@@ -7,7 +7,6 @@ import styles from "./MessageForm.module.css";
 const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef(null);
-  const [isTextareaActive, setIsTextareaActive] = useState(false);
 
   const handleSubmit = useCallback((e) => {
     if (textareaRef.current) {
@@ -37,29 +36,15 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
 
   return (
     <>
-      <Box sx={{ position: 'relative' }}>
-        {/* Safety notices — anchored just above the input (float upward on focus,
-            so they never overlap the sidebar and cause no layout shift). */}
-        {isTextareaActive && (
-          <Box
-            sx={{
-              position: 'absolute', bottom: 'calc(100% + 8px)', left: 4, right: 4,
-              display: 'flex', flexWrap: 'wrap', gap: 1, zIndex: 5, pointerEvents: 'none',
-            }}
-          >
-            <span className={styles.notice}>Do not include personal information</span>
-            <span className={styles.notice}>Your conversation is stored and used for research</span>
-          </Box>
-        )}
-        <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
+      <Box component="form" onSubmit={handleSubmit} display="flex" alignItems="flex-end" gap={2}>
         <div className={styles.container}>
           <textarea
             ref={textareaRef}
             value={message}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => setIsTextareaActive(true)}
-            onBlur={() => setIsTextareaActive(false)}
+            onFocus={onFocus}
+            onBlur={onBlur}
             placeholder="Type a message... (Press Enter to send, Shift+Enter for new line)"
             className={styles.textarea}
           />
@@ -81,11 +66,15 @@ const MessageForm = ({ onsendChatMessage, onFocus, onBlur, disabled }) => {
         >
           <SendIcon fontSize="small" />
         </IconButton>
-        </Box>
       </Box>
-      <Typography variant="caption" className={styles["disclaimer-text"]}>
-        Note: The AI chatbot may say sensitive things based on your interactions with it.
-      </Typography>
+      {/* Persistent, quiet safety notes below the input (no floating / overlap). */}
+      <Box className={styles['composer-notes']}>
+        <span className={styles.notice}>Don&apos;t include personal information</span>
+        <span className={styles.notice}>Stored and used for research</span>
+        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+          The chatbot may say sensitive things based on your interactions.
+        </Typography>
+      </Box>
     </>
   );
 };
