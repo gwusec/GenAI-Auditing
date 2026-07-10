@@ -4,7 +4,7 @@
 // handler uses, so no network or port binding is involved.
 
 import { describe, test, expect } from 'vitest';
-import { resolveDecoding, ensureSystemMessage } from '../relayHelpers.js';
+import { resolveDecoding, ensureSystemMessage, createRateCeiling } from '../relayHelpers.js';
 
 describe('resolveDecoding', () => {
   test('carries the study-configured temperature/topP/maxTokens', () => {
@@ -42,5 +42,41 @@ describe('ensureSystemMessage', () => {
   test('never overrides an inline system message supplied by the caller', () => {
     const msgs = [{ role: 'system', content: 'inline' }, { role: 'user', content: 'hi' }];
     expect(ensureSystemMessage(msgs, 'study prompt')).toEqual(msgs);
+  });
+});
+
+describe('createRateCeiling (per-session backstop)', () => {
+  test('allows up to max within a window, then blocks', () => {
+    const rc = createRateCeiling({ max: 3, windowMs: 1000 });
+    expect(rc.hit('pid')).toEqual({ allowed: true, count: 1 });
+    expect(rc.hit('pid')).toEqual({ allowed: true, count: 2 });
+    expect(rc.hit('pid')).toEqual({ allowed: true, count: 3 });
+    expect(rc.hit('pid')).toEqual({ allowed: false, count: 4 });
+  });
+
+  test('tracks keys independently', () => {
+    const rc = createRateCeiling({ max: 1, windowMs: 1000 });
+    expect(rc.hit('a').allowed).toBe(true);
+    expect(rc.hit('b').allowed).toBe(true);
+    expect(rc.hit('a').allowed).toBe(false);
+  });
+
+  test('resets after the window elapses (injected clock)', () => {
+    let t = 0;
+    const rc = createRateCeiling({ max: 1, windowMs: 100, now: () => t });
+    expect(rc.hit('a').allowed).toBe(true);
+    expect(rc.hit('a').allowed).toBe(false);
+    t = 150;
+    expect(rc.hit('a')).toEqual({ allowed: true, count: 1 });
+  });
+
+  test('sweep drops stale buckets', () => {
+    let t = 0;
+    const rc = createRateCeiling({ max: 5, windowMs: 100, now: () => t });
+    rc.hit('a');
+    expect(rc._buckets.has('a')).toBe(true);
+    t = 500;
+    rc.sweep();
+    expect(rc._buckets.has('a')).toBe(false);
   });
 });

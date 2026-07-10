@@ -31,4 +31,34 @@ function ensureSystemMessage(messages, relaySystemPrompt) {
   return [{ role: 'system', content }, ...list];
 }
 
-module.exports = { DEFAULT_SYSTEM_PROMPT, resolveDecoding, ensureSystemMessage };
+// A rolling-window request counter with a ceiling, keyed by an arbitrary id
+// (e.g. an auditor pid). Used as a SERVER-SIDE backstop to the client-side
+// conversation/time limits (MOD-4/MOD-7): even a tampered client can't exceed the
+// ceiling. Pure + in-memory; self-cleans stale buckets via sweep(). The clock is
+// injectable so window behavior is deterministic to unit-test.
+// hit(key) -> { allowed, count }.
+function createRateCeiling({ max, windowMs, now = () => Date.now() }) {
+  const buckets = new Map();
+
+  const hit = (key) => {
+    const t = now();
+    const entry = buckets.get(key);
+    if (!entry || t - entry.windowStart >= windowMs) {
+      buckets.set(key, { count: 1, windowStart: t });
+      return { allowed: 1 <= max, count: 1 };
+    }
+    entry.count += 1;
+    return { allowed: entry.count <= max, count: entry.count };
+  };
+
+  const sweep = () => {
+    const cutoff = now() - windowMs;
+    for (const [key, entry] of buckets.entries()) {
+      if (entry.windowStart < cutoff) buckets.delete(key);
+    }
+  };
+
+  return { hit, sweep, _buckets: buckets };
+}
+
+module.exports = { DEFAULT_SYSTEM_PROMPT, resolveDecoding, ensureSystemMessage, createRateCeiling };

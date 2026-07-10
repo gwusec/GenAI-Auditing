@@ -12,6 +12,11 @@ const BODY_SIZE_LIMIT = process.env.BODY_SIZE_LIMIT || '1mb';
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 120000);
 const CHAT_RATE_LIMIT_WINDOW_MS = Number(process.env.CHAT_RATE_LIMIT_WINDOW_MS || 60000);
 const CHAT_RATE_LIMIT_MAX = Number(process.env.CHAT_RATE_LIMIT_MAX || 20);
+// Per-auditor (pid) request ceiling — a server-side backstop to the client-side
+// conversationsPerAuditor / time limits (MOD-4/MOD-7). Rolling window; generous by
+// default so it only stops runaway/abusive clients, not normal auditing.
+const MAX_CHAT_REQUESTS_PER_SESSION = Number(process.env.MAX_CHAT_REQUESTS_PER_SESSION || 300);
+const SESSION_RATE_WINDOW_MS = Number(process.env.SESSION_RATE_WINDOW_MS || 3600000); // 1 hour
 const OLLAMA_TEST_TIMEOUT_MS = Number(process.env.OLLAMA_TEST_TIMEOUT_MS || 5000);
 const ALLOW_PRIVATE_OLLAMA_URLS = (process.env.ALLOW_PRIVATE_OLLAMA_URLS || '').toLowerCase() === 'true';
 
@@ -54,7 +59,7 @@ function missingKeyMessage(rawProvider) {
 
 // Pure relay helpers (decoding resolution + system-message injection) live in a
 // dependency-free module so they can be unit-tested without the relay's deps.
-const { resolveDecoding, ensureSystemMessage } = require('./relayHelpers');
+const { resolveDecoding, ensureSystemMessage, createRateCeiling } = require('./relayHelpers');
 
 function parseAllowedOrigins(value) {
   if (!value) {
@@ -68,28 +73,34 @@ function parseAllowedOrigins(value) {
 
 const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN);
 
-// When no allowlist is configured, default to permissive. This is the self-host /
-// demo single-container case where the frontend and relay share an origin — and it
-// is required because Vite emits asset tags with `crossorigin`, so the browser
-// fetches same-origin JS/CSS in CORS mode (sending an Origin header). A blocking
-// default would 403 the app's own assets. Operators lock cross-origin access down
-// by setting ALLOWED_ORIGINS in production.
-const allowAllOrigins = allowedOrigins.length === 0;
-if (allowAllOrigins) {
-  console.warn('[cors] ALLOWED_ORIGINS not set — allowing all origins. Set ALLOWED_ORIGINS to restrict cross-origin access in production.');
+if (allowedOrigins.length === 0 && !isDevelopment) {
+  console.warn('[cors] ALLOWED_ORIGINS not set — allowing SAME-ORIGIN requests only. Set ALLOWED_ORIGINS to permit specific external origins.');
 }
 
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) {
-      return callback(null, true);
-    }
-    if (allowAllOrigins || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error('CORS origin not allowed'));
+function hostOfOrigin(origin) {
+  try { return new URL(origin).host; } catch (_) { return null; }
+}
+
+// Fail-closed CORS. An explicit ALLOWED_ORIGINS allowlist always wins (and a bare
+// `*` opts into allow-all, e.g. in development). When NO allowlist is configured we
+// no longer allow every origin — we allow requests with no Origin header and
+// same-origin requests (Origin host === request Host), which covers the self-host
+// single-container case and Vite's `crossorigin` asset tags, and we block
+// cross-origin. Set ALLOWED_ORIGINS to permit specific external origins.
+function corsDelegate(req, callback) {
+  const origin = typeof req.header === 'function' ? req.header('Origin') : (req.headers && req.headers.origin);
+  if (!origin) {
+    return callback(null, { origin: true });
   }
-};
+  if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    return callback(null, { origin: true });
+  }
+  if (allowedOrigins.length === 0) {
+    const sameOrigin = hostOfOrigin(origin) === (req.headers && req.headers.host);
+    return callback(null, { origin: sameOrigin });
+  }
+  return callback(null, { origin: false });
+}
 
 function redactSecret(secret = '') {
   if (!secret || typeof secret !== 'string') {
@@ -227,7 +238,31 @@ function chatRateLimit(req, res, next) {
   return next();
 }
 
-app.use(cors(corsOptions));
+// Per-auditor request ceiling (MOD-7): a server-side backstop keyed by the
+// caller's pid. The client already enforces conversationsPerAuditor + time limits,
+// but a tampered client could ignore them; this caps total requests per pid in a
+// rolling window so it can't. Requests without a pid fall through to the per-IP
+// limit only.
+const sessionCeiling = createRateCeiling({
+  max: MAX_CHAT_REQUESTS_PER_SESSION,
+  windowMs: SESSION_RATE_WINDOW_MS,
+});
+setInterval(() => sessionCeiling.sweep(), Math.max(60000, SESSION_RATE_WINDOW_MS)).unref();
+
+function sessionRateLimit(req, res, next) {
+  const pid = req.body && req.body.pid;
+  if (!pid) return next();
+  const { allowed } = sessionCeiling.hit(String(pid));
+  if (!allowed) {
+    return res.status(429).json({
+      statusCode: 429,
+      error: 'Session request limit reached. If you believe this is an error, contact the researcher.',
+    });
+  }
+  return next();
+}
+
+app.use(cors(corsDelegate));
 app.use(express.json({ limit: BODY_SIZE_LIMIT }));
 
 app.use((err, req, res, next) => {
@@ -277,7 +312,7 @@ app.post('/api/set-config', (req, res) => {
 });
 
 // IMPORTANT: This is the main chat endpoint that TRAILS-Chatbot uses
-app.post('/chat', chatRateLimit, async (req, res) => {
+app.post('/chat', chatRateLimit, sessionRateLimit, async (req, res) => {
   try {
     const { messages, relay } = req.body;
     if (!validateMessages(messages)) {
