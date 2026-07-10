@@ -10,11 +10,13 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import SettingsIcon from '@mui/icons-material/Settings';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import BarChartIcon from '@mui/icons-material/BarChart';
 import ScienceIcon from '@mui/icons-material/Science';
 import DarkModeIcon from '@mui/icons-material/DarkModeOutlined';
 import LightModeIcon from '@mui/icons-material/LightModeOutlined';
 import { useFeature0 } from './Feature0Context';
 import StudySetup from './StudySetup';
+import StudyData from './StudyData';
 import { validateStudyConfig, withStudyConfigDefaults } from '../tools/studyConfig';
 import { useColorMode } from '../theme';
 
@@ -25,6 +27,7 @@ export default function StudyDashboard() {
   const [title, setTitle] = useState('');
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(null); // study being configured
+  const [viewingData, setViewingData] = useState(null); // study whose data is being viewed
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -52,6 +55,10 @@ export default function StudyDashboard() {
 
   if (selected) {
     return <StudySetup study={selected} onBack={() => { setSelected(null); refresh(); }} />;
+  }
+
+  if (viewingData) {
+    return <StudyData study={viewingData} onBack={() => setViewingData(null)} />;
   }
 
   return (
@@ -134,6 +141,11 @@ export default function StudyDashboard() {
                       {isInvestigator && (
                         <Button size="small" startIcon={<SettingsIcon />} onClick={() => setSelected(s)}>
                           Set up
+                        </Button>
+                      )}
+                      {isInvestigator && (
+                        <Button size="small" startIcon={<BarChartIcon />} onClick={() => setViewingData(s)}>
+                          Data
                         </Button>
                       )}
                       <Button

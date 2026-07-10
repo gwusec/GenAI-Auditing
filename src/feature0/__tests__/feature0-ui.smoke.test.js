@@ -10,6 +10,7 @@ import StudySetup from '../StudySetup';
 import StudyConfigForm from '../StudyConfigForm';
 import Feature0Gate from '../Feature0Gate';
 import ConsentGate from '../ConsentGate';
+import StudyData from '../StudyData';
 
 test('Feature 0 context module exports provider, hook, and a valid default questionnaire', () => {
   expect(Feature0Context).toBeTruthy();
@@ -25,7 +26,7 @@ test('Feature 0 context module exports provider, hook, and a valid default quest
 });
 
 test('Feature 0 UI components import and are React components', () => {
-  for (const C of [InvestigatorAuth, AuditorJoin, StudyDashboard, StudySetup, StudyConfigForm, Feature0Gate, ConsentGate]) {
+  for (const C of [InvestigatorAuth, AuditorJoin, StudyDashboard, StudySetup, StudyConfigForm, Feature0Gate, ConsentGate, StudyData]) {
     expect(typeof C).toBe('function');
   }
 });
