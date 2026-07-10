@@ -72,6 +72,38 @@ describe('toTidyRows', () => {
     expect(toTidyRows([{ id: 'x' }])).toEqual([]);
     expect(toTidyRows(undefined)).toEqual([]);
   });
+
+  test('flattens the AuditFlow questionnaire shape (audit.questionnaire)', () => {
+    // Matches how AuditFlow persists SurveyJS responses: a flat map where a matrix
+    // answer is an object, a rating is a number, and free text is a string.
+    const conv = {
+      id: 'c2',
+      provenance: { controlMode: 'seed_prompt', configVersion: 1 },
+      audit: {
+        questionnaire: {
+          fairness_matrix: { unfair: 2, disrespectful: 1, inaccurate: 3 },
+          overall_fairness: 2,
+          fairness_explain: 'The pirate persona is odd, "unprofessional", and biased.',
+        },
+      },
+    };
+    const rows = toTidyRows([conv]);
+    // 3 matrix sub-rows + 1 rating + 1 text = 5
+    expect(rows).toHaveLength(5);
+
+    const matrix = rows.filter((r) => r.question_key.startsWith('fairness_matrix.'));
+    expect(matrix.map((r) => r.question_key).sort())
+      .toEqual(['fairness_matrix.disrespectful', 'fairness_matrix.inaccurate', 'fairness_matrix.unfair']);
+    expect(matrix.every((r) => r.observation_type === 'likert')).toBe(true);
+
+    const rating = rows.find((r) => r.question_key === 'overall_fairness');
+    expect(rating).toMatchObject({ observation_type: 'likert', value: 2 });
+
+    const text = rows.find((r) => r.question_key === 'fairness_explain');
+    expect(text.observation_type).toBe('text_response');
+    // provenance still rides along
+    expect(text.control_mode).toBe('seed_prompt');
+  });
 });
 
 describe('CSV ⇄ JSON agreement', () => {

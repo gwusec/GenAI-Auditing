@@ -110,17 +110,39 @@ export function toTidyRows(conversations) {
       });
     }
 
-    // Likert / matrix questionnaire answers: one row per question key.
+    // Legacy questionnaire shape (pre-AuditFlow): explicit likert/text buckets.
     for (const [k, v] of Object.entries(audit.likertResponses || {})) {
       rows.push({ ...base, observation_type: 'likert', question_key: k, value: firstDefined(v) });
     }
-
-    // Free-text questionnaire answers: one row per question key.
     for (const [k, v] of Object.entries(audit.textResponses || {})) {
       rows.push({ ...base, observation_type: 'text_response', question_key: k, value: firstDefined(v) });
     }
+
+    // Current questionnaire shape (AuditFlow stores the SurveyJS response map on
+    // audit.questionnaire): a flat { questionName: answer } object where an answer
+    // may be a scalar (single choice / rating / text), a matrix ({ row: value }),
+    // or an array (multi-select). Flatten each into tidy rows.
+    for (const [q, answer] of Object.entries(audit.questionnaire || {})) {
+      rows.push(...questionnaireRows(base, q, answer));
+    }
   }
   return rows.map(fillColumns);
+}
+
+// Flatten one questionnaire answer into tidy rows. Matrix answers expand to one
+// row per sub-question (question_key "q.row"); arrays are joined; strings become
+// text_response, everything else (numbers/booleans/ratings) becomes likert.
+function questionnaireRows(base, question, answer) {
+  if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+    return Object.entries(answer).map(([sub, val]) => ({
+      ...base, observation_type: 'likert', question_key: `${question}.${sub}`, value: firstDefined(val),
+    }));
+  }
+  if (Array.isArray(answer)) {
+    return [{ ...base, observation_type: 'text_response', question_key: question, value: answer.join('; ') }];
+  }
+  const type = typeof answer === 'string' ? 'text_response' : 'likert';
+  return [{ ...base, observation_type: type, question_key: question, value: firstDefined(answer) }];
 }
 
 export default toTidyRows;
