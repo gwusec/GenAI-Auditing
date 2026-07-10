@@ -7,6 +7,19 @@
 
 ---
 
+## Update — 2026-07-09 working session
+
+The stale `.git/index.lock` was cleared and **the entire working tree is now committed** on `audit-fixes` (junk cleanup → CRA→Vite migration/architecture → audit fixes P0–P2 → hygiene → P3 → consent/sessions → dashboard/export). Since the prior handoff, the following are **done** (unit suite now **211 passing**, `vite build` clean, `node --check` OK):
+
+- **P3 (§4.1) — finished.** The relay now honors `relay.decoding` (temperature/top_p/max_tokens mapped per provider) and applies `relay.systemPrompt` — the study's system prompt, with the seed folded in for `seed_prompt` mode — instead of the hardcoded 0.7/2000 and "You are a helpful assistant." `deriveRuntimeConfig` puts the effective system prompt + decoding on the relay object. Pure helpers live in `server/relayHelpers.js`; tests in `server/__tests__/relayDecoding.test.js` + `deriveRuntimeConfig.test.js`.
+- **Consent gate + sessions (§4.3) + join-by-link (§4.4, partial) — done.** `ConsentGate` renders before chat when the study sets consent text and records `{version,agreed,timestamp}`. `Feature0Context` opens an `AuditorSession` on join/preview (with launch-metadata capture), records consent, attaches conversations, and progresses completion via optional `App` callbacks (`onConversationStart`/`onConversationComplete`, no-op when unwired). `AuditorJoin` prefills `?code=`.
+- **Dashboard + tidy/long export (§4.2) — done.** Pure, tested projector in `src/tools/export/` (`toTidyRows`, `toCsv`/`parseCsv`, `summarizeRows`, `buildStudyExport`); CSV+JSON come from one projection and a round-trip test proves they agree. `StudyData` view (conversation list, aggregates, CSV/JSON download) is wired into the dashboard via a **Data** button.
+- **Hygiene (§4.5) — mostly done.** Dead `adapters/` + `ChatService.js` + `build_log.txt` removed; CI switched to `npm ci` (lockfile committed); `.env`/`.DS_Store` untracked and ignored; `build/` ignored; V1 library fields dropped from `package.json`; README rewritten for the current app.
+
+**Still open / deferred:** run migration `0003` against a live Supabase (still unexecuted); **rotate the committed self-host `JWT_SECRET`/anon key** (§4.5 — a manual secret-rotation step); server-side per-study/session request ceilings (§4.4 MOD-4/7); append-only persistence (§4.6); fail-closed CORS before public deploy (§5). Live Docker re-verification (§8) still recommended before merge.
+
+---
+
 ## 0. Read this first — state of the branch
 
 Three things you must know before you start:
