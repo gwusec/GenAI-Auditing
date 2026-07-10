@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import apiClient from './tools/APIClient';
 import { ChatEvent, CHAT_EVENT_TYPE, STATE } from './tools/models';
 import conversationHandler from './tools/ConversationHandler';
@@ -28,7 +28,7 @@ const AppState = {
     COMPLETE: 'complete',
 };
 
-function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {}, userId, debugMode = false, presetSurveyQuestions = null }) {
+function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {}, userId, debugMode = false, presetSurveyQuestions = null, onConversationStart = null, onConversationComplete = null }) {
     // When a study is pre-configured (auditor taking an investigator's study),
     // skip the in-app SurveyMaker step and start directly in CHAT using the
     // provided questionnaire. With no preset (standalone/legacy), behavior is
@@ -87,6 +87,10 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
             setConversations(prev => [...prev, newConversation]);
             setActiveConversation(newConversation);
             setActiveConversationIndex(conversations.length);
+            // Attach the new conversation to the auditor session (Feature 0), if wired.
+            if (onConversationStart) {
+                try { await onConversationStart(newConversation.id); } catch (_) { /* non-fatal */ }
+            }
             await conversationHandler.setActiveConversation(newConversation.id);
             updateAppStateBasedOnConversation(newConversation.state);
             if (!timerSystem.state.hasStarted) {
@@ -177,6 +181,19 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
             conversationHandler.unregisterOnStateUpdated(handleStateUpdate);
         };
     }, [updateAppStateBasedOnConversation]);
+
+    // Notify the auditor session (Feature 0) once, when a conversation completes.
+    // A ref set guards against the effect re-firing on unrelated re-renders.
+    const completedConversationIds = useRef(new Set());
+    useEffect(() => {
+        if (currentAppState !== AppState.COMPLETE) return;
+        const id = activeConversation?.id;
+        if (!id || completedConversationIds.current.has(id)) return;
+        completedConversationIds.current.add(id);
+        if (onConversationComplete) {
+            Promise.resolve(onConversationComplete(id)).catch(() => { /* non-fatal */ });
+        }
+    }, [currentAppState, activeConversation, onConversationComplete]);
 
     const handleTutorialComplete = useCallback(() => {
         if (currentAppState === AppState.CHAT) {

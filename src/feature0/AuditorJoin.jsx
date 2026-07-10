@@ -1,13 +1,28 @@
 // AuditorJoin — anonymous auditor entry via an access code.
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, TextField, Typography, Alert, Paper } from '@mui/material';
 import { useFeature0 } from './Feature0Context';
 
+// Read a join-by-link code from the URL: ?code=ABC123 (no router needed).
+function codeFromUrl() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const c = new URLSearchParams(window.location.search).get('code');
+    return (c || '').trim();
+  } catch (_) { return ''; }
+}
+
 export default function AuditorJoin({ onJoined }) {
   const { joinWithCode } = useFeature0();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(() => codeFromUrl());
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
+
+  // If arriving via a join link, prefill the code so the auditor only has to confirm.
+  useEffect(() => {
+    const linked = codeFromUrl();
+    if (linked) setCode(linked);
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();

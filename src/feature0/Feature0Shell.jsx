@@ -14,6 +14,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import App from '../App';
 import { Feature0Provider, useFeature0, DEFAULT_QUESTIONNAIRE } from './Feature0Context';
 import Feature0Gate from './Feature0Gate';
+import ConsentGate from './ConsentGate';
 import StudyDashboard from './StudyDashboard';
 import { getConversationStore } from '../tools/stores';
 import { deriveRuntimeConfig } from '../tools/studyConfig';
@@ -38,7 +39,10 @@ function ExitBar({ label, onExit }) {
 }
 
 function ShellInner({ appProps = {} }) {
-  const { user, activeStudyId, activeStudy, demoMode, exitStudy } = useFeature0();
+  const {
+    user, activeStudyId, activeStudy, demoMode, exitStudy,
+    consentAgreed, recordConsent, attachConversation, completeConversation,
+  } = useFeature0();
 
   // Derive the runtime config the audit app consumes (timers, control mode, model,
   // evaluation toggles, provenance) from the active study's StudyConfig. Falls back
@@ -75,6 +79,23 @@ function ShellInner({ appProps = {} }) {
 
   // 1) In a study (auditor who joined, or investigator previewing).
   if (activeStudyId && user) {
+    // Consent gate: when the study configures consent text, the auditor must agree
+    // before reaching the chat. Recorded on the session as {version, agreed, timestamp}.
+    const consent = studyRuntimeConfig?.consent;
+    if (consent?.text && !consentAgreed) {
+      return (
+        <>
+          <ExitBar label="Exit" onExit={exitStudy} />
+          <ConsentGate
+            text={consent.text}
+            version={consent.version}
+            onAgree={(v) => recordConsent(v)}
+            onDecline={exitStudy}
+          />
+        </>
+      );
+    }
+
     // The investigator configured the questionnaire — the auditor must NEVER see the
     // legacy in-app survey builder. Pass a non-null preset so App skips the SURVEY
     // state and goes straight to chat. The new AuditFlow reads the SurveyJS schema
@@ -89,6 +110,8 @@ function ShellInner({ appProps = {} }) {
           userId={user.id}
           presetSurveyQuestions={preset}
           config={studyRuntimeConfig}
+          onConversationStart={attachConversation}
+          onConversationComplete={completeConversation}
         />
       </>
     );

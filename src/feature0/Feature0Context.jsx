@@ -6,7 +6,9 @@
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
 import { getAuthProvider } from '../tools/auth';
 import { getStudyService } from '../tools/studies';
+import { getSessionService, parseLaunchMetadata } from '../tools/sessions';
 import { setPersistenceOverride } from '../tools/stores';
+import { deriveRuntimeConfig } from '../tools/studyConfig';
 
 const Feature0Context = createContext(null);
 
@@ -39,11 +41,18 @@ export const DEFAULT_QUESTIONNAIRE = {
   ],
 };
 
-export function Feature0Provider({ children, auth = getAuthProvider(), studies = getStudyService() }) {
+export function Feature0Provider({
+  children,
+  auth = getAuthProvider(),
+  studies = getStudyService(),
+  sessions = getSessionService(),
+}) {
   const [user, setUser] = useState(() => auth.getCurrentUser());
   const [activeStudyId, setActiveStudyId] = useState(null);
   const [activeStudy, setActiveStudy] = useState(null); // full study object (incl. config)
   const [demoMode, setDemoMode] = useState(false);
+  const [session, setSession] = useState(null);          // current AuditorSession
+  const [consentAgreed, setConsentAgreed] = useState(false);
 
   useEffect(() => {
     const off = auth.onAuthChange((u) => setUser(u));
@@ -57,7 +66,42 @@ export function Feature0Provider({ children, auth = getAuthProvider(), studies =
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
+    setSession(null);
+    setConsentAgreed(false);
   }, [auth]);
+
+  // Start an AuditorSession for a study the auditor/investigator is entering.
+  // Best-effort: a session failure must never block the audit itself, so we log
+  // and continue (the audit still records conversations in the store).
+  const startSession = useCallback(async (study, auditorId, { capture = false } = {}) => {
+    try {
+      let expectedConversations = 1;
+      let configVersion = null;
+      try {
+        const rt = deriveRuntimeConfig(study?.config);
+        expectedConversations = rt.conversationsPerAuditor || 1;
+        configVersion = rt.configVersion ?? null;
+      } catch (_) { /* draft/legacy config — fall back to a single conversation */ }
+
+      const launchMetadata = capture && typeof window !== 'undefined'
+        ? parseLaunchMetadata(window.location.search, {
+            enabled: !!study?.config?.launchCapture?.enabled,
+          })
+        : null;
+
+      const s = await sessions.createSession(study.id, auditorId || null, {
+        configVersion,
+        expectedConversations,
+        launchMetadata,
+      });
+      setSession(s);
+      return s;
+    } catch (err) {
+      console.warn('Could not start auditor session (continuing without one):', err?.message || err);
+      setSession(null);
+      return null;
+    }
+  }, [sessions]);
 
   const loadStudy = useCallback(async (studyId, asUserId) => {
     try {
@@ -70,21 +114,52 @@ export function Feature0Provider({ children, auth = getAuthProvider(), studies =
     }
   }, [studies]);
 
-  // Auditor flow: ensure an (anonymous) session, redeem the code, load the study.
+  // Auditor flow: ensure an (anonymous) session, redeem the code, load the study,
+  // then open an AuditorSession (with launch-metadata capture when the study opts in).
   const joinWithCode = useCallback(async (code) => {
     let current = auth.getCurrentUser();
     if (!current) current = await auth.signInAnonymously();
     const studyId = await studies.redeemAccessCode(code, current.id);
-    await loadStudy(studyId, current.id);
+    const study = await loadStudy(studyId, current.id);
     setActiveStudyId(studyId);
+    setConsentAgreed(false);
+    await startSession(study || { id: studyId }, current.id, { capture: true });
     return studyId;
-  }, [auth, studies, loadStudy]);
+  }, [auth, studies, loadStudy, startSession]);
 
   // Investigator preview: enter their own study's audit session (no code needed).
   const previewStudy = useCallback(async (study) => {
     setActiveStudy(study);
     setActiveStudyId(study.id);
-  }, []);
+    setConsentAgreed(false);
+    const current = auth.getCurrentUser();
+    await startSession(study, current?.id || null, { capture: false });
+  }, [auth, startSession]);
+
+  // Record informed consent on the current session and unlock the audit.
+  const recordConsent = useCallback(async (version) => {
+    setConsentAgreed(true); // optimistic — consent is a UI gate, not a hard dependency on the store
+    if (session) {
+      try { await sessions.recordConsent(session.id, { version: version ?? null }); }
+      catch (err) { console.warn('Could not persist consent record:', err?.message || err); }
+    }
+  }, [session, sessions]);
+
+  // Attach a conversation to the session as it's created.
+  const attachConversation = useCallback(async (conversationId) => {
+    if (!session || !conversationId) return;
+    try { await sessions.attachConversation(session.id, conversationId); }
+    catch (err) { console.warn('Could not attach conversation to session:', err?.message || err); }
+  }, [session, sessions]);
+
+  // Mark a conversation complete (progresses the session toward N).
+  const completeConversation = useCallback(async () => {
+    if (!session) return;
+    try {
+      const updated = await sessions.completeConversation(session.id);
+      setSession(updated);
+    } catch (err) { console.warn('Could not mark conversation complete:', err?.message || err); }
+  }, [session, sessions]);
 
   // Leave the audit session and return to the dashboard / gate.
   const exitStudy = useCallback(() => {
@@ -92,6 +167,8 @@ export function Feature0Provider({ children, auth = getAuthProvider(), studies =
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
+    setSession(null);
+    setConsentAgreed(false);
   }, [demoMode]);
 
   // Public demo: no account, no code. Runs locally (ephemeral) so it never
@@ -102,12 +179,14 @@ export function Feature0Provider({ children, auth = getAuthProvider(), studies =
   }, []);
 
   const value = useMemo(() => ({
-    auth, studies, user,
+    auth, studies, sessions, user,
     activeStudyId, setActiveStudyId, activeStudy, loadStudy,
     demoMode, startDemo,
+    session, consentAgreed, recordConsent, attachConversation, completeConversation,
     signIn, signUp, signOut, joinWithCode, previewStudy, exitStudy,
-  }), [auth, studies, user, activeStudyId, activeStudy, loadStudy, demoMode,
-       startDemo, signIn, signUp, signOut, joinWithCode, previewStudy, exitStudy]);
+  }), [auth, studies, sessions, user, activeStudyId, activeStudy, loadStudy, demoMode,
+       startDemo, session, consentAgreed, recordConsent, attachConversation, completeConversation,
+       signIn, signUp, signOut, joinWithCode, previewStudy, exitStudy]);
 
   return <Feature0Context.Provider value={value}>{children}</Feature0Context.Provider>;
 }
