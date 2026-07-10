@@ -72,7 +72,7 @@ Status: ✅ done · 🟡 partial · ⬜ not started.
 | AUD-1 | Anonymous join via code/link, no account | MVP | ✅ |
 | AUD-2 | Optional account; sessions associate with it | MVP | 🟡 (anonymous works; account-upgrade not surfaced in UI) |
 | AUD-3 | Consent gate when configured | MVP | ✅ |
-| AUD-4 | Live chat under config; visible time/turns; limits stop cleanly | MVP | ✅ (UI) |
+| AUD-4 | Live chat under config; visible time/turns; limits stop cleanly | MVP | 🟡 (chat/streaming ✅; **timer currently not firing** — bug, see §6 C/D; server-side limits = MOD-4) |
 | AUD-5 | Turn-level reactions when enabled | MVP | ✅ |
 | AUD-6 | End-and-audit (questionnaire + span highlights + explanations) | MVP | ✅ |
 | AUD-7 | Multiple conversations then finish at N | MVP | ✅ |
@@ -227,9 +227,83 @@ Each cell: what's done → what remains.
 richer analysis (DASH-5/6); span taxonomy (EVAL-4); Prolific completion loop (AUD-10);
 i18n (DEP-5).
 
+> A larger enhancement backlog was captured on 2026-07-10 — see **§6** below.
+
 ---
 
-## 6. Work log
+## 6. Planned enhancements — 2026-07-10 backlog
+
+Captured from a review session. Item numbers **[n]** match the source list. Grouped by
+theme and cross-referenced to the requirement catalog (§3); **NEW** marks scope beyond the
+current PRD. Several items imply real design decisions (flagged) before implementation.
+
+### A. Roles, profiles & assignment  (NEW — extends SEC-1/2/3, AUD-2)
+The biggest architectural theme: make **auditor** and **investigator** two *profiles a single
+account can hold*, not two separate account types.
+- **[6] Two profiles per account.** Every account has an **auditor** profile; investigators
+  additionally have an **investigator** profile. Auditor-only accounts see only the auditor
+  side. Separate landing screen per profile.
+- **[2] Investigator-as-auditor without signing out.** An investigator can take/audit studies
+  under their auditor profile — a profile switch, not an account switch.
+- **[5] Auditor accounts.** Auditors can register a real account (email/password), not only
+  join anonymously by access code (AUD-2). Anonymous join stays supported.
+- **[7] Study assignment.** An investigator assigns a study to an auditor by **username or
+  email**; it then appears on that auditor's dashboard as "assigned to audit."
+- *Design note:* needs a data-model change (per-user profiles + assignment table) and RLS
+  updates; touches Users/Auditor/Investigator across all three lenses.
+
+### B. Landing screens & dashboards  (NEW — extends DASH-1/2/3/6)
+- **[6] Role-specific landing screens.** Investigator: studies they **created** + studies
+  they're **assigned / auditing / completed**. Auditor: studies **assigned** + **completed**.
+- **[4] "Live conversations" tab.** A view of what conversations people are currently having
+  in a study (browse ongoing / collected conversations).
+- **[8] Personal analytics dashboards.** Auditor: analysis of their own audit activity.
+  Investigator: per-study combined analysis + graphs across all audits of their study.
+
+### C. Setup / study-config rework  (extends SC-4/6/7/8, UX-1)
+- **[1] Setup screen reorganization** — another major UI rework; more organized layout.
+- **[20] Audit-question builder.** Question setup is out of proportion (title bar + questions
+  oversized); add **multi-page** questionnaires; design a proper in-app survey maker for setup.
+- **[21] More template questionnaires** beyond the fairness/bias pair (SC-8).
+- **[16] Editable principles + sidebar message.** Add/remove the conversation "principles";
+  add/remove the sidebar guidance message (e.g. "on average a user needs ~7 messages").
+- **[15] Timer config.** Timer is **currently not working** (bug); add on/off + better config
+  (relates to SC-4 / AUD-4 / MOD-4).
+
+### D. Chatbot UX & behaviour  (extends AUD-4, EVAL-6, UX-2/3)
+- **[14] Collapsible sidebar.**
+- **[13] Interrupted streaming.** Define + implement what happens when a streaming reply is
+  **stopped mid-way**: how the partial message is stored (append-only event log, EVAL-6).
+  Needs a clear data contract + test.
+- **[15] Timer** (see C) — the runtime countdown itself isn't firing.
+- **[16] Principles / sidebar message** (see C) — the runtime rendering side.
+
+### E. Audit & highlighting  (bugs + extends EVAL-3)
+- **[17] Highlighting is broken.** Overlapping highlights aren't visually distinguishable;
+  add an **optional comment per highlight**; multi-point (multi-span) highlighting doesn't
+  highlight correctly.
+- **[18] Condensed long highlights.** Long highlights condense at the top; show the full text
+  on hover.
+- **[19] Click-to-scroll.** Clicking a highlight at the top scrolls the chat to bring that
+  span into focus.
+- **[20] Audit screen sizing** (see C) — proportions of the questions view need fixing.
+
+### F. Connectors & packaging  (extends MOD-2, DEP-4)
+- **[3] Remote auditors.** Today it assumes investigator + auditor share one machine. When
+  they're on **different machines**, the auditor needs their own model access — pull Ollama
+  models or use WebLLM **from the auditor side**. Surface model setup/pull in the auditor flow.
+- **[11] Robust cloud connectors.** Replace the generic HTTP relay calls for OpenAI /
+  Anthropic / Gemini with their **official SDKs** (direct imports) — evaluate `openai`,
+  `@anthropic-ai/sdk`, `@google/generative-ai`.
+- **[12] npm library release.** Prepare the app/component for npm publication (DEP-4).
+
+### G. Code quality & open-source readiness
+- **[9] Code cleanup & organization.**
+- **[10] Comment every source file** to prepare for an open-source release.
+
+---
+
+## 7. Work log
 
 ### 2026-07-03 → 2026-07-09 — audit fixes + MVP build (branch `audit-fixes`)
 Committed the whole working tree (junk cleanup → CRA→Vite migration → audit fixes P0–P2 →
@@ -265,7 +339,7 @@ Suite at 220.
 
 ---
 
-## 7. How to verify / run
+## 8. How to verify / run
 
 - **Tests:** `npx vitest run` (231 passing). **Build:** `npx vite build`. **Relay syntax:**
   `node --check server/server.js`.
