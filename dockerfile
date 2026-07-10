@@ -10,6 +10,23 @@ WORKDIR /app
 ARG REACT_APP_FEATURE0=on
 ENV REACT_APP_FEATURE0=$REACT_APP_FEATURE0
 
+# Optional Supabase backend. Vite inlines REACT_APP_* at build time, and .env is
+# not copied into the image (.dockerignore), so these come in as build args (wired
+# from docker-compose.yml -> the .env next to it). Leave blank to keep the local
+# mock/IndexedDB backend; set them to switch persistence/auth/studies to Supabase.
+ARG REACT_APP_SUPABASE_URL=
+ARG REACT_APP_SUPABASE_ANON_KEY=
+ARG REACT_APP_AUTH=
+ARG REACT_APP_STUDIES=
+ARG REACT_APP_SESSIONS=
+ARG REACT_APP_PERSISTENCE=
+ENV REACT_APP_SUPABASE_URL=$REACT_APP_SUPABASE_URL \
+    REACT_APP_SUPABASE_ANON_KEY=$REACT_APP_SUPABASE_ANON_KEY \
+    REACT_APP_AUTH=$REACT_APP_AUTH \
+    REACT_APP_STUDIES=$REACT_APP_STUDIES \
+    REACT_APP_SESSIONS=$REACT_APP_SESSIONS \
+    REACT_APP_PERSISTENCE=$REACT_APP_PERSISTENCE
+
 COPY package.json package-lock.json* ./
 RUN npm install
 COPY . .

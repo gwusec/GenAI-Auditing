@@ -8,6 +8,14 @@ services:
       args:
         # Feature 0 (investigator studies / config / auditor join) on by default.
         REACT_APP_FEATURE0: "on"
+        # Optional Supabase backend — values come from the .env next to this file.
+        # Blank = keep the local mock/IndexedDB backend.
+        REACT_APP_SUPABASE_URL: ${REACT_APP_SUPABASE_URL:-}
+        REACT_APP_SUPABASE_ANON_KEY: ${REACT_APP_SUPABASE_ANON_KEY:-}
+        REACT_APP_AUTH: ${REACT_APP_AUTH:-}
+        REACT_APP_STUDIES: ${REACT_APP_STUDIES:-}
+        REACT_APP_SESSIONS: ${REACT_APP_SESSIONS:-}
+        REACT_APP_PERSISTENCE: ${REACT_APP_PERSISTENCE:-}
     image: chatbot:osf
     ports:
       # Host 3030 → container 3000 (host 3000 is often already in use).
