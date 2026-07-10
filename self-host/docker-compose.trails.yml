@@ -1,0 +1,44 @@
+# Runs the TRAILS app + relay, built against your self-hosted Supabase.
+#
+# This is intentionally SEPARATE from Supabase's own docker-compose: the browser
+# (not this container) talks to Supabase, so they only need to share a reachable
+# URL, not a docker network. Bring Supabase up first (see SELF-HOST.md), then:
+#
+#   cd self-host
+#   cp .env.selfhost.example .env      # fill in REACT_APP_SUPABASE_URL + ANON_KEY
+#   docker compose -f docker-compose.trails.yml up -d --build
+#
+# App is then on http://localhost:3000
+
+services:
+  trails:
+    build:
+      context: ..
+      dockerfile: self-host/Dockerfile
+      args:
+        REACT_APP_SUPABASE_URL: ${REACT_APP_SUPABASE_URL}
+        REACT_APP_SUPABASE_ANON_KEY: ${REACT_APP_SUPABASE_ANON_KEY}
+        REACT_APP_AUTH: supabase
+        REACT_APP_STUDIES: supabase
+        REACT_APP_PERSISTENCE: supabase
+        REACT_APP_FEATURE0: "on"
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      # CORS allowlist for the relay; set to your public app origin in production
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      # security defaults (see .env.example at repo root for the full list)
+      ALLOW_PRIVATE_OLLAMA_URLS: ${ALLOW_PRIVATE_OLLAMA_URLS:-false}
+      ALLOW_PRIVATE_API_URLS: ${ALLOW_PRIVATE_API_URLS:-false}
+      # Provider API keys (server-side only, MOD-1): set in self-host/.env.
+      # Never put keys in study configs — the relay reads them from here.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+    extra_hosts:
+      # lets the relay reach a host-run Ollama at host.docker.internal
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

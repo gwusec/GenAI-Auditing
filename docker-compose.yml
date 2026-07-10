@@ -1,11 +1,32 @@
-# docker-compose.yml
+# docker-compose.yml — turnkey single-command run:  docker compose up --build
+# Serves the app + relay on http://localhost:3000
 services:
   chatbot:
+    build:
+      context: .
+      dockerfile: dockerfile
+      args:
+        # Feature 0 (investigator studies / config / auditor join) on by default.
+        REACT_APP_FEATURE0: "on"
     image: chatbot:osf
     ports:
-      - "3000:3000"
+      # Host 3030 → container 3000 (host 3000 is often already in use).
+      - "3030:3000"
     environment:
       NODE_ENV: production
+      # Self-host: the relay is trusted and is meant to reach a local/LAN model
+      # server (Ollama/vLLM), so don't block private/local endpoints.
+      ALLOW_PRIVATE_OLLAMA_URLS: "true"
+      ALLOW_PRIVATE_API_URLS: "true"
+      # Provider API keys (server-side only, MOD-1). Put values in a `.env` next
+      # to this file or export them; empty values are ignored by the relay.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+    # Lets the relay reach a model running on the host (e.g. Ollama at
+    # host.docker.internal:11434 — the default model config in src/index.js).
     extra_hosts:
       - host.docker.internal:host-gateway
     restart: unless-stopped

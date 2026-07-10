@@ -36,39 +36,42 @@ const apiClient = (() => {
       }));
 
       const userId = AppConfig.get("userId");
+      // Canonical backend contract (Phase 1): the bundled relay (server/server.js)
+      // expects a `relay` object describing the chosen backend/provider. It is
+      // sourced from the runtime `config.llmRelay` passed into <App />. An
+      // interactive settings UI to populate this is Phase 4; until then the host
+      // app / index.js provides it. `pid` is retained for proxy allow-list/logging.
+      const appRuntimeConfig = AppConfig.get("config") || {};
+      const relay = appRuntimeConfig.llmRelay;
 
       try {
         if (!userId) {
           throw new Error('User ID not found');
         }
+        if (!relay || !relay.backend) {
+          throw new Error('LLM relay configuration is missing (expected config.llmRelay with a `backend`)');
+        }
         const response = await instance.post('/chat', {
           messages: llmMessages,
-          pid: userId
+          pid: userId,
+          relay
         });
         return {status: "success", data: response.data};
       } catch (err) {
-        console.error("[ERROR] Error sending chat message:", err);
+        // Log only message + status: the full axios error embeds the request
+        // config (the whole relay object), which doesn't belong in the console.
+        console.error(
+          '[ERROR] Error sending chat message:',
+          err.message,
+          err.response?.status ?? '(no status)'
+        );
         if (err.response && err.response.status === 400) {
           return {status: "error400", data: null};
-        } else {
-          try {
-            const testMessage = {
-              role: 'user',
-              content: 'Are you down?'
-            }
-            const response = await instance.post('/chat', {
-              messages: [testMessage],
-              pid: userId
-            });
-            if (response.data.statuCode === 200) {
-              console.log("[INFO] API available - probably message exceeding limit.");
-              return response.data;
-            }
-          } catch (err) {
-            console.error("[ERROR] Error sending test message:", err);
-          }
-          throw err;
         }
+        // (Removed the old "Are you down?" probe: it fired a real upstream
+        // model call on every non-400 error, and its success check tested a
+        // misspelled `statuCode` so the branch could never return anyway.)
+        throw err;
       }
     }
   };

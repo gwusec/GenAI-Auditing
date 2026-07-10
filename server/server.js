@@ -15,6 +15,43 @@ const CHAT_RATE_LIMIT_MAX = Number(process.env.CHAT_RATE_LIMIT_MAX || 20);
 const OLLAMA_TEST_TIMEOUT_MS = Number(process.env.OLLAMA_TEST_TIMEOUT_MS || 5000);
 const ALLOW_PRIVATE_OLLAMA_URLS = (process.env.ALLOW_PRIVATE_OLLAMA_URLS || '').toLowerCase() === 'true';
 
+// --- Server-side provider API keys (MOD-1 invariant) -------------------------
+// The deployer sets these in the relay environment. Study configs, the DB, and
+// auditors' browsers never carry a provider key. A client-supplied relay.apiKey
+// is honored ONLY as a fallback when ALLOW_CLIENT_API_KEYS=true (the BYO-key
+// carve-out reserved for the hosted demo, MOD-8/§9 D5) — never over a server key.
+const SERVER_PROVIDER_KEYS = {
+  openai: process.env.OPENAI_API_KEY || '',
+  anthropic: process.env.ANTHROPIC_API_KEY || '',
+  gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
+  cohere: process.env.COHERE_API_KEY || '',
+  vllm: process.env.VLLM_API_KEY || '',
+};
+const PROVIDER_KEY_ENV = {
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  cohere: 'COHERE_API_KEY',
+  vllm: 'VLLM_API_KEY',
+};
+const KEY_REQUIRED_PROVIDERS = ['openai', 'anthropic', 'gemini', 'cohere'];
+const ALLOW_CLIENT_API_KEYS = (process.env.ALLOW_CLIENT_API_KEYS || '').toLowerCase() === 'true';
+
+/** Resolve the key for a provider: server env first; client key only when
+ *  explicitly allowed. Returns '' when neither is available. */
+function resolveApiKey(rawProvider, clientKey) {
+  const serverKey = SERVER_PROVIDER_KEYS[rawProvider] || '';
+  if (serverKey) return serverKey;
+  if (ALLOW_CLIENT_API_KEYS && clientKey) return String(clientKey);
+  return '';
+}
+
+function missingKeyMessage(rawProvider) {
+  const envVar = PROVIDER_KEY_ENV[rawProvider] || 'the provider API key';
+  return `No server-side API key is configured for ${rawProvider}. ` +
+    `Set ${envVar} in the relay environment (see .env.example) and restart.`;
+}
+
 function parseAllowedOrigins(value) {
   if (!value) {
     return isDevelopment ? ['*'] : [];
@@ -27,12 +64,23 @@ function parseAllowedOrigins(value) {
 
 const allowedOrigins = parseAllowedOrigins(process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN);
 
+// When no allowlist is configured, default to permissive. This is the self-host /
+// demo single-container case where the frontend and relay share an origin — and it
+// is required because Vite emits asset tags with `crossorigin`, so the browser
+// fetches same-origin JS/CSS in CORS mode (sending an Origin header). A blocking
+// default would 403 the app's own assets. Operators lock cross-origin access down
+// by setting ALLOWED_ORIGINS in production.
+const allowAllOrigins = allowedOrigins.length === 0;
+if (allowAllOrigins) {
+  console.warn('[cors] ALLOWED_ORIGINS not set — allowing all origins. Set ALLOWED_ORIGINS to restrict cross-origin access in production.');
+}
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
       return callback(null, true);
     }
-    if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+    if (allowAllOrigins || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
     return callback(new Error('CORS origin not allowed'));
@@ -107,6 +155,33 @@ function validateOllamaUrl(rawUrl) {
     };
   }
 
+  return { valid: true, normalized };
+}
+
+// SSRF guard for the `api` backend's baseUrl (openai/anthropic/gemini/cohere/vllm).
+// Same policy as validateOllamaUrl: private/local hosts are blocked in production
+// unless the deployer opts in (ALLOW_PRIVATE_API_URLS=true, e.g. a LAN vLLM).
+const ALLOW_PRIVATE_API_URLS = (process.env.ALLOW_PRIVATE_API_URLS || '').toLowerCase() === 'true';
+function validateApiBaseUrl(rawUrl) {
+  const normalized = normalizeUrl(rawUrl);
+  if (!normalized) {
+    return { valid: false, error: 'baseUrl is required' };
+  }
+  let parsed;
+  try {
+    parsed = new URL(normalized);
+  } catch (error) {
+    return { valid: false, error: 'baseUrl is invalid' };
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    return { valid: false, error: 'baseUrl must use http or https' };
+  }
+  if (!isDevelopment && !ALLOW_PRIVATE_API_URLS && isPrivateHost(parsed.hostname)) {
+    return {
+      valid: false,
+      error: 'Private/local provider URLs are blocked by server policy (set ALLOW_PRIVATE_API_URLS=true for a LAN vLLM)'
+    };
+  }
   return { valid: true, normalized };
 }
 
@@ -210,16 +285,29 @@ app.post('/chat', chatRateLimit, async (req, res) => {
     }
 
     if (relay.backend === 'api') {
-      const provider = relay.provider;
-      const apiKey = relay.apiKey;
+      const rawProvider = relay.provider;
+      // vLLM exposes an OpenAI-compatible API — route it through the OpenAI formatter
+      // but keep the caller's custom baseUrl. (vLLM may be keyless.)
+      const provider = rawProvider === 'vllm' ? 'openai' : rawProvider;
       const model = relay.model;
       const baseUrl = relay.baseUrl;
 
-      if (!provider || !apiKey || !model || !baseUrl) {
+      if (!rawProvider || !model || !baseUrl) {
         return res.status(400).json({
           statusCode: 400,
-          error: 'API relay requires provider, apiKey, model, and baseUrl'
+          error: 'API relay requires provider, model, and baseUrl'
         });
+      }
+
+      const baseUrlValidation = validateApiBaseUrl(baseUrl);
+      if (!baseUrlValidation.valid) {
+        return res.status(400).json({ statusCode: 400, error: baseUrlValidation.error });
+      }
+
+      // Keys are resolved SERVER-SIDE (env), never trusted from the study config.
+      const apiKey = resolveApiKey(rawProvider, relay.apiKey);
+      if (KEY_REQUIRED_PROVIDERS.includes(rawProvider) && !apiKey) {
+        return res.status(400).json({ statusCode: 400, error: missingKeyMessage(rawProvider) });
       }
 
       return handleApiProviderRequest(req, res, provider, apiKey, model, baseUrl);
@@ -312,8 +400,11 @@ app.post('/chat', chatRateLimit, async (req, res) => {
       console.error('Error calling Ollama API:', error.message);
       console.error('Error details:', error.response?.status || 'No status');
 
-      // Prevent crash if headers already sent (e.g., by timeout)
-      if (res.headerSent) return;
+      // Prevent crash if headers already sent (e.g., by timeout).
+      // NOTE: the property is `headersSent`; the old `headerSent` was always
+      // undefined, so this guard never fired and a late upstream error after a
+      // 408 timeout would throw ERR_HTTP_HEADERS_SENT.
+      if (res.headersSent) return;
 
       // Send error response
       res.status(500).json({
@@ -331,8 +422,8 @@ app.post('/chat', chatRateLimit, async (req, res) => {
   } catch (error) {
     console.error('Error processing chat request:', error.message);
 
-    // Prevent crash if headers already sent (e.g., by timeout)
-    if (res.headerSent) return;
+    // Prevent crash if headers already sent (e.g., by timeout) — see note above.
+    if (res.headersSent) return;
 
     // Send error response
     res.status(500).json({
@@ -376,12 +467,23 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    // Prepare the request body based on the provider
+    // Prepare the request body based on the provider.
+    // System-message handling is provider-specific and was previously wrong for
+    // anthropic (which REJECTS role:"system" inside `messages` — it must be the
+    // top-level `system` param) and gemini (where a system message was silently
+    // remapped to a `model` turn). Extract it once and route it correctly.
+    const systemText = formattedMessages
+      .filter((m) => m.role === 'system')
+      .map((m) => m.content)
+      .join('\n\n');
+    const nonSystemMessages = formattedMessages.filter((m) => m.role !== 'system');
+
     let requestBody;
     let apiEndpoint;
 
     switch (provider) {
       case 'openai':
+        // OpenAI-compatible endpoints accept system messages inline.
         apiEndpoint = `${baseUrl}/chat/completions`;
         requestBody = {
           model: model,
@@ -394,7 +496,8 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         apiEndpoint = `${baseUrl}/messages`;
         requestBody = {
           model: model,
-          messages: formattedMessages,
+          messages: nonSystemMessages,
+          ...(systemText ? { system: systemText } : {}),
           max_tokens: 2000,
           temperature: 0.7
         };
@@ -403,11 +506,12 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         apiEndpoint = `${baseUrl}/chat`;
         requestBody = {
           model: model,
-          message: formattedMessages[formattedMessages.length - 1].content,
-          chat_history: formattedMessages.slice(0, -1).map(msg => ({
+          message: nonSystemMessages[nonSystemMessages.length - 1].content,
+          chat_history: nonSystemMessages.slice(0, -1).map(msg => ({
             role: msg.role,
             message: msg.content
           })),
+          ...(systemText ? { preamble: systemText } : {}),
           temperature: 0.7,
           max_tokens: 2000
         };
@@ -416,7 +520,8 @@ async function handleApiProviderRequest(req, res, provider, apiKey, model, baseU
         // For Gemini, API key is in the URL as a parameter
         apiEndpoint = `${baseUrl}/models/${model}:generateContent?key=${apiKey}`;
         requestBody = {
-          contents: formattedMessages.map(msg => ({
+          ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
+          contents: nonSystemMessages.map(msg => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }]
           })),
@@ -551,22 +656,25 @@ function formatMessagesForProvider(messages, provider) {
 app.post('/api/test-api-key', async (req, res) => {
   const payload = req.body || {};
   const provider = (payload.provider || '').toLowerCase().trim();
-  const apiKey = (payload.apiKey || '').trim();
+  // Server env key first; a payload key only under ALLOW_CLIENT_API_KEYS.
+  const apiKey = resolveApiKey(provider, (payload.apiKey || '').trim());
   const model = (payload.model || '').trim();
   const baseUrl = (payload.baseUrl || '').trim();
 
-  if (!provider || !apiKey) {
-    return res.status(400).json({ error: 'Provider and API key are required' });
+  if (!provider) {
+    return res.status(400).json({ error: 'Provider is required' });
+  }
+  if (!apiKey) {
+    return res.status(400).json({ error: missingKeyMessage(provider) });
   }
 
   if (!baseUrl || typeof baseUrl !== 'string') {
     return res.status(400).json({ error: 'A valid baseUrl is required' });
   }
 
-  try {
-    new URL(baseUrl);
-  } catch (error) {
-    return res.status(400).json({ error: 'Invalid baseUrl format' });
+  const baseUrlValidation = validateApiBaseUrl(baseUrl);
+  if (!baseUrlValidation.valid) {
+    return res.status(400).json({ error: baseUrlValidation.error });
   }
 
   console.log(`TESTING API KEY FOR ${provider.toUpperCase()} - Model: ${model}`);
@@ -677,11 +785,157 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Test-connection endpoint: given a relay config, check that the model is actually
+// reachable and (for Ollama) pulled. Returns { ok, stage, message, availableModels? }
+// with actionable diagnostics so an investigator knows whether their model works
+// BEFORE opening a study. Comprehensive for Ollama; reasonable for API providers.
+app.post('/api/test-model', async (req, res) => {
+  const relay = (req.body && req.body.relay) || {};
+
+  try {
+    if (relay.backend === 'ollama') {
+      const validation = validateOllamaUrl(relay.ollamaUrl);
+      if (!validation.valid) {
+        return res.json({ ok: false, stage: 'url', message: validation.error });
+      }
+      const url = validation.normalized;
+      const wanted = (relay.ollamaModel || '').trim();
+      if (!wanted) {
+        return res.json({ ok: false, stage: 'model', message: 'No model name provided.' });
+      }
+
+      // 1) Is the Ollama server reachable?
+      let tags;
+      try {
+        tags = await axios.get(`${url}/api/tags`, { timeout: OLLAMA_TEST_TIMEOUT_MS });
+      } catch (error) {
+        const reason = error.code === 'ECONNREFUSED' || /ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/.test(error.message || '')
+          ? `Couldn't reach an Ollama server at ${url}. Make sure Ollama is running AND listening on all interfaces so this container can reach it: stop Ollama, then run "OLLAMA_HOST=0.0.0.0 ollama serve". (Ollama listens on 127.0.0.1 only by default, which Docker can't reach.)`
+          : `Couldn't reach Ollama at ${url}: ${error.message}`;
+        return res.json({ ok: false, stage: 'reachability', message: reason });
+      }
+
+      // 2) Is the requested model pulled?
+      const available = (tags.data && Array.isArray(tags.data.models) ? tags.data.models : []).map((m) => m.name);
+      const present = available.some(
+        (n) => n === wanted || n === `${wanted}:latest` || n.startsWith(`${wanted}:`)
+      );
+      if (!present) {
+        return res.json({
+          ok: false,
+          stage: 'model',
+          message: `Connected to Ollama at ${url}, but the model "${wanted}" isn't pulled. Run: ollama pull ${wanted}`,
+          availableModels: available,
+        });
+      }
+
+      return res.json({
+        ok: true,
+        stage: 'ready',
+        message: `Connected to Ollama at ${url} and "${wanted}" is available.`,
+        availableModels: available,
+      });
+    }
+
+    if (relay.backend === 'api') {
+      const rawProvider = relay.provider;
+      const provider = rawProvider === 'vllm' ? 'openai' : rawProvider;
+      if (!relay.model) return res.json({ ok: false, stage: 'model', message: 'No model id provided.' });
+      if (!relay.baseUrl) return res.json({ ok: false, stage: 'url', message: 'No base URL provided.' });
+      const baseCheck = validateApiBaseUrl(relay.baseUrl);
+      if (!baseCheck.valid) return res.json({ ok: false, stage: 'url', message: baseCheck.error });
+      const apiKey = resolveApiKey(rawProvider, relay.apiKey);
+      if (KEY_REQUIRED_PROVIDERS.includes(rawProvider) && !apiKey) {
+        return res.json({ ok: false, stage: 'key', message: missingKeyMessage(rawProvider) });
+      }
+
+      // Live check for OpenAI-compatible endpoints (openai, vllm): list models.
+      if (provider === 'openai') {
+        try {
+          const base = normalizeUrl(relay.baseUrl);
+          const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+          const r = await axios.get(`${base}/models`, { headers, timeout: OLLAMA_TEST_TIMEOUT_MS });
+          const ids = (r.data && Array.isArray(r.data.data) ? r.data.data.map((m) => m.id) : []);
+          const present = ids.length === 0 || ids.includes(relay.model);
+          return res.json({
+            ok: present,
+            stage: present ? 'ready' : 'model',
+            message: present
+              ? `Reached ${base} and credentials are accepted.`
+              : `Reached ${base}, but model "${relay.model}" was not listed. Available: ${ids.slice(0, 20).join(', ')}`,
+            availableModels: ids,
+          });
+        } catch (error) {
+          const status = error.response && error.response.status;
+          const msg = status === 401 || status === 403
+            ? 'Reached the endpoint but the API key was rejected (401/403).'
+            : `Couldn't reach ${relay.baseUrl}: ${error.message}`;
+          return res.json({ ok: false, stage: status === 401 || status === 403 ? 'key' : 'reachability', message: msg });
+        }
+      }
+
+      // Anthropic / Gemini: no uniform list endpoint here — report config completeness.
+      return res.json({
+        ok: true,
+        stage: 'config',
+        message: `Config for ${rawProvider} looks complete. A full live check for this provider isn't implemented yet — it will be verified on the first chat.`,
+      });
+    }
+
+    return res.json({ ok: false, stage: 'config', message: 'Unknown or missing backend.' });
+  } catch (error) {
+    return res.status(500).json({ ok: false, stage: 'error', message: `Test failed: ${error.message}` });
+  }
+});
+
+// List the models available at a provider endpoint, so the config UI can offer a
+// dropdown instead of a free-text model id. { ok, models: string[], error? }
+app.post('/api/list-models', async (req, res) => {
+  const relay = (req.body && req.body.relay) || {};
+  try {
+    if (relay.backend === 'ollama') {
+      const v = validateOllamaUrl(relay.ollamaUrl);
+      if (!v.valid) return res.json({ ok: false, models: [], error: v.error });
+      const r = await axios.get(`${v.normalized}/api/tags`, { timeout: OLLAMA_TEST_TIMEOUT_MS });
+      const models = (r.data && Array.isArray(r.data.models) ? r.data.models : []).map((m) => m.name);
+      return res.json({ ok: true, models });
+    }
+    if (relay.backend === 'api') {
+      const provider = relay.provider === 'vllm' ? 'openai' : relay.provider;
+      if (provider === 'openai' && relay.baseUrl) {
+        const baseCheck = validateApiBaseUrl(relay.baseUrl);
+        if (!baseCheck.valid) return res.json({ ok: false, models: [], error: baseCheck.error });
+        const base = normalizeUrl(relay.baseUrl);
+        const apiKey = resolveApiKey(relay.provider, relay.apiKey);
+        const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+        const r = await axios.get(`${base}/models`, { headers, timeout: OLLAMA_TEST_TIMEOUT_MS });
+        const models = (r.data && Array.isArray(r.data.data) ? r.data.data : []).map((m) => m.id);
+        return res.json({ ok: true, models });
+      }
+      // Anthropic / Gemini have no uniform list endpoint here.
+      return res.json({ ok: true, models: [] });
+    }
+    return res.json({ ok: false, models: [], error: 'Unknown backend' });
+  } catch (error) {
+    const status = error.response && error.response.status;
+    const msg = status === 401 || status === 403 ? 'API key rejected (401/403).' : error.message;
+    return res.json({ ok: false, models: [], error: msg });
+  }
+});
+
 // In development mode, don't try to serve the static build files
 if (!isDevelopment) {
-  // Check if the build directory exists
-  const buildPath = path.join(__dirname, '..', 'build');
-  if (fs.existsSync(buildPath)) {
+  // Locate the React build robustly. Depending on how the image is laid out,
+  // server.js may sit beside `build/` (/app/server.js + /app/build) or one level
+  // up (/app/server/server.js + /app/build). An explicit BUILD_DIR env wins.
+  const buildCandidates = [
+    process.env.BUILD_DIR,
+    path.join(__dirname, '..', 'build'),
+    path.join(__dirname, 'build'),
+    path.join(process.cwd(), 'build'),
+  ].filter(Boolean);
+  const buildPath = buildCandidates.find((p) => fs.existsSync(p));
+  if (buildPath) {
     // Serve static files from the React app
     app.use(express.static(buildPath));
 

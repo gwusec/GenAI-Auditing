@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import conversationHandler from "../../tools/ConversationHandler";
 import ChatMessages from '../ChatMessages/ChatMessages';
+import { toRenderableHighlight } from "../../tools/audit/spanHighlights";
 import styles from "./ChatHistory.module.css";
 
 
@@ -14,6 +15,15 @@ const ChatHistory = ({
 }) => {
   const [messages, setMessages] = useState([]);
   const [processedMessages, setProcessedMessages] = useState([]);
+
+  // Highlights arrive in either the legacy shape ({text,startIndex}) — from the
+  // live highlight step — or the hardened shape ({quotedText,startOffset}) — from
+  // a saved audit re-rendered on the summary page. Normalize once so the renderer
+  // below never reads `.text` / `.startIndex` off the wrong shape (this was the
+  // post-audit white-screen crash).
+  const renderableHighlights = (highlights || [])
+    .map(toRenderableHighlight)
+    .filter(Boolean);
 
   useEffect(() => {
     const handleVisibleChatUpdated = () => {
@@ -34,13 +44,13 @@ const ChatHistory = ({
   useEffect(() => {
     // Function to process message content with highlights
     const processMessageContent = (message) => {
-      if (message.author === "user" || !highlights.length) {
+      if (message.author === "user" || !renderableHighlights.length) {
         return message.content;
       }
 
-      if (message.author === "bot" && highlights.length) {
+      if (message.author === "bot" && renderableHighlights.length) {
         // Are there any highlights for this message?
-        const highlightedPassages = highlights.filter((h) => h.messageId === message.id);
+        const highlightedPassages = renderableHighlights.filter((h) => h.messageId === message.id);
 
         // Return the message content if there are no highlights
         if (highlightedPassages.length === 0) {
@@ -118,7 +128,7 @@ const ChatHistory = ({
       
       if (startIndex !== -1) {
         // Check if the selection overlaps with any existing highlight
-        const overlappingHighlight = highlights.find(
+        const overlappingHighlight = renderableHighlights.find(
           (h) =>
             h.messageId === messageId &&
             (
