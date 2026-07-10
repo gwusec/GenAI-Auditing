@@ -7,7 +7,7 @@ import React, { createContext, useContext, useMemo, useState } from 'react';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
-const ACCENT = { main: '#4f46e5', light: '#6366f1', dark: '#4338ca', contrastText: '#ffffff' };
+const ACCENT = { main: '#0d9488', light: '#2dd4bf', dark: '#0f766e', contrastText: '#ffffff' };
 
 const softShadow = (isLight) =>
   isLight
@@ -32,7 +32,9 @@ export function makeTheme(mode) {
         ? { primary: '#0f172a', secondary: '#475569' }
         : { primary: '#e5e7eb', secondary: '#94a3b8' },
       divider,
-      success: { main: isLight ? '#059669' : '#10b981' },
+      // Grass-green success, deliberately distinct from the teal primary so
+      // "Ready"/"complete" states don't blur into the accent color.
+      success: { main: isLight ? '#16a34a' : '#22c55e' },
       warning: { main: isLight ? '#d97706' : '#f59e0b' },
       error: { main: isLight ? '#dc2626' : '#f87171' },
     },
