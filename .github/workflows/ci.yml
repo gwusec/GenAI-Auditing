@@ -24,12 +24,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      # NOTE: package-lock.json is currently gitignored, so `npm ci` (which
-      # requires a committed lockfile) cannot run. Using `npm install` for now.
-      # Recommended Phase 1 follow-up: stop ignoring package-lock.json, commit it,
-      # and switch this back to `npm ci` for reproducible installs.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Test
         run: npm test

@@ -1,184 +1,126 @@
+# TRAILS — Chatbot Auditing Platform
 
-# TRAILS Chatbot Auditing Tool
+TRAILS is a research tool for running structured **bias/harm audits of chatbots**. An
+investigator configures a study (model, framing prompt, questionnaire, consent), shares
+a join code, and auditors chat with the configured model and mark problematic responses.
+The collected conversations, reactions, highlights, and questionnaire answers are the
+research data.
 
-This is the chatbot auditing interface using the Material-UI for the frontend interface.
-Live Demo: https://chatbot-audit.onrender.com/
+The app is a **Vite + React** single-page frontend served together with a small
+**Node/Express relay** (`server/`) that talks to the language models. Provider API keys
+live only in the relay environment — never in the browser or the study config.
 
-## Setup
+> Product spec: [`docs/PRD.md`](docs/PRD.md) · Build roadmap: [`PLAN.md`](PLAN.md) ·
+> Current fix/handoff plan: [`docs/AUDIT-FIX-PLAN.md`](docs/AUDIT-FIX-PLAN.md)
 
-1. Ensure [Node.js](https://nodejs.org/) (v14 or higher)
+## Quick start (Docker — recommended)
 
-2. Clone repository:
+One command builds the frontend and starts the relay together:
 
-    ```bash
-    git clone git@github.com:gwusec/TRAILS-Chatbot.git
-    cd TRAILS-Chatbot
-    ```
+```bash
+docker compose up --build     # serves app + relay on http://localhost:3030
+```
 
-3. Install dependencies:
+Set any provider keys you need in a `.env` next to `docker-compose.yml` (see
+[`.env.example`](.env.example)); empty values are ignored:
 
-    ```bash
-    npm install
-    ```
+```bash
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=...
+GEMINI_API_KEY=...
+```
 
-## Development
+By default the relay can also reach a model running on the host — e.g. Ollama at
+`host.docker.internal:11434`, which is the default model config.
 
-### Option 1 - Dev without proxy server (default)
+## Local development
 
-1. Add required environment variables to `.env` file:
-   ```bash
-    touch .env
-    echo "DEV_SERVER_PORT=3100" >> .env
-    echo "MOCK_SERVER_PORT=3110" >> .env
-    ```
-2. Run the chatbot with mock server
-    ```bash
-    npm run start-with-mock
-    ```
+```bash
+npm ci            # install (uses the committed lockfile)
+npm run dev       # Vite dev server
+npm run build     # production build
+npm test          # unit suite (Vitest)
+```
 
-The application should open in your web browser.
+The relay is a separate process for local work:
 
+```bash
+node server/server.js         # or: docker compose up
+```
 
-### Option 2 - Dev with proxy server
+Environment variables (relay hardening, CORS allowlist, SSRF toggles, provider keys)
+are documented in [`.env.example`](.env.example).
 
-1. Setup and run [TRAILS-ui-llm-proxy](https://github.com:gwusec/TRAILS-ui-llm-proxy.git)
-1. Add required environment variables to `.env` file:
-   ```bash
-   touch .env
-   echo "DEV_SERVER_PORT=3100" >> .env
-   echo "REACT_APP_LLM_PROXY_HOST_AND_PORT='localhost:3110'" >> .env
-   ```
-3. Run the chatbot
-    ```bash
-    npm run start
-    ```
+## How it works
 
-## Understanding the Data Flow
+**Investigator → study → auditor.** The Feature-0 flow (`src/feature0/`) lets an
+investigator authenticate, create and configure a study (`StudyConfigForm`), open it,
+and share an access code. Auditors join with the code (`AuditorJoin`), pass the consent
+gate, chat with the configured model, and audit the responses.
 
-The frontend sends user messages to a backend (either an external TRAILS LLM proxy or the bundled relay in `server/`), which forwards them to the configured model (Ollama or a cloud provider) and returns the response.
+**Relay.** The frontend never calls a provider directly. It POSTs to the bundled relay
+(`server/server.js`), which resolves the provider key from its own environment, applies
+the study's system/seed prompt and decoding settings, forwards to the model (Ollama or a
+cloud provider), and returns the response. The relay validates `baseUrl`s to reduce SSRF
+risk (`ALLOW_PRIVATE_*` toggles).
 
-**Persistence (today):** conversations and audit data are stored **client-side in the browser using IndexedDB via [Dexie](https://dexie.org/)** (see `src/tools/db.js`). There is no server-side database in the current build — data lives in the participant's browser until exported. (An earlier version of this document referred to MongoDB; that is not accurate for this codebase.)
+**Conversations as event logs.** Each conversation is an append-only log of events
+(`new_user_message`, `new_bot_message`, `edit_message`, `restart_chat`, `end_chat`); the
+UI view and the model context are *derived* from that log (`src/tools/ConversationHandler.js`).
 
-> **Roadmap note:** server-side persistence is planned via Supabase/Postgres (with per-study data isolation), so research data can be collected across participants and viewed in an investigator dashboard. Until then, treat persistence as local-only. The product spec is [`docs/PRD.md`](docs/PRD.md) and the build roadmap is [`PLAN.md`](PLAN.md).
-
-Each conversation is modeled as an append-only log of events (`new_user_message`, `new_bot_message`, `edit_message`, `restart_chat`, `end_chat`); the UI view and the LLM context are *derived* from that log (see `src/tools/ConversationHandler.js`).
-
-### Data Flow Diagram
+### Data flow
 
 ```mermaid
-    sequenceDiagram
-        participant User as User
-        participant chatbot as TRAILS-chatbot
-        participant proxy as TRAILS LLM proxy / relay
-        participant store as IndexedDB (browser, local)
+sequenceDiagram
+    participant User as Auditor
+    participant app as TRAILS frontend
+    participant relay as Relay (server/)
+    participant model as Model (Ollama / cloud)
+    participant store as Store (IndexedDB or Supabase)
 
-        User->>+chatbot: Enter message
-        chatbot->>+proxy: POST message
-        proxy-->>-chatbot: Return response
-        chatbot->>store: Persist conversation + audit (local)
-        chatbot-->>-User: Display Conversation
+    User->>app: Enter message
+    app->>relay: POST /chat (no API key in browser)
+    relay->>model: Forward with server-side key + study framing
+    model-->>relay: Completion
+    relay-->>app: Response
+    app->>store: Persist conversation + audit
+    app-->>User: Display response
 ```
 
-## Event API
+## Persistence
 
-### `trails-chatbot:audit-finished`
+Two backends, selected at runtime:
 
-The `trails-chatbot:audit-finished` custom event is dispatched by the `ExportManager` component when the user clicks the "Finish audit and proceed with survey" button. This event is used to notify other parts of the application that the audit process has been completed and the exported data is available.
+- **Local (default):** conversations and audit data are stored in the browser via
+  IndexedDB ([Dexie](https://dexie.org/), `src/tools/db.js`). Data stays on the
+  participant's device until exported.
+- **Supabase/Postgres (optional):** for multi-participant collection with per-study data
+  isolation (RLS) and an investigator dashboard. Apply the migrations in
+  [`supabase/migrations/`](supabase/migrations/) (`0001` → `0002` → `0003`) in order and
+  configure the Supabase client (`src/tools/supabaseClient.js`).
 
-**Event Name:** `trails-chatbot:audit-finished`
+## Security notes
 
-**Event Type:** `CustomEvent`
+- **Provider API keys are server-side only.** They are read from the relay environment
+  (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, …) and never stored in study config, the
+  database, or shipped to any browser. A client-supplied key is honored only when
+  `ALLOW_CLIENT_API_KEYS=true` (a future hosted BYO-key demo).
+- **CORS:** set `ALLOWED_ORIGINS` to your exact app origin before any public deploy; it
+  defaults to allow-all when unset.
+- **SSRF:** keep `ALLOW_PRIVATE_OLLAMA_URLS` / `ALLOW_PRIVATE_API_URLS` `false` in
+  production; set `true` only for trusted internal model servers.
 
-**Bubbles:** `true`
+## Repository layout
 
-**Cancelable:** `true`
-
-**Detail:** The event detail is the exported conversation data returned by `conversationHandler.getExistingConversations()` — an **array of conversation objects**. Each conversation has the following shape:
-
-```json
-[
-  {
-    "id": "uuid",
-    "userID": "user123",
-    "startTimestamp": 1736728140426,
-    "endTimestamp": 1736728170553,
-    "state": "complete",
-    "chatEvents": [
-      {
-        "id": "uuid",
-        "type": "new_user_message | new_bot_message | edit_message | restart_chat | end_chat | api_error",
-        "timestamp": 1736728148828,
-        "data": { "id": "uuid", "author": "user | bot", "content": "...", "referencedMessageId": null, "isEdited": false }
-      }
-    ],
-    "audit": {
-      "id": "uuid",
-      "startTimestamp": 1736728140426,
-      "endTimestamp": 1736728170553,
-      "likertResponses": { "problematic": "(1)<br/>Strongly Disagree" },
-      "highlights": [ { "messageId": "uuid", "text": "problematic passage", "startIndex": 0 } ],
-      "textResponses": { "explainProblematic": "...", "biasesHarms": "..." }
-    }
-  }
-]
+```
+src/feature0/     Investigator/auditor flow (auth, study config, join, dashboard)
+src/components/   Chat + audit UI (ChatBox, ChatHistory, Questionnaire, AuditFlow)
+src/tools/        ConversationHandler, stores, study services, studyConfig, sessions
+server/           Express relay
+supabase/         SQL migrations + RLS policies
+docs/             PRD, phase scopes, audit fix plan
 ```
 
-> See `src/index.js` (`exportedData`) for a complete worked example of this structure.
+## License
 
-## Deployment
-
-### Embed component in parent React application
-
-The chatbot can be embedded into a parent application, allowing you to control the user interface and user experience around the chatbot. To do so, you can import the `App` component from the `trails-ui-chatbot` package and use it as a component in your parent application.
-
-Here is an example of how you can embed the chatbot in a parent application:
-
-`package.json`
-```json
-{
-  "dependencies": {
-    "trails-ui-chatbot": "github:gwusec/TRAILS-Chatbot#main"
-  },
-}
-```
-
-`ParentApp.jsx`
-```javascript
-import { App as Chatbot } from "trails-ui-chatbot";
-
-export default function ParentApp() {
-
-    const authorizedUser = 'id_of_some_authorized_user'; // this will be sent to the proxy, as the proxy uses an allow list
-    const publicLlmProxyServerUrl = 'https://my-host.com/proxy'; // public url where the proxy is reachable
-
-    async function handleReturnChatbot(data){
-        const exportedData = event.detail;
-        // Process the exported data as needed
-    }
-
-    useEffect(() => {
-        // add listener
-        document.addEventListener('trails-chatbot:audit-finished', handleReturnChatbot);
-
-        // cleanup
-        return () => {
-            document.removeEventListener("trails-chatbot:audit-finished", handleReturnChatbot);
-        }
-    }, [])
-
-    return (
-        <Chatbot
-            userId={authorizedUser}
-            llmProxyServerUrl={publicLlmProxyServerUrl} 
-            debugMode={false} // should be false in deployment
-            config={{
-                timerMaxOverallChatTimeSeconds: 15 * 60, // 15 minutes in seconds
-                timerChatsMaxSeconds: [7 * 60, 5 * 60],  // 
-                timerAuditMaxSeconds: [],          // audit: first 1.5 min (90s), second 1 min (60s)
-                timerWarningChatTimeIsUpSeconds: 2 * 60,    // show warning with 2 min left in a chat
-                timerMinChatTimeRemainingToStartNewChatSeconds: 3 * 60, // need at least 3 min left to start a new chat
-            }}
-        />
-    )    
-}
-```
+Apache-2.0 — see [`LICENSE`](LICENSE).

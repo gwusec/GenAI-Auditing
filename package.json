@@ -3,11 +3,6 @@
   "version": "1.0.2",
   "private": true,
   "license": "Apache-2.0",
-  "files": [
-    "src/**/*",
-    "assets/tutorial-marking.mov"
-  ],
-  "main": "./src/lib.js",
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
@@ -28,12 +23,6 @@
     "survey-core": "^2.5.31",
     "survey-react-ui": "^2.5.31",
     "uuid": "^11.0.4"
-  },
-  "exports": {
-    ".": {
-      "node": "./src/lib.js",
-      "default": "./src/lib.js"
-    }
   },
   "scripts": {
     "dev": "vite",
