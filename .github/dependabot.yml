@@ -47,6 +47,11 @@ updates:
       semver-major-days: 30
       semver-minor-days: 7
       semver-patch-days: 3
+    ignore:
+      # Express 5 is a deliberate relay migration, not a routine dependency bump.
+      - dependency-name: "express"
+        update-types:
+          - "version-update:semver-major"
 
   # GitHub Actions versions
   - package-ecosystem: "github-actions"
