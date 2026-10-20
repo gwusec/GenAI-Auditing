@@ -153,8 +153,9 @@
     color: hsl(var(--primary));
 }
 
-/* rename as .chatMessages__inlineCode; Element: Styles inline code snippets. */
-.inline-code {
+/* Inline code is the code element inside a Markdown paragraph. Code blocks are
+   rendered as sibling pre elements, so this cannot style block code. */
+.markdown-paragraph code {
     background-color: hsl(var(--accent));
     padding: 2px 4px;
     border-radius: 4px;

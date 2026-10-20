@@ -43,14 +43,12 @@ function SpeakerAvatar({ author }) {
         </div>
     );
 }
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
-import rehypeRaw from 'rehype-raw';
 import LoadingDots from '../LoadingDots/LoadingDots';
 import conversationHandler from '../../tools/ConversationHandler';
 import AppConfig from '../../tools/AppConfig';
 import { currentReactions } from '../../tools/audit/reactions';
 import styles from './ChatMessages.module.css';
+import MarkdownContent from './MarkdownContent';
 
 // Inline turn-level reaction controls under a chatbot message (AUD-5 / EVAL-1).
 function MessageReactions({ messageId, types, reactions, onReact }) {
@@ -309,38 +307,9 @@ const ChatMessages = ({
                                                 </Button>
                                             </div>
                                         ) : (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                rehypePlugins={[rehypeRaw]}
-                                                components={{
-                                                    p: ({ node, ...props }) => (
-                                                        <p {...props} className={styles['markdown-paragraph']} />
-                                                    ),
-                                                    a: ({ node, children, ...props }) => (
-                                                        <a {...props} className={styles['markdown-link']}>
-                                                            {children}
-                                                        </a>
-                                                    ),
-                                                    code: ({ node, inline, className, children, ...props }) =>
-                                                        inline ? (
-                                                            <code {...props} className={styles['inline-code']}>
-                                                                {children}
-                                                            </code>
-                                                        ) : (
-                                                            <pre {...props} className={styles['block-code']}>
-                                                                <code>{children}</code>
-                                                            </pre>
-                                                        ),
-                                                    // Custom component for trails-audit-mark
-                                                    'trails-audit-mark': ({ node, children, ...props }) => (
-                                                        <mark {...props} className={styles['markdown-mark']}>
-                                                            {children}
-                                                        </mark>
-                                                    ),
-                                                }}
-                                            >
+                                            <MarkdownContent>
                                                 {message.content.toString()}
-                                            </ReactMarkdown>
+                                            </MarkdownContent>
                                         )}
                                         {/* Timestamp */}
                                         <Typography variant="caption" className={styles['timestamp']}>
