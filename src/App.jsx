@@ -50,7 +50,12 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
     const [showAPIErrorDialog, setShowAPIErrorDialog] = useState(false);
     const [showTimerChatTimeUpDialog, setShowTimerChatTimeUpDialog] = useState(false);
 
-    const timerSystem = useMemo(() => new ChatTimerSystem(config), [config]);
+    const timerSystem = useMemo(() => {
+        const timerStorageKey = config?.studyId && userId
+            ? `chatTimerState:${config.studyId}:${userId}`
+            : 'chatTimerState';
+        return new ChatTimerSystem({ ...config, timerStorageKey });
+    }, [config, userId]);
     const [timerState, setTimerState] = useState({
         percentageChatTimeRemaining: 100,
         overallTimeRemaining: timerSystem.state.overallTimeRemaining,
@@ -439,7 +444,8 @@ function App({ llmProxyServerUrl, isViewOnly = false, viewOnlyData, config = {},
                                             conversations,
                                             timerSystem,
                                             STATE,
-                                            startNextConversation
+                                            startNextConversation,
+                                            expectedConversations: config?.conversationsPerAuditor ?? null
                                         }} />
                                 </>
                             )}

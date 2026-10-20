@@ -38,6 +38,13 @@ describe('ChatTimerSystem — initialization', () => {
     expect(saved).toMatchObject({ hasStarted: false, isPaused: true, currentChatIndex: -1 });
     t.cleanup();
   });
+
+  test('supports a study- and user-scoped storage key', () => {
+    const t = new ChatTimerSystem({ ...CONFIG, timerStorageKey: 'chatTimerState:study:user' });
+    expect(window.localStorage.getItem('chatTimerState')).toBeNull();
+    expect(window.localStorage.getItem('chatTimerState:study:user')).not.toBeNull();
+    t.cleanup();
+  });
 });
 
 describe('ChatTimerSystem — start / pause / resume', () => {
@@ -77,6 +84,16 @@ describe('ChatTimerSystem — new chat lifecycle', () => {
     expect(ok).toBe(true);
     expect(t.state.currentChatIndex).toBe(0);
     expect(t.state.currentChatTimeRemaining).toBe(5 * 1000); // chatDurations[0]
+    t.cleanup();
+  });
+
+  test('requires the remaining-time threshold after the configured chat count', () => {
+    const t = new ChatTimerSystem(CONFIG);
+    t.state.currentChatIndex = 1; // second and final configured chat
+    t.state.overallTimeRemaining = 9 * 1000;
+    expect(t.canStartNewChat()).toBe(false);
+    t.state.overallTimeRemaining = 10 * 1000;
+    expect(t.canStartNewChat()).toBe(true);
     t.cleanup();
   });
 

@@ -16,6 +16,7 @@ ARG REACT_APP_SUPABASE_URL
 ARG REACT_APP_SUPABASE_ANON_KEY
 ARG REACT_APP_AUTH=supabase
 ARG REACT_APP_STUDIES=supabase
+ARG REACT_APP_SESSIONS=supabase
 ARG REACT_APP_PERSISTENCE=supabase
 ARG REACT_APP_FEATURE0=on
 # Self-host unlocks the commercial cloud connectors (public build = Ollama + WebLLM only).
@@ -24,15 +25,14 @@ ENV REACT_APP_SUPABASE_URL=$REACT_APP_SUPABASE_URL \
     REACT_APP_SUPABASE_ANON_KEY=$REACT_APP_SUPABASE_ANON_KEY \
     REACT_APP_AUTH=$REACT_APP_AUTH \
     REACT_APP_STUDIES=$REACT_APP_STUDIES \
+    REACT_APP_SESSIONS=$REACT_APP_SESSIONS \
     REACT_APP_PERSISTENCE=$REACT_APP_PERSISTENCE \
     REACT_APP_FEATURE0=$REACT_APP_FEATURE0 \
     REACT_APP_COMMERCIAL_CONNECTORS=$REACT_APP_COMMERCIAL_CONNECTORS \
     CI=false
 
-COPY package.json ./
-# package-lock.json is currently gitignored, so use npm install (not npm ci).
-# @supabase/supabase-js is a declared dependency, so it's installed here.
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 COPY . .
 RUN npm run build
 
@@ -42,9 +42,9 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000
 COPY --from=build /app/build ./build
-COPY server/package.json ./package.json
+COPY server/package.json server/package-lock.json ./
 COPY server/server.js ./server.js
 COPY server/relayHelpers.js ./relayHelpers.js
-RUN npm install --only=production
+RUN npm ci --omit=dev
 EXPOSE 3000
 CMD ["node", "server.js"]

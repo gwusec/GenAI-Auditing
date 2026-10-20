@@ -65,6 +65,7 @@ export function Feature0Provider({
   const [activeStudyId, setActiveStudyId] = useState(null);
   const [activeStudy, setActiveStudy] = useState(null); // full study object (incl. config)
   const [demoMode, setDemoMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [session, setSession] = useState(null);          // current AuditorSession
   const [consentAgreed, setConsentAgreed] = useState(false);
 
@@ -82,6 +83,7 @@ export function Feature0Provider({
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
+    setPreviewMode(false);
     setSession(null);
     setConsentAgreed(false);
   }, [auth]);
@@ -144,6 +146,9 @@ export function Feature0Provider({
     (async () => {
       const study = await loadStudy(rec.studyId, user.id);
       if (!study) { clearResume(); return; }
+      try { deriveRuntimeConfig(study.config); }
+      catch (_) { clearResume(); return; }
+      setPreviewMode(false);
       setActiveStudyId(rec.studyId);
       if (rec.consented) setConsentAgreed(true);
       if (rec.sessionId) {
@@ -162,6 +167,11 @@ export function Feature0Provider({
     if (!current) current = await auth.signInAnonymously();
     const studyId = await studies.redeemAccessCode(code, current.id);
     const study = await loadStudy(studyId, current.id);
+    if (!study) throw new Error('Study could not be loaded');
+    // Auditor sessions must always use a strictly valid, reproducible config.
+    // Lenient derivation is reserved for an investigator previewing a draft.
+    deriveRuntimeConfig(study.config);
+    setPreviewMode(false);
     setActiveStudyId(studyId);
     setConsentAgreed(false);
     const s = await startSession(study || { id: studyId }, current.id, { capture: true });
@@ -172,6 +182,7 @@ export function Feature0Provider({
 
   // Investigator preview: enter their own study's audit session (no code needed).
   const previewStudy = useCallback(async (study) => {
+    setPreviewMode(true);
     setActiveStudy(study);
     setActiveStudyId(study.id);
     setConsentAgreed(false);
@@ -213,6 +224,7 @@ export function Feature0Provider({
     setActiveStudyId(null);
     setActiveStudy(null);
     setDemoMode(false);
+    setPreviewMode(false);
     setSession(null);
     setConsentAgreed(false);
   }, [demoMode]);
@@ -221,16 +233,17 @@ export function Feature0Provider({
   // touches the backend or study constraints.
   const startDemo = useCallback(() => {
     setPersistenceOverride('indexeddb');
+    setPreviewMode(false);
     setDemoMode(true);
   }, []);
 
   const value = useMemo(() => ({
     auth, studies, sessions, user,
     activeStudyId, setActiveStudyId, activeStudy, loadStudy,
-    demoMode, startDemo,
+    demoMode, previewMode, startDemo,
     session, consentAgreed, recordConsent, attachConversation, completeConversation,
     signIn, signUp, signOut, joinWithCode, previewStudy, exitStudy,
-  }), [auth, studies, sessions, user, activeStudyId, activeStudy, loadStudy, demoMode,
+  }), [auth, studies, sessions, user, activeStudyId, activeStudy, loadStudy, demoMode, previewMode,
        startDemo, session, consentAgreed, recordConsent, attachConversation, completeConversation,
        signIn, signUp, signOut, joinWithCode, previewStudy, exitStudy]);
 

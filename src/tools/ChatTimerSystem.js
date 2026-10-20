@@ -10,9 +10,10 @@ class ChatTimerSystem {
             warningThreshold: config.timerWarningChatTimeIsUpSeconds ?? PHASE_DURATIONS.timerWarningChatTimeIsUpSeconds,
             minNewChatThreshold: config.timerMinChatTimeRemainingToStartNewChatSeconds ?? PHASE_DURATIONS.timerMinChatTimeRemainingToStartNewChatSeconds
         };
+        this.storageKey = config.timerStorageKey || 'chatTimerState';
 
         // Load persisted state from browser cache
-        const savedState = JSON.parse(localStorage.getItem('chatTimerState'));
+        const savedState = JSON.parse(localStorage.getItem(this.storageKey));
 
         // Restore state
         this.state = savedState
@@ -132,7 +133,7 @@ class ChatTimerSystem {
 
     canStartNewChat() {
         let minAmountOfChats = this.config.chatDurations.length;
-        if (this.state.currentChatIndex < minAmountOfChats) {
+        if (this.state.currentChatIndex < minAmountOfChats - 1) {
             return true;
         }
         return this.state.overallTimeRemaining >= this.config.minNewChatThreshold * 1000;
@@ -257,11 +258,11 @@ class ChatTimerSystem {
             hasStarted: this.state.hasStarted,
             isWarningShown: this.state.isWarningShown
         };
-        localStorage.setItem('chatTimerState', JSON.stringify(stateToSave));
+        localStorage.setItem(this.storageKey, JSON.stringify(stateToSave));
     }
 
     loadPersistedState() {
-        const saved = localStorage.getItem('chatTimerState');
+        const saved = localStorage.getItem(this.storageKey);
         if (saved) {
             const parsed = JSON.parse(saved);
             this.state = { ...this.state, ...parsed };

@@ -11,6 +11,7 @@ import StudyConfigForm from '../StudyConfigForm';
 import Feature0Gate from '../Feature0Gate';
 import ConsentGate from '../ConsentGate';
 import StudyData from '../StudyData';
+import { resolveStudyRuntimeConfig } from '../Feature0Shell';
 
 test('Feature 0 context module exports provider, hook, and a valid default questionnaire', () => {
   expect(Feature0Context).toBeTruthy();
@@ -29,4 +30,17 @@ test('Feature 0 UI components import and are React components', () => {
   for (const C of [InvestigatorAuth, AuditorJoin, StudyDashboard, StudySetup, StudyConfigForm, Feature0Gate, ConsentGate, StudyData]) {
     expect(typeof C).toBe('function');
   }
+});
+
+test('invalid study configs are lenient only for investigator preview', () => {
+  const invalid = { models: [{ provider: 'ollama', modelId: '', baseUrl: '' }] };
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  const auditor = resolveStudyRuntimeConfig({ base: { studyId: 's1' }, studyConfig: invalid, previewMode: false });
+  expect(auditor.__configError).toBe(true);
+  const preview = resolveStudyRuntimeConfig({ base: { studyId: 's1' }, studyConfig: invalid, previewMode: true });
+  expect(preview.__configError).toBeUndefined();
+  expect(preview.evaluation).toBeTruthy();
+  error.mockRestore();
+  warn.mockRestore();
 });

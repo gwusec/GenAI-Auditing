@@ -19,6 +19,24 @@ import StudyDashboard from './StudyDashboard';
 import { getConversationStore } from '../tools/stores';
 import { deriveRuntimeConfig } from '../tools/studyConfig';
 
+export function resolveStudyRuntimeConfig({ base, studyConfig, previewMode }) {
+  try {
+    return { ...base, ...deriveRuntimeConfig(studyConfig) };
+  } catch (err) {
+    if (!previewMode) {
+      console.error('Feature0Shell: refusing to start an auditor with an invalid study config.', err);
+      return { ...base, __configError: true };
+    }
+    console.warn('Feature0Shell: preview config failed strict validation; deriving leniently for investigator preview.', err);
+    try {
+      return { ...base, ...deriveRuntimeConfig(studyConfig, { strict: false }) };
+    } catch (err2) {
+      console.error('Feature0Shell: lenient preview config derivation failed.', err2);
+      return { ...base, __configError: true };
+    }
+  }
+}
+
 // Small floating control to leave an audit session (demo / preview / auditor).
 function ExitBar({ label, onExit }) {
   return (
@@ -35,7 +53,7 @@ function ExitBar({ label, onExit }) {
 
 function ShellInner({ appProps = {} }) {
   const {
-    user, activeStudyId, activeStudy, demoMode, exitStudy,
+    user, activeStudyId, activeStudy, demoMode, previewMode, exitStudy,
     consentAgreed, recordConsent, attachConversation, completeConversation,
   } = useFeature0();
 
@@ -47,25 +65,12 @@ function ShellInner({ appProps = {} }) {
   const studyRuntimeConfig = useMemo(() => {
     if (!activeStudyId) return null;
     const base = { ...(appProps.config || {}), studyId: activeStudyId };
-    try {
-      return { ...base, ...deriveRuntimeConfig(activeStudy?.config) };
-    } catch (err) {
-      // The study config didn't pass strict validation — e.g. an investigator
-      // previewing an incomplete draft, or schema drift. Previously we silently
-      // fell back to `base`, which drops `evaluation` (and the questionnaire
-      // schema) and routes the auditor onto the legacy AuditForm with an empty
-      // questionnaire — the "audit view never renders" bug (B4). Instead, derive
-      // leniently so `evaluation` survives and the config-driven AuditFlow runs;
-      // surface the reason so a genuinely broken config is still diagnosable.
-      console.warn('Feature0Shell: study config failed strict validation; deriving runtime config leniently for the session.', err);
-      try {
-        return { ...base, ...deriveRuntimeConfig(activeStudy?.config, { strict: false }) };
-      } catch (err2) {
-        console.error('Feature0Shell: lenient deriveRuntimeConfig also failed; falling back to base config.', err2);
-        return base;
-      }
-    }
-  }, [activeStudyId, activeStudy, appProps.config]);
+    return resolveStudyRuntimeConfig({
+      base,
+      studyConfig: activeStudy?.config,
+      previewMode,
+    });
+  }, [activeStudyId, activeStudy, appProps.config, previewMode]);
 
   // Tag the persistence store with the active study so conversations are scoped
   // to it (required by Supabase; ignored by local/demo storage).
@@ -87,6 +92,19 @@ function ShellInner({ appProps = {} }) {
 
   // 1) In a study (auditor who joined, or investigator previewing).
   if (activeStudyId && user) {
+    if (studyRuntimeConfig?.__configError) {
+      return (
+        <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+          <section className="w-full max-w-lg rounded-xl border bg-card p-6 text-center shadow-sm">
+            <h1 className="text-xl font-semibold">Study temporarily unavailable</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This study configuration is invalid. Please contact the investigator before continuing.
+            </p>
+            <Button className="mt-5" onClick={exitStudy}>Exit study</Button>
+          </section>
+        </main>
+      );
+    }
     // Consent gate: when the study configures consent text, the auditor must agree
     // before reaching the chat. Recorded on the session as {version, agreed, timestamp}.
     const consent = studyRuntimeConfig?.consent;

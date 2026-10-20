@@ -28,7 +28,7 @@ ENV REACT_APP_SUPABASE_URL=$REACT_APP_SUPABASE_URL \
     REACT_APP_PERSISTENCE=$REACT_APP_PERSISTENCE
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 
@@ -37,10 +37,10 @@ FROM node:20-alpine AS production
 WORKDIR /app
 
 COPY --from=build /app/build ./build
-COPY server/package.json ./package.json
+COPY server/package.json server/package-lock.json ./
 COPY server/server.js ./server.js
 COPY server/relayHelpers.js ./relayHelpers.js
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
 EXPOSE 3000
 ENV NODE_ENV=production

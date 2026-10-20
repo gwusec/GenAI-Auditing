@@ -52,18 +52,20 @@ Now:
 
 ## Part B — Apply the TRAILS schema
 
-From this repo, apply both migrations to the Supabase Postgres. Easiest is the
+From this repo, apply all migrations to the Supabase Postgres in numeric order. Easiest is the
 Studio SQL editor:
 
 1. Open Studio → **SQL Editor → New query**.
-2. Paste `supabase/migrations/0001_init.sql` → Run.
-3. Paste `supabase/migrations/0002_auth_glue.sql` → Run.
+2. Run each file in `supabase/migrations/` in numeric order (`0001` through the latest).
 
 Or via psql from the repo root:
 ```bash
 psql "postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres" \
   -f supabase/migrations/0001_init.sql \
-  -f supabase/migrations/0002_auth_glue.sql
+  -f supabase/migrations/0002_auth_glue.sql \
+  -f supabase/migrations/0003_lifecycle_sessions_provenance.sql \
+  -f supabase/migrations/0004_append_chat_event.sql \
+  -f supabase/migrations/0005_idempotent_session_progress.sql
 ```
 
 Verify in Studio → **Table editor** that `profiles`, `studies`,
@@ -81,8 +83,8 @@ cp .env.selfhost.example .env
 docker compose -f docker-compose.trails.yml up -d --build
 ```
 
-App is now on **http://localhost:3000** with Feature 0 enabled and all three
-seams (auth / studies / persistence) pointed at your Supabase.
+App is now on **http://localhost:3000** with Feature 0 enabled and all four
+seams (auth / studies / sessions / persistence) pointed at your Supabase.
 
 > Note: `REACT_APP_*` are baked at build time, so if you change the Supabase URL
 > or key later, rebuild: `docker compose -f docker-compose.trails.yml up -d --build`.
